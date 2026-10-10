@@ -14,7 +14,7 @@ against its checklist.
 
 **Before changing project behaviour, read `.design/claude-projects-research.md`
 (what Claude's Projects are, in all three products) and `.design/projects.md`
-(what the current classic-Projects implementation does).** It records
+(what the current classic-Projects implementation does).** Together they record
 what claude.ai Projects does, what we replicate, and what is deliberately out of
 scope (e.g. sharing). Keep claude.ai parity where it is listed as in scope —
 e.g. name/description are never sent to the model; archived projects cannot be
