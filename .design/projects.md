@@ -1,5 +1,12 @@
 # Projects — what we replicate from claude.ai
 
+> **Scope note (2026-10-10):** this document covers only the *classic* chat
+> Projects (folder model). Claude's Projects are being redesigned into a
+> coordinator conversation plus parallel agent threads, and the classic
+> version will be upgraded into it. See
+> [`claude-projects-research.md`](claude-projects-research.md) for the full
+> research and the gap analysis (§9) before extending this design.
+
 tingly-project is a local, single-user replica of **claude.ai Projects**, built on
 the same stack and conventions as tingly-box, with tingly-box as the default
 model gateway.
