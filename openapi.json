@@ -1,0 +1,1975 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Tingly Project API",
+    "description": "Projects, knowledge, memory and chats for tingly-project.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/conversations": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List conversations, most recent first",
+        "description": "List conversations, most recent first",
+        "operationId": "apiV1ConversationsGet",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "description": "Project ID, or \"none\" for chats outside any project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search titles and message text",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "starred",
+            "in": "query",
+            "description": "Only starred conversations",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of conversations",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Start a conversation, optionally inside a project",
+        "description": "Start a conversation, optionally inside a project",
+        "operationId": "apiV1ConversationsPost",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get a conversation with its messages",
+        "description": "Get a conversation with its messages",
+        "operationId": "apiV1ConversationsIdGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Delete a conversation",
+        "description": "Delete a conversation",
+        "operationId": "apiV1ConversationsIdDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Rename, star, change model, or move a conversation between projects",
+        "description": "Rename, star, change model, or move a conversation between projects",
+        "operationId": "apiV1ConversationsIdPatch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/messages": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Send a user message and stream the reply as text/event-stream; each data line is a StreamEvent",
+        "description": "Send a user message and stream the reply as text/event-stream; each data line is a StreamEvent",
+        "operationId": "apiV1ConversationsIdMessagesPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/regenerate": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Replace the last reply and stream a new one as text/event-stream",
+        "description": "Replace the last reply and stream a new one as text/event-stream",
+        "operationId": "apiV1ConversationsIdRegeneratePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health check",
+        "description": "Health check",
+        "operationId": "apiV1HealthGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/{id}": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Get a knowledge file with its content",
+        "description": "Get a knowledge file with its content",
+        "operationId": "apiV1KnowledgeIdGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeFile"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Delete a knowledge file",
+        "description": "Delete a knowledge file",
+        "operationId": "apiV1KnowledgeIdDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Rename or rewrite a knowledge file",
+        "description": "Rename or rewrite a knowledge file",
+        "operationId": "apiV1KnowledgeIdPatch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKnowledgeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeFileSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List models offered by the saved connection",
+        "description": "List models offered by the saved connection",
+        "operationId": "apiV1ModelsGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List projects",
+        "description": "List projects",
+        "operationId": "apiV1ProjectsGet",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search name and description",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "description": "List archived projects instead of active ones",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Create a project",
+        "description": "Create a project",
+        "operationId": "apiV1ProjectsPost",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get a project with its knowledge",
+        "description": "Get a project with its knowledge",
+        "operationId": "apiV1ProjectsIdGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Delete a project with its knowledge and conversations. Archived projects must be unarchived first.",
+        "description": "Delete a project with its knowledge and conversations. Archived projects must be unarchived first.",
+        "operationId": "apiV1ProjectsIdDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Update a project",
+        "description": "Update a project",
+        "operationId": "apiV1ProjectsIdPatch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/context": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get the system prompt sent with conversations in the project",
+        "description": "Get the system prompt sent with conversations in the project",
+        "operationId": "apiV1ProjectsIdContextGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Sample user message to rank knowledge against in retrieval mode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/knowledge": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Upload text files (multipart field \"files\") as project knowledge",
+        "description": "Upload text files (multipart field \"files\") as project knowledge",
+        "operationId": "apiV1ProjectsIdKnowledgePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/knowledge/text": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Add pasted text as project knowledge",
+        "description": "Add pasted text as project knowledge",
+        "operationId": "apiV1ProjectsIdKnowledgeTextPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeFileSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/memory/refresh": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Fold the project's recent chats into its memory now",
+        "description": "Fold the project's recent chats into its memory now",
+        "operationId": "apiV1ProjectsIdMemoryRefreshPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get the model connection settings",
+        "description": "Get the model connection settings",
+        "operationId": "apiV1SettingsGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Save the model connection settings",
+        "description": "Save the model connection settings",
+        "operationId": "apiV1SettingsPut",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/models": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List models offered by a draft connection",
+        "description": "List models offered by a draft connection",
+        "operationId": "apiV1SettingsModelsPost",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/test": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Send a real chat request through a draft connection",
+        "description": "Send a real chat request through a draft connection",
+        "operationId": "apiV1SettingsTestPost",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddTextRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          }
+        },
+        "required": [
+          "name",
+          "content"
+        ]
+      },
+      "Capacity": {
+        "type": "object",
+        "properties": {
+          "inline_budget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field inline_budget"
+          },
+          "knowledge_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field knowledge_tokens"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field max_tokens"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Field mode",
+            "enum": [
+              "inline",
+              "retrieval"
+            ]
+          }
+        },
+        "required": [
+          "knowledge_tokens",
+          "inline_budget",
+          "max_tokens",
+          "mode"
+        ]
+      },
+      "ConnectionDraft": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "description": "Field api_key"
+          },
+          "api_style": {
+            "type": "string",
+            "description": "Field api_style",
+            "enum": [
+              "anthropic",
+              "openai"
+            ]
+          },
+          "base_url": {
+            "type": "string",
+            "description": "Field base_url"
+          },
+          "default_model": {
+            "type": "string",
+            "description": "Field default_model"
+          }
+        },
+        "required": [
+          "api_style",
+          "base_url",
+          "default_model"
+        ]
+      },
+      "ContextResponse": {
+        "type": "object",
+        "properties": {
+          "excerpts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field excerpts"
+          },
+          "knowledge_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field knowledge_tokens"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Field mode"
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "Field system_prompt"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field tokens"
+          }
+        },
+        "required": [
+          "system_prompt",
+          "tokens",
+          "mode",
+          "knowledge_tokens",
+          "excerpts"
+        ]
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "memory_disabled": {
+            "type": "boolean",
+            "description": "Field memory_disabled"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Field starred"
+          },
+          "title": {
+            "type": "string",
+            "description": "Field title"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "title",
+          "model",
+          "starred",
+          "memory_disabled",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "ConversationDetailResponse": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/Conversation"
+          },
+          "messages": {
+            "type": "array",
+            "description": "Field messages",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectRef"
+          }
+        },
+        "required": [
+          "conversation",
+          "messages"
+        ]
+      },
+      "ConversationListResponse": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "description": "Field conversations",
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            }
+          }
+        },
+        "required": [
+          "conversations"
+        ]
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "memory_disabled": {
+            "type": "boolean",
+            "description": "Field memory_disabled"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "project_name": {
+            "type": "string",
+            "description": "Field project_name"
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Field starred"
+          },
+          "title": {
+            "type": "string",
+            "description": "Field title"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "title",
+          "model",
+          "starred",
+          "memory_disabled",
+          "created_at",
+          "updated_at",
+          "project_name"
+        ]
+      },
+      "CreateConversationRequest": {
+        "type": "object",
+        "properties": {
+          "memory_disabled": {
+            "type": "boolean",
+            "description": "Field memory_disabled"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          }
+        }
+      },
+      "CreateProjectRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Field description"
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Field instructions"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Field status",
+            "example": "ok"
+          },
+          "version": {
+            "type": "string",
+            "description": "Field version"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ]
+      },
+      "KnowledgeFile": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "Field mime_type"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field size"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field tokens"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "mime_type",
+          "content",
+          "size",
+          "tokens",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "KnowledgeFileSummary": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "Field mime_type"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field size"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field tokens"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "mime_type",
+          "size",
+          "tokens",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "conversation_id": {
+            "type": "string",
+            "description": "Field conversation_id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field input_tokens"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field output_tokens"
+          },
+          "role": {
+            "type": "string",
+            "description": "Field role"
+          },
+          "stop_reason": {
+            "type": "string",
+            "description": "Field stop_reason"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "role",
+          "content",
+          "created_at"
+        ]
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "Field display_name"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ]
+      },
+      "ModelsResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          },
+          "models": {
+            "type": "array",
+            "description": "Field models",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            }
+          }
+        },
+        "required": [
+          "models"
+        ]
+      },
+      "OKResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Field ok"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field archived_at"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Field instructions"
+          },
+          "memory": {
+            "type": "string",
+            "description": "Field memory"
+          },
+          "memory_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field memory_updated_at"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Field starred"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "instructions",
+          "memory",
+          "starred",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "ProjectDetailResponse": {
+        "type": "object",
+        "properties": {
+          "capacity": {
+            "$ref": "#/components/schemas/Capacity"
+          },
+          "knowledge": {
+            "type": "array",
+            "description": "Field knowledge",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeFileSummary"
+            }
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          }
+        },
+        "required": [
+          "project",
+          "knowledge",
+          "capacity"
+        ]
+      },
+      "ProjectListResponse": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "description": "Field projects",
+            "items": {
+              "$ref": "#/components/schemas/ProjectSummary"
+            }
+          }
+        },
+        "required": [
+          "projects"
+        ]
+      },
+      "ProjectRef": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Field archived"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "archived"
+        ]
+      },
+      "ProjectSummary": {
+        "type": "object",
+        "properties": {
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field archived_at"
+          },
+          "conversation_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field conversation_count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Field instructions"
+          },
+          "knowledge_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field knowledge_count"
+          },
+          "knowledge_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field knowledge_tokens"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field last_activity_at"
+          },
+          "memory": {
+            "type": "string",
+            "description": "Field memory"
+          },
+          "memory_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field memory_updated_at"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Field starred"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "instructions",
+          "memory",
+          "starred",
+          "created_at",
+          "updated_at",
+          "conversation_count",
+          "knowledge_count",
+          "knowledge_tokens",
+          "last_activity_at"
+        ]
+      },
+      "RegenerateRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          }
+        }
+      },
+      "RejectedFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Field reason"
+          }
+        },
+        "required": [
+          "name",
+          "reason"
+        ]
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "SettingsResponse": {
+        "type": "object",
+        "properties": {
+          "api_key_hint": {
+            "type": "string",
+            "description": "Field api_key_hint",
+            "example": "…a1b2"
+          },
+          "api_key_set": {
+            "type": "boolean",
+            "description": "Field api_key_set"
+          },
+          "api_style": {
+            "type": "string",
+            "description": "Field api_style",
+            "example": "anthropic"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "Field base_url",
+            "example": "http://localhost:12580/tingly/anthropic"
+          },
+          "context_limit_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field context_limit_tokens"
+          },
+          "default_base_url": {
+            "type": "string",
+            "description": "Field default_base_url"
+          },
+          "default_model": {
+            "type": "string",
+            "description": "Field default_model"
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "Field endpoint",
+            "example": "http://localhost:12580/tingly/anthropic/v1/messages"
+          }
+        },
+        "required": [
+          "api_style",
+          "base_url",
+          "endpoint",
+          "api_key_set",
+          "api_key_hint",
+          "default_model",
+          "default_base_url",
+          "context_limit_tokens"
+        ]
+      },
+      "StreamEvent": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/TurnContext"
+          },
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          },
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "text": {
+            "type": "string",
+            "description": "Field text"
+          },
+          "title": {
+            "type": "string",
+            "description": "Field title"
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type",
+            "enum": [
+              "user_message",
+              "delta",
+              "assistant_message",
+              "title",
+              "error",
+              "done"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "TestRequest": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "description": "Field api_key"
+          },
+          "api_style": {
+            "type": "string",
+            "description": "Field api_style",
+            "enum": [
+              "anthropic",
+              "openai"
+            ]
+          },
+          "base_url": {
+            "type": "string",
+            "description": "Field base_url"
+          },
+          "default_model": {
+            "type": "string",
+            "description": "Field default_model"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          }
+        },
+        "required": [
+          "api_style",
+          "base_url",
+          "default_model",
+          "model"
+        ]
+      },
+      "TestResponse": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "Field endpoint"
+          },
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field latency_ms"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "Field ok"
+          },
+          "reply": {
+            "type": "string",
+            "description": "Field reply"
+          }
+        },
+        "required": [
+          "ok",
+          "endpoint",
+          "model",
+          "latency_ms"
+        ]
+      },
+      "TurnContext": {
+        "type": "object",
+        "properties": {
+          "excerpts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field excerpts"
+          },
+          "knowledge_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field knowledge_tokens"
+          },
+          "memory_used": {
+            "type": "boolean",
+            "description": "Field memory_used"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Field mode"
+          }
+        },
+        "required": [
+          "mode",
+          "knowledge_tokens",
+          "excerpts",
+          "memory_used"
+        ]
+      },
+      "UpdateConversationRequest": {
+        "type": "object",
+        "properties": {
+          "memory_disabled": {
+            "type": "boolean",
+            "description": "Field memory_disabled"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Field starred"
+          },
+          "title": {
+            "type": "string",
+            "description": "Field title"
+          }
+        }
+      },
+      "UpdateKnowledgeRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          }
+        }
+      },
+      "UpdateProjectRequest": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Field archived"
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description"
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Field instructions"
+          },
+          "memory": {
+            "type": "string",
+            "description": "Field memory"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Field starred"
+          }
+        }
+      },
+      "UploadResponse": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "description": "Field files",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeFileSummary"
+            }
+          },
+          "rejected": {
+            "type": "array",
+            "description": "Field rejected",
+            "items": {
+              "$ref": "#/components/schemas/RejectedFile"
+            }
+          }
+        },
+        "required": [
+          "files",
+          "rejected"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "description": "API key authorization header",
+        "name": "Authorization",
+        "in": "header",
+        "flows": {}
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "conversations",
+      "description": "Operations related to conversations"
+    },
+    {
+      "name": "knowledge",
+      "description": "Operations related to knowledge"
+    },
+    {
+      "name": "projects",
+      "description": "Operations related to projects"
+    },
+    {
+      "name": "settings",
+      "description": "Operations related to settings"
+    },
+    {
+      "name": "system",
+      "description": "Operations related to system"
+    }
+  ]
+}
