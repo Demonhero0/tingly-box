@@ -1780,8 +1780,7 @@
         "required": [
           "api_style",
           "base_url",
-          "default_model",
-          "model"
+          "default_model"
         ]
       },
       "TestResponse": {

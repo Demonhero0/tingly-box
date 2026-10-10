@@ -260,3 +260,59 @@ func TestSendWithoutConnectionKeepsNothing(t *testing.T) {
 	n, _ := store.CountMessages(conv.ID)
 	assert.Zero(t, n, "the user's message is not saved when the turn cannot start")
 }
+
+func TestMemoryRefresh(t *testing.T) {
+	fake := &fakeAnthropic{}
+	upstream := httptest.NewServer(http.HandlerFunc(fake.handler))
+	defer upstream.Close()
+	store, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer store.Close()
+	srv := httptest.NewServer(New(store))
+	defer srv.Close()
+	c := client{t: t, base: srv.URL + "/api/v1"}
+	c.do("PUT", "/settings", map[string]any{"api_style": "anthropic", "base_url": upstream.URL, "default_model": "fake-model"}, nil)
+
+	var p db.Project
+	c.do("POST", "/projects", map[string]any{"name": "P"}, &p)
+
+	// Nothing to summarize yet: no model call, memory unchanged.
+	var got db.Project
+	require.Equal(t, 200, c.do("POST", "/projects/"+p.ID+"/memory/refresh", nil, &got))
+	assert.Empty(t, got.Memory)
+	assert.Empty(t, fake.chatRequests())
+
+	var on, off db.Conversation
+	c.do("POST", "/conversations", map[string]any{"project_id": p.ID}, &on)
+	c.do("POST", "/conversations", map[string]any{"project_id": p.ID, "memory_disabled": true}, &off)
+	c.stream("/conversations/"+on.ID+"/messages", map[string]any{"content": "remember ALPHA"})
+	c.stream("/conversations/"+off.ID+"/messages", map[string]any{"content": "secret OMEGA"})
+
+	before := len(fake.chatRequests())
+	var raw map[string]any
+	status := c.do("POST", "/projects/"+p.ID+"/memory/refresh", nil, &raw)
+	require.Equal(t, 200, status, raw)
+	b, _ := json.Marshal(raw)
+	require.NoError(t, json.Unmarshal(b, &got))
+	assert.Equal(t, "Hello from fake", got.Memory)
+	require.NotNil(t, got.MemoryUpdatedAt)
+	reqs := fake.chatRequests()
+	require.Len(t, reqs, before+1)
+	prompt := fmt.Sprint(reqs[len(reqs)-1]["messages"])
+	assert.Contains(t, prompt, "ALPHA")
+	assert.NotContains(t, prompt, "OMEGA", "memory-off chats are never read")
+
+	// The memory now reaches new chats in the project.
+	var next db.Conversation
+	c.do("POST", "/conversations", map[string]any{"project_id": p.ID}, &next)
+	c.stream("/conversations/"+next.ID+"/messages", map[string]any{"content": "hi"})
+	reqs = fake.chatRequests()
+	var sys string
+	for _, r := range reqs {
+		if strings.Contains(fmt.Sprint(r["messages"]), "hi") && !strings.Contains(fmt.Sprint(r["messages"]), "Write a short title") {
+			b, _ := json.Marshal(r["system"])
+			sys = string(b)
+		}
+	}
+	assert.Contains(t, sys, "project_memory")
+}

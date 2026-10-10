@@ -14,15 +14,16 @@ type anthropicClient struct {
 
 func newAnthropic(conn Connection) *anthropicClient {
 	opts := []option.RequestOption{
+		// Only the connection configured in settings is used: no
+		// ANTHROPIC_* env vars or profiles, and a keyless endpoint (a local
+		// gateway without auth) is allowed instead of failing for lack of
+		// credentials.
+		option.WithoutEnvironmentDefaults(),
 		option.WithBaseURL(strings.TrimRight(conn.BaseURL, "/") + "/"),
 		option.WithMaxRetries(1),
 	}
 	if conn.APIKey != "" {
 		opts = append(opts, option.WithAPIKey(conn.APIKey))
-	} else {
-		// The SDK otherwise falls back to ANTHROPIC_API_KEY from the
-		// environment; an unset key must stay unset.
-		opts = append(opts, option.WithAPIKey(""))
 	}
 	return &anthropicClient{client: anthropic.NewClient(opts...)}
 }
