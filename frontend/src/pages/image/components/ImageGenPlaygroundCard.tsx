@@ -524,20 +524,31 @@ const ImageGenPlaygroundCard: React.FC<ImageGenPlaygroundCardProps> = ({
         () => withText(latest.current.prompts, latest.current.activePromptId, promptStore.get()),
         [promptStore],
     );
+    // Tab actions load another prompt's text into the field. That is not an
+    // edit: it must not schedule a save under the id that is still active (the
+    // state update has not rendered yet), which would write the new tab's text
+    // over the old tab's.
+    const saveTimer = useRef<number | undefined>(undefined);
+    const loadingPrompt = useRef(false);
+    const loadPrompt = useCallback((text: string) => {
+        window.clearTimeout(saveTimer.current);
+        loadingPrompt.current = true;
+        try { promptStore.set(text); } finally { loadingPrompt.current = false; }
+    }, [promptStore]);
     useEffect(() => {
         if (!profileId) return;
-        let timer: number | undefined;
         const unsubscribe = promptStore.subscribe(() => {
+            if (loadingPrompt.current) return;
             // The id the text was typed under, not whichever is active when the timer fires.
             const id = latest.current.activePromptId;
-            window.clearTimeout(timer);
-            timer = window.setTimeout(() => {
+            window.clearTimeout(saveTimer.current);
+            saveTimer.current = window.setTimeout(() => {
                 setProfilePrompts((current) => withText(current, id, promptStore.get()));
             }, PROMPT_SAVE_DELAY_MS);
         });
         return () => {
             unsubscribe();
-            window.clearTimeout(timer);
+            window.clearTimeout(saveTimer.current);
         };
     }, [profileId, promptStore]);
     // Leaving inside the delay — a route change or a reload — must not lose the last words.
@@ -575,7 +586,7 @@ const ImageGenPlaygroundCard: React.FC<ImageGenPlaygroundCardProps> = ({
             const synced = syncedPrompts();
             setProfilePrompts(synced);
             setActivePromptId(id);
-            setPrompt(synced.find((item) => item.id === id)?.text ?? '');
+            loadPrompt(synced.find((item) => item.id === id)?.text ?? '');
         },
         add: () => {
             const id = newPromptId();
@@ -583,7 +594,7 @@ const ImageGenPlaygroundCard: React.FC<ImageGenPlaygroundCardProps> = ({
             const synced = syncedPrompts();
             setProfilePrompts([...synced, { id, name: '', text: '' }]);
             setActivePromptId(id);
-            setPrompt('');
+            loadPrompt('');
         },
         remove: (id: string) => {
             const { prompts, activePromptId: current } = latest.current;
@@ -595,11 +606,11 @@ const ImageGenPlaygroundCard: React.FC<ImageGenPlaygroundCardProps> = ({
                 // The neighbour takes its place, as closing a tab would.
                 const next = remaining[Math.min(index, remaining.length - 1)];
                 setActivePromptId(next.id);
-                setPrompt(next.text);
+                loadPrompt(next.text);
             }
         },
         rename: (id: string, name: string) => setProfilePrompts((current) => current.map((item) => (item.id === id ? { ...item, name } : item))),
-    }), [setPrompt, syncedPrompts]);
+    }), [loadPrompt, syncedPrompts]);
 
     const location = useLocation();
     const [renaming, setRenaming] = useState(Boolean((location.state as { rename?: boolean } | null)?.rename));
