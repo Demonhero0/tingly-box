@@ -365,3 +365,56 @@ func TestConcurrentMutationsPersistConsistently(t *testing.T) {
 	defer c2.CloseStores()
 	assertSameUserRules(t, want, userRulesJSON(t, c2.Rules), "after concurrent mutations + restart")
 }
+
+// The first Save that drops a non-empty rules array keeps a one-time copy of
+// the old file (rollback / DB-loss safety net) and never overwrites it.
+func TestFirstNullingSaveKeepsOneTimeBackup(t *testing.T) {
+	dir := t.TempDir()
+	seedProviders(t, dir)
+	writeLegacyConfig(t, dir, richLegacyRules())
+	cfg := startCfg(t, dir)
+	defer cfg.CloseStores()
+
+	bak := filepath.Join(dir, "config.json"+rulesFileBackupSuffix)
+	raw, err := os.ReadFile(bak)
+	if err != nil {
+		t.Fatalf("expected backup of the pre-upgrade config.json: %v", err)
+	}
+	var old struct {
+		Rules []typ.Rule `json:"rules"`
+	}
+	if err := json.Unmarshal(raw, &old); err != nil || len(old.Rules) != len(richLegacyRules()) {
+		t.Fatalf("backup does not carry the original rules: %v (%d rules)", err, len(old.Rules))
+	}
+
+	// Later Saves must not touch the backup.
+	r := richLegacyRules()[0]
+	r.UUID, r.RequestModel = "u-later", "later-model"
+	if err := cfg.AddRule(r); err != nil {
+		t.Fatal(err)
+	}
+	raw2, _ := os.ReadFile(bak)
+	if string(raw2) != string(raw) {
+		t.Error("backup was overwritten by a later Save")
+	}
+}
+
+// After the stores are closed, an unrelated Save still works, but a rule
+// change must fail loudly: with no file mirror it would be stored nowhere.
+func TestRuleChangeAfterStoreCloseFailsLoudly(t *testing.T) {
+	dir := t.TempDir()
+	seedProviders(t, dir)
+	writeLegacyConfig(t, dir, richLegacyRules())
+	cfg := startCfg(t, dir)
+	if err := cfg.CloseStores(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.SetVerbose(true); err != nil {
+		t.Errorf("unrelated Save after close failed: %v", err)
+	}
+	r := richLegacyRules()[0]
+	r.UUID, r.RequestModel = "u-late", "late-model"
+	if err := cfg.AddRule(r); err == nil {
+		t.Error("AddRule after the store was closed reported success for a write that is stored nowhere")
+	}
+}

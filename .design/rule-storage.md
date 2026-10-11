@@ -167,6 +167,11 @@ InsertDefaultRule / RefreshStatsFromStore ...
   load()/热加载读到的非空 rules 数组一律丢弃并告警；下一次 Save() 把它
   写回 `null`。
 - **手改文件不再生效**（与 provider 迁移后一致）。规则入口是 UI/API/CLI。
+- **一次性备份**：首次把非空 `rules` 数组写成 `null` 时，Save() 先把旧
+  config.json 拷成 `config.json.pre-rules-removal.bak`（只写一次，不覆盖）。
+  用途：回退到库化之前的版本、或 `tingly.db` 丢失时手工找回规则。
+- **库已关闭**：`StoreManager.Close()` 之后，不涉及规则的 Save() 照常；
+  规则有变化的 Save() 返回错误——没有文件镜像，这种写入否则无处可存。
 - **旧文件仍可导入**：跳版本升级的用户，其 config.json 里的 rules 数组在
   库为空时仍会被一次性导入（`hydrateRulesFromStore`），读路径保留。
 - **`rulesHydrated` 门闩**：hydrate 之前的任何 Save()（如

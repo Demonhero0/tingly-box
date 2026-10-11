@@ -261,6 +261,8 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 	// Like migrateProvidersToDB, this is storage plumbing rather than a config
 	// migration, so it is not gated by enableMigration.
 	if err := cfg.hydrateRulesFromStore(); err != nil {
+		// Don't leak the SQLite handles of a Config the caller never receives.
+		_ = cfg.CloseStores()
 		return nil, fmt.Errorf("failed to hydrate rules from store: %w", err)
 	}
 
@@ -452,15 +454,14 @@ func (c *Config) load() error {
 	// Restore the config file path after unmarshaling
 	c.ConfigFile = configFile
 
-	// After the one-time hydration, the database is authoritative for rules.
-	// The "rules" array in config.json is Save()'s own downgrade-compat
-	// mirror — a reload of our own write matches the live rules and is
-	// dropped silently. A DIFFERING array means someone hand-edited the file
-	// expecting the pre-database behavior; tell them where rules live now
-	// instead of eating the edit without a trace.
+	// After the one-time hydration, the database is authoritative for rules
+	// and Save() writes the file's "rules" key as null. A non-empty array
+	// here is therefore foreign: a hand edit, a backup/sync restore, or a
+	// leftover mirror from the dual-write era or an older binary. Ignore it,
+	// but say where rules live now instead of eating it without a trace.
 	if c.rulesHydrated {
 		if len(c.LegacyRules) > 0 && !rulesEquivalent(c.LegacyRules, c.Rules) {
-			logrus.Warn("Ignoring rule edits in config.json: rules are stored in the database now; manage them via the UI/API/CLI")
+			logrus.Warn("Ignoring the rules array in config.json: it differs from the database, which is the only source of rules now (it may be a hand edit or a stale copy from an older version); manage rules via the UI/API/CLI")
 		}
 		c.LegacyRules = nil
 	}
@@ -484,7 +485,9 @@ func (c *Config) Save() error {
 	if err := json.Unmarshal(data, &next); err != nil {
 		return err
 	}
+	var existingRaw []byte
 	if raw, err := os.ReadFile(c.ConfigFile); err == nil && len(raw) > 0 {
+		existingRaw = raw
 		var existing map[string]interface{}
 		if err := json.Unmarshal(raw, &existing); err == nil {
 			for k, v := range existing {
@@ -494,9 +497,11 @@ func (c *Config) Save() error {
 			}
 		}
 	}
-	// default_request_id (index of a "default rule") was removed with no
-	// readers left; drop the stale key the merge above would carry forward.
-	delete(next, "default_request_id")
+	// The merge above carries unknown keys forward forever; drop the ones we
+	// retired on purpose.
+	for _, k := range retiredConfigKeys {
+		delete(next, k)
+	}
 
 	// Rules persist authoritatively in the database. Syncing here — inside
 	// the choke point every rule mutation already goes through — guarantees no
@@ -515,7 +520,42 @@ func (c *Config) Save() error {
 		return err
 	}
 
+	c.backupFileRulesOnce(existingRaw, next)
 	return os.WriteFile(c.ConfigFile, out, 0644)
+}
+
+// retiredConfigKeys are config.json keys no code reads or writes anymore;
+// Save() removes them instead of carrying them forward with other unknown keys.
+var retiredConfigKeys = []string{"default_request_id"}
+
+// rulesFileBackupSuffix names the one-time safety copy of config.json taken
+// right before Save() replaces a non-empty "rules" array with null.
+const rulesFileBackupSuffix = ".pre-rules-removal.bak"
+
+// backupFileRulesOnce keeps a copy of the old config.json the first time Save()
+// is about to drop a non-empty "rules" array from it (the dual-write mirror of
+// the previous release). The database is the only source of rules from then
+// on; the copy lets a user roll back to an older binary or recover rules if
+// the database is ever lost. Best effort: a failed backup never blocks Save.
+func (c *Config) backupFileRulesOnce(existingRaw []byte, next map[string]interface{}) {
+	if len(existingRaw) == 0 || next["rules"] != nil {
+		return
+	}
+	var old struct {
+		Rules []json.RawMessage `json:"rules"`
+	}
+	if json.Unmarshal(existingRaw, &old) != nil || len(old.Rules) == 0 {
+		return
+	}
+	path := c.ConfigFile + rulesFileBackupSuffix
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+	if err := os.WriteFile(path, existingRaw, 0600); err != nil {
+		logrus.WithError(err).Warn("Failed to back up config.json before dropping its rules array")
+		return
+	}
+	logrus.Infof("Rules now live only in the database; kept a copy of the previous config.json at %s", path)
 }
 
 // RefreshStatsFromStore hydrates service stats from the SQLite store.

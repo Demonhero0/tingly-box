@@ -49,8 +49,8 @@ func (c *Config) hydrateRulesFromStore() error {
 
 	store := c.rulesStore()
 	if store == nil {
-		// No store (lightweight test configs): fall back to whatever the JSON
-		// had so behavior degrades to the old in-memory semantics.
+		// No store (lightweight test configs): rules are memory-only, seeded
+		// from whatever the JSON had.
 		c.Rules = legacy
 		return nil
 	}
@@ -71,6 +71,14 @@ func (c *Config) hydrateRulesFromStore() error {
 			logrus.Warnf("config.json rules differ from the database (%d in file, %d in database); the database wins and the file copy will be overwritten — rule changes made under an older version or by hand are not merged back", len(legacy), len(stored))
 		}
 		c.Rules = stored
+		// Loaded rows are in sync by definition; seeding the snapshot lets
+		// syncRulesToStore tell "unchanged" from "changed" even if the store
+		// is closed before the first Save.
+		if snapshot, err := json.Marshal(stored); err == nil {
+			c.ruleSyncMu.Lock()
+			c.lastSyncedRules = snapshot
+			c.ruleSyncMu.Unlock()
+		}
 		return nil
 	}
 
@@ -115,14 +123,21 @@ func (c *Config) syncRulesToStore() error {
 		return nil
 	}
 
-	store := c.rulesStore()
-	if store == nil {
-		return nil
-	}
-
 	snapshot, err := json.Marshal(c.Rules)
 	if err != nil {
 		return fmt.Errorf("failed to snapshot rules: %w", err)
+	}
+
+	store := c.rulesStore()
+	if store == nil {
+		// A lightweight Config (no store manager) is memory-only by design.
+		// A store that was closed under a real Config is different: the file
+		// no longer mirrors rules, so a rule change here would be stored
+		// nowhere. Fail the Save instead of reporting a lost write as success.
+		if c.storeManager != nil && !bytes.Equal(snapshot, c.lastSyncedRules) {
+			return fmt.Errorf("rule store is closed; rule changes cannot be persisted")
+		}
+		return nil
 	}
 	if bytes.Equal(snapshot, c.lastSyncedRules) {
 		return nil
