@@ -10,7 +10,7 @@ Rule（路由规则）从 config.json 的 JSON 数组迁入主库 `tingly.db` �
 3. Schema：哪些是列，哪些是胖字段
 4. 写路径收口：Save() 即同步
 5. 一次性迁移与权威性规则（双写已移除）
-6. 顺序语义（position 与 DefaultRequestID）
+6. 顺序语义（position）
 7. 不变量与边界情况
 8. 未来扩展
 
@@ -175,21 +175,18 @@ InsertDefaultRule / RefreshStatsFromStore ...
 - **hydrate 在 Migrate 之前、且不受 `WithDisableMigration` 控制**——
   它是存储管道，不是配置迁移，和 `migrateProvidersToDB` 同一待遇。
 
-## 6. 顺序语义（position 与 DefaultRequestID）
+## 6. 顺序语义（position）
 
-`DefaultRequestID` 是**下标**语义的默认 rule 指针，且仍留在 config.json。
-为了让它跨重启稳定，表里的 `position` 列忠实记录内存切片的顺序：
-SyncAll 时 `position = i`，List 时 `ORDER BY position`。
+表里的 `position` 列忠实记录内存切片的顺序：SyncAll 时 `position = i`，
+List 时 `ORDER BY position`。追加、删除、`SetRequestConfigs` 整体重排都
+自然正确——顺序永远是"上次 Save() 时内存里的顺序"，只服务展示排序。
 
-追加、删除、`SetRequestConfigs` 整体重排都自然正确——顺序永远是"上次
-Save() 时内存里的顺序"。
-
-**已知取舍：跨载体写入不原子。** `DefaultRequestID` 在文件、规则列表在
-库，一次 Save 是"先库后文件"两步写。若进程恰好在两步之间崩溃，重启后
-下标可能指向错位/越界的规则——读取侧的边界检查保证不 panic，最坏是默认
-规则暂时选错，UI 一次操作即可修复。config.json 时代两者同文件原子写、
-没有这个窗口；彻底修复是 §8 的「DefaultRequestID → 默认规则 UUID」（届时
-默认规则身份随规则本体一起入库），不塞进本次存储迁移。
+**历史：`DefaultRequestID` 已删除。** 它曾是 config.json 里按下标指向"默认
+rule"的指针，存在跨载体（文件 vs 库）写入不原子的窗口。核查发现它没有
+任何读取方（只有 AddRule 把它设为最后一条），于是连同 `GetDefaultRule`
+等无调用方的 getter 一并删除，而不是迁成 UUID。config.json 里残留的
+`default_request_id` 在下一次 Save() 时被清掉。至此 config.json 不再
+含任何 rule 相关状态。
 
 ## 7. 不变量与边界情况
 
@@ -216,7 +213,5 @@ Save() 时内存里的顺序"。
 - **增量写**：若 rule 规模增长到全量 diff-sync 不可接受，把 Save() 收口
   拆成显式的 store 粒度操作（AddRule → store.Save 单行）；RuleStore 的
   接口（Save/Delete/GetByUUID 语义）已按这个方向预留。
-- **DefaultRequestID → default rule UUID**：摆脱下标语义，之后
-  `position` 只服务展示排序。
 - **flags 谓词查询**：真出现"找出所有开了 X flag 的 rule"需求时，用
   SQLite `json_extract` 表达式索引即可，无需拆列。

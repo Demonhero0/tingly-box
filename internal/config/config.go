@@ -39,15 +39,14 @@ type Config struct {
 	// by Save() (dual-write removed): it is read only for the legacy import and
 	// written back as null.
 	LegacyRules        []typ.Rule           `yaml:"-" json:"rules"`
-	DefaultRequestID   int                  `yaml:"default_request_id" json:"default_request_id"` // Index of the default Rule
-	UserToken          string               `yaml:"user_token" json:"user_token"`                 // User token for UI and control API authentication
-	ModelToken         string               `yaml:"model_token" json:"model_token"`               // Model token for OpenAI and Anthropic API authentication
-	InternalAPIToken   string               `json:"-"`                                            // Internal API token for probe testing (generated at startup, not persisted)
-	EncryptProviders   bool                 `yaml:"encrypt_providers" json:"encrypt_providers"`   // Whether to encrypt provider info (default false)
-	Scenarios          []typ.ScenarioConfig `yaml:"scenarios" json:"scenarios"`                   // Scenario-specific configurations
-	GUI                GUIConfig            `json:"gui"`                                          // GUI-specific settings
-	RandomUUID         string               `json:"random_uuid"`                                  // A random uuid to help protocol transform for some special provider
-	ClaudeCodeDeviceID string               `json:"claude_code_device_id"`                        // Calc from random claude code device id with sha256
+	UserToken          string               `yaml:"user_token" json:"user_token"`               // User token for UI and control API authentication
+	ModelToken         string               `yaml:"model_token" json:"model_token"`             // Model token for OpenAI and Anthropic API authentication
+	InternalAPIToken   string               `json:"-"`                                          // Internal API token for probe testing (generated at startup, not persisted)
+	EncryptProviders   bool                 `yaml:"encrypt_providers" json:"encrypt_providers"` // Whether to encrypt provider info (default false)
+	Scenarios          []typ.ScenarioConfig `yaml:"scenarios" json:"scenarios"`                 // Scenario-specific configurations
+	GUI                GUIConfig            `json:"gui"`                                        // GUI-specific settings
+	RandomUUID         string               `json:"random_uuid"`                                // A random uuid to help protocol transform for some special provider
+	ClaudeCodeDeviceID string               `json:"claude_code_device_id"`                      // Calc from random claude code device id with sha256
 
 	// Merged fields from Config struct
 	// ProvidersV1 and Providers are legacy JSON-config storage for providers.
@@ -495,6 +494,10 @@ func (c *Config) Save() error {
 			}
 		}
 	}
+	// default_request_id (index of a "default rule") was removed with no
+	// readers left; drop the stale key the merge above would carry forward.
+	delete(next, "default_request_id")
+
 	// Rules persist authoritatively in the database. Syncing here — inside
 	// the choke point every rule mutation already goes through — guarantees no
 	// write path can update the in-memory rules without also updating the
@@ -562,7 +565,6 @@ func (c *Config) CloseStores() error {
 func (c *Config) CreateDefaultConfig() error {
 	// Create a default Rule
 	c.Rules = []typ.Rule{}
-	c.DefaultRequestID = 0
 	// Set default auth tokens if not already set. Always generate secure random
 	// values for new installs — never assign the well-known legacy defaults.
 	if c.UserToken == "" {

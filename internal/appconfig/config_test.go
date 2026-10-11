@@ -147,7 +147,6 @@ func TestConfig_DebugVerbose_Load(t *testing.T) {
 		"providers_v2":       []interface{}{},
 		"providers_v1":       map[string]interface{}{},
 		"rules":              []interface{}{},
-		"default_request_id": 0,
 		"encrypt_providers":  false,
 		"default_max_tokens": 4096,
 	}

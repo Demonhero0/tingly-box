@@ -17,11 +17,10 @@ import (
 func writeLegacyConfig(t *testing.T, dir string, rules []typ.Rule) {
 	t.Helper()
 	payload := map[string]interface{}{
-		"rules":              rules,
-		"default_request_id": 0,
-		"user_token":         "test-user-token",
-		"model_token":        "test-model-token",
-		"jwt_secret":         "test-secret",
+		"rules":       rules,
+		"user_token":  "test-user-token",
+		"model_token": "test-model-token",
+		"jwt_secret":  "test-secret",
 	}
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
@@ -387,5 +386,26 @@ func TestRulesUUIDAssignedDuringLegacyMigration(t *testing.T) {
 	}
 	if _, err := cfg.StoreManager().Rules().GetByUUID(migrated.UUID); err != nil {
 		t.Errorf("uuidless rule not persisted to store: %v", err)
+	}
+}
+
+func TestStaleDefaultRequestIDDroppedOnSave(t *testing.T) {
+	dir := t.TempDir()
+	writeLegacyConfig(t, dir, []typ.Rule{legacyTestRule("legacy-1", "legacy-model")})
+	raw := readConfigJSON(t, dir)
+	raw["default_request_id"] = 3
+	data, _ := json.MarshalIndent(raw, "", "  ")
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), data, 0600); err != nil {
+		t.Fatalf("failed to rewrite config.json: %v", err)
+	}
+
+	cfg, err := NewConfigWithDir(dir)
+	if err != nil {
+		t.Fatalf("NewConfigWithDir failed: %v", err)
+	}
+	defer cfg.CloseStores()
+
+	if _, ok := readConfigJSON(t, dir)["default_request_id"]; ok {
+		t.Error("stale default_request_id still present in config.json after Save")
 	}
 }

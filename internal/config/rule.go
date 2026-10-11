@@ -109,7 +109,6 @@ func (c *Config) AddRule(rule typ.Rule) error {
 
 	// If not found, append new config
 	c.Rules = append(c.Rules, rule)
-	c.DefaultRequestID = len(c.Rules) - 1
 	return c.Save()
 }
 
@@ -190,40 +189,12 @@ func (c *Config) AddRequestConfig(reqConfig typ.Rule) error {
 	return c.Save()
 }
 
-// GetDefaultRequestConfig returns the default Rule
-func (c *Config) GetDefaultRequestConfig() *typ.Rule {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.DefaultRequestID >= 0 && c.DefaultRequestID < len(c.Rules) {
-		return &c.Rules[c.DefaultRequestID]
-	}
-	return nil
-}
-
-// SetDefaultRequestID sets the index of the default Rule
-func (c *Config) SetDefaultRequestID(id int) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.DefaultRequestID = id
-	return c.Save()
-}
-
 // GetRequestConfigs returns all Rules
 func (c *Config) GetRequestConfigs() []typ.Rule {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return c.Rules
-}
-
-// GetDefaultRequestID returns the index of the default Rule
-func (c *Config) GetDefaultRequestID() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.DefaultRequestID
 }
 
 // IsRequestModel checks if the given model name is a request model in any config
@@ -440,61 +411,6 @@ func (c *Config) AddOrUpdateRequestConfigByRequestModel(reqConfig typ.Rule) erro
 	ensureRuleUUID(&reqConfig)
 	c.Rules = append(c.Rules, reqConfig)
 	return c.Save()
-}
-
-// RemoveRequestConfig removes the Rule at the given index
-func (c *Config) RemoveRequestConfig(index int) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if index < 0 || index >= len(c.Rules) {
-		return fmt.Errorf("index %d is out of bounds for Rules (length %d)", index, len(c.Rules))
-	}
-
-	c.Rules = append(c.Rules[:index], c.Rules[index+1:]...)
-
-	// Adjust DefaultRequestID after removal
-	if len(c.Rules) == 0 {
-		c.DefaultRequestID = -1
-	} else if c.DefaultRequestID >= len(c.Rules) {
-		c.DefaultRequestID = len(c.Rules) - 1
-	}
-
-	return c.Save()
-}
-
-// GetRequestModel returns the request model from the default Rule
-func (c *Config) GetRequestModel() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.DefaultRequestID >= 0 && c.DefaultRequestID < len(c.Rules) {
-		return c.Rules[c.DefaultRequestID].RequestModel
-	}
-	return ""
-}
-
-// GetResponseModel returns the response model from the default Rule
-func (c *Config) GetResponseModel() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.DefaultRequestID >= 0 && c.DefaultRequestID < len(c.Rules) {
-		return c.Rules[c.DefaultRequestID].ResponseModel
-	}
-	return ""
-}
-
-// GetDefaults returns all default values from the default Rule
-func (c *Config) GetDefaults() (requestModel, responseModel string) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.DefaultRequestID >= 0 && c.DefaultRequestID < len(c.Rules) {
-		rc := c.Rules[c.DefaultRequestID]
-		return rc.RequestModel, rc.ResponseModel
-	}
-	return "", ""
 }
 
 // IsTacticValid checks if the tactic params are valid (not zero values)
