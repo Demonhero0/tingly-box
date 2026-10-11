@@ -10,6 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
+	github.com/tingly-dev/tingly-box/agentboot v0.0.0-20261011040203-b33ded7babf4
 	github.com/tingly-dev/tingly-box/swagger v0.0.0-20261010131608-19e97ed89d68
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2
@@ -50,7 +51,6 @@ require (
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	github.com/tingly-dev/tingly-box/agentboot v0.0.0-20261010131608-19e97ed89d68 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect

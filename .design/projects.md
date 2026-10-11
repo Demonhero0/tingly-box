@@ -150,5 +150,5 @@ MVP 已实现（§2 中标 ✅ 的部分）。验证：
 - 后端单测与 HTTP 端到端测试（含真实 Anthropic SDK 的 tool_use 流），`go test -race` 通过。
 - **真机**：本机 `claude` CLI（2.1.296）作为线程，指向一个模拟 Anthropic 服务：协调者 `start_thread` → Claude Code 建 worktree 分支、请求 `Bash` → 线程进入 Waiting on you → 在 UI 允许 → 提交 → Ready for review → diff → Merge 落到真实仓库。
 
-已知问题：
-- **agentboot 进程句柄的竞态**（上游 tingly-box）：`process/osexec.go` 启动后立即在 goroutine 里 `cmd.Wait()`，而 `Wait` 会关闭 stdout 管道；CLI 在写完 result 后立即退出时，解码器最后一次读会报 `read |0: file already closed`。`os/exec` 文档明确要求读完管道再调用 `Wait`。tingly-project 在 `internal/project/runner.go` 中只对"已收到成功 result + 该错误"这一种情况容错；根治应在 agentboot 修复。
+已解决的问题：
+- **agentboot 进程句柄的竞态**（上游 tingly-box）：`process/osexec.go` 启动后立即在后台 `cmd.Wait()`，而 `Wait` 会关闭 `StdoutPipe` 的读端；CLI 写完 result 后立即退出时，解码器最后一次读会报 `read |0: file already closed`，成功的一轮被判为失败。已在 [tingly-dev/tingly-box#2022](https://github.com/tingly-dev/tingly-box/pull/2022) 修复（stdout 改为自有管道，直到 `Handle.Wait` 才关闭），tingly-project 已升级到包含该修复的 agentboot，并移除了临时容错代码。
