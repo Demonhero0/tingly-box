@@ -1,7 +1,10 @@
 # Tingly-Project
 
-Claude-style Projects (instructions, knowledge, memory, chats) on top of Tingly
-Box. Same stack and conventions as tingly-box.
+A local replica of Claude's redesigned Projects: one conversation with a
+coordinator that runs parallel Claude Code threads in git worktrees, on top of
+Tingly Box. Same stack and conventions as tingly-box.
+
+Research lives in `.research/`, design in `.design/`.
 
 # Guideline
 
@@ -12,13 +15,12 @@ UX further. **Before building or changing a feature, read
 `.design/ux-principles.md`** (shared with tingly-box) and check the change
 against its checklist.
 
-**Before changing project behaviour, read `.design/claude-projects-research.md`
-(what Claude's Projects are, in all three products) and `.design/projects.md`
-(what the current classic-Projects implementation does).** Together they record
-what claude.ai Projects does, what we replicate, and what is deliberately out of
-scope (e.g. sharing). Keep claude.ai parity where it is listed as in scope —
-e.g. name/description are never sent to the model; archived projects cannot be
-deleted; memory can only be turned off before a chat's first message.
+**Before changing project behaviour, read `.research/claude-projects.md`
+(what Claude's Projects are and how people use them) and `.design/projects.md`
+(what we replicate, the MVP cut, and the architecture).** Keep parity with the
+official experience where the design marks it in scope, and keep vocabulary
+fixed: Project, Conversation, Coordinator, Thread, Overview, Library, Memory,
+Instructions, Goal.
 
 ## Backend
 
