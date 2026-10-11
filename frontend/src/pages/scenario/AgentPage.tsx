@@ -304,6 +304,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                                     options={slots.modeOptions}
                                     onChange={slots.requestMode}
                                     optionWidth={112}
+                                flush
                                     ariaLabel={slotModeLabel}
                                 />
                             </ToggleRow>
@@ -316,6 +317,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                             <ChoiceToggle<'requests' | 'usage' | 'quickstart' | ''>
                                 value=""
                                 optionWidth={100}
+                                flush
                                 ariaLabel={statusLabel}
                                 onChange={(next) => {
                                     if (next === 'quickstart') restartQuickStart();
