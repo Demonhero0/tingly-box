@@ -210,7 +210,6 @@ class TestAutomation:
 
         test_config = {
             "rules": rules,
-            "default_request_id": config.get("default_request_id", 14),
             "user_token": config.get("user_token", "tingly-box-user-token"),
             "model_token": model_token,
             "encrypt_providers": config.get("encrypt_providers", False),

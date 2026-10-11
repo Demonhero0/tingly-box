@@ -34,7 +34,7 @@ type RuleRecord struct {
 	UUID string `gorm:"primaryKey;column:uuid"`
 
 	// Position preserves the rule-list order that used to be implied by the
-	// JSON array in config.json. DefaultRequestID indexes into that order.
+	// JSON array in config.json.
 	Position int `gorm:"column:position;index"`
 
 	Scenario      string `gorm:"column:scenario;not null;index:idx_rules_scenario_request_model"`

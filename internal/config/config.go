@@ -35,19 +35,18 @@ type Config struct {
 	// LegacyRules receives the file's "rules" array on load. It is consumed
 	// exactly once, by hydrateRulesFromStore (one-time import into the
 	// database on upgraded installs); after hydration the field stays nil and
-	// file rules are ignored on reload. The "rules" key itself keeps being
-	// written by Save() as a live mirror of Rules during the transition
-	// period, purely for downgrade compatibility — see Save().
+	// file rules are ignored on reload. The "rules" key is no longer mirrored
+	// by Save() (dual-write removed): it is read only for the legacy import and
+	// written back as null.
 	LegacyRules        []typ.Rule           `yaml:"-" json:"rules"`
-	DefaultRequestID   int                  `yaml:"default_request_id" json:"default_request_id"` // Index of the default Rule
-	UserToken          string               `yaml:"user_token" json:"user_token"`                 // User token for UI and control API authentication
-	ModelToken         string               `yaml:"model_token" json:"model_token"`               // Model token for OpenAI and Anthropic API authentication
-	InternalAPIToken   string               `json:"-"`                                            // Internal API token for probe testing (generated at startup, not persisted)
-	EncryptProviders   bool                 `yaml:"encrypt_providers" json:"encrypt_providers"`   // Whether to encrypt provider info (default false)
-	Scenarios          []typ.ScenarioConfig `yaml:"scenarios" json:"scenarios"`                   // Scenario-specific configurations
-	GUI                GUIConfig            `json:"gui"`                                          // GUI-specific settings
-	RandomUUID         string               `json:"random_uuid"`                                  // A random uuid to help protocol transform for some special provider
-	ClaudeCodeDeviceID string               `json:"claude_code_device_id"`                        // Calc from random claude code device id with sha256
+	UserToken          string               `yaml:"user_token" json:"user_token"`               // User token for UI and control API authentication
+	ModelToken         string               `yaml:"model_token" json:"model_token"`             // Model token for OpenAI and Anthropic API authentication
+	InternalAPIToken   string               `json:"-"`                                          // Internal API token for probe testing (generated at startup, not persisted)
+	EncryptProviders   bool                 `yaml:"encrypt_providers" json:"encrypt_providers"` // Whether to encrypt provider info (default false)
+	Scenarios          []typ.ScenarioConfig `yaml:"scenarios" json:"scenarios"`                 // Scenario-specific configurations
+	GUI                GUIConfig            `json:"gui"`                                        // GUI-specific settings
+	RandomUUID         string               `json:"random_uuid"`                                // A random uuid to help protocol transform for some special provider
+	ClaudeCodeDeviceID string               `json:"claude_code_device_id"`                      // Calc from random claude code device id with sha256
 
 	// Merged fields from Config struct
 	// ProvidersV1 and Providers are legacy JSON-config storage for providers.
@@ -262,6 +261,8 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 	// Like migrateProvidersToDB, this is storage plumbing rather than a config
 	// migration, so it is not gated by enableMigration.
 	if err := cfg.hydrateRulesFromStore(); err != nil {
+		// Don't leak the SQLite handles of a Config the caller never receives.
+		_ = cfg.CloseStores()
 		return nil, fmt.Errorf("failed to hydrate rules from store: %w", err)
 	}
 
@@ -453,15 +454,14 @@ func (c *Config) load() error {
 	// Restore the config file path after unmarshaling
 	c.ConfigFile = configFile
 
-	// After the one-time hydration, the database is authoritative for rules.
-	// The "rules" array in config.json is Save()'s own downgrade-compat
-	// mirror — a reload of our own write matches the live rules and is
-	// dropped silently. A DIFFERING array means someone hand-edited the file
-	// expecting the pre-database behavior; tell them where rules live now
-	// instead of eating the edit without a trace.
+	// After the one-time hydration, the database is authoritative for rules
+	// and Save() writes the file's "rules" key as null. A non-empty array
+	// here is therefore foreign: a hand edit, a backup/sync restore, or a
+	// leftover mirror from the dual-write era or an older binary. Ignore it,
+	// but say where rules live now instead of eating it without a trace.
 	if c.rulesHydrated {
-		if !rulesEquivalent(c.LegacyRules, c.Rules) {
-			logrus.Warn("Ignoring rule edits in config.json: rules are stored in the database now; manage them via the UI/API/CLI")
+		if len(c.LegacyRules) > 0 && !rulesEquivalent(c.LegacyRules, c.Rules) {
+			logrus.Warn("Ignoring the rules array in config.json: it differs from the database, which is the only source of rules now (it may be a hand edit or a stale copy from an older version); manage rules via the UI/API/CLI")
 		}
 		c.LegacyRules = nil
 	}
@@ -485,7 +485,9 @@ func (c *Config) Save() error {
 	if err := json.Unmarshal(data, &next); err != nil {
 		return err
 	}
+	var existingRaw []byte
 	if raw, err := os.ReadFile(c.ConfigFile); err == nil && len(raw) > 0 {
+		existingRaw = raw
 		var existing map[string]interface{}
 		if err := json.Unmarshal(raw, &existing); err == nil {
 			for k, v := range existing {
@@ -495,27 +497,22 @@ func (c *Config) Save() error {
 			}
 		}
 	}
+	// The merge above carries unknown keys forward forever; drop the ones we
+	// retired on purpose.
+	for _, k := range retiredConfigKeys {
+		delete(next, k)
+	}
+
 	// Rules persist authoritatively in the database. Syncing here — inside
 	// the choke point every rule mutation already goes through — guarantees no
 	// write path can update the in-memory rules without also updating the
 	// store. The store MUST be written before the file: if the store sync
 	// fails during the one-time legacy import, aborting here leaves the file's
 	// legacy rules untouched so the next startup retries the import.
-	rulesSnapshot, err := c.syncRulesToStore()
-	if err != nil {
+	// After hydration LegacyRules is nil, so the marshaled "rules" key is
+	// null; pre-hydration Saves keep the file's legacy array intact.
+	if err := c.syncRulesToStore(); err != nil {
 		return err
-	}
-
-	// Transition-period dual write: the file keeps a live "rules" mirror
-	// (the same snapshot the sync produced) so downgrading to a pre-database
-	// version loses nothing — the old binary reads the array as before. The
-	// mirror is write-only; load() ignores it once hydrated. Scheduled for
-	// removal in a later release; see .design/rule-storage.md §5.
-	// Pre-hydration Saves get a nil snapshot and leave the marshaled
-	// LegacyRules value in place, so an unmigrated file's rules can never be
-	// overwritten with an empty list.
-	if rulesSnapshot != nil {
-		next["rules"] = json.RawMessage(rulesSnapshot)
 	}
 
 	out, err := json.MarshalIndent(next, "", "    ")
@@ -523,7 +520,42 @@ func (c *Config) Save() error {
 		return err
 	}
 
+	c.backupFileRulesOnce(existingRaw, next)
 	return os.WriteFile(c.ConfigFile, out, 0644)
+}
+
+// retiredConfigKeys are config.json keys no code reads or writes anymore;
+// Save() removes them instead of carrying them forward with other unknown keys.
+var retiredConfigKeys = []string{"default_request_id"}
+
+// rulesFileBackupSuffix names the one-time safety copy of config.json taken
+// right before Save() replaces a non-empty "rules" array with null.
+const rulesFileBackupSuffix = ".pre-rules-removal.bak"
+
+// backupFileRulesOnce keeps a copy of the old config.json the first time Save()
+// is about to drop a non-empty "rules" array from it (the dual-write mirror of
+// the previous release). The database is the only source of rules from then
+// on; the copy lets a user roll back to an older binary or recover rules if
+// the database is ever lost. Best effort: a failed backup never blocks Save.
+func (c *Config) backupFileRulesOnce(existingRaw []byte, next map[string]interface{}) {
+	if len(existingRaw) == 0 || next["rules"] != nil {
+		return
+	}
+	var old struct {
+		Rules []json.RawMessage `json:"rules"`
+	}
+	if json.Unmarshal(existingRaw, &old) != nil || len(old.Rules) == 0 {
+		return
+	}
+	path := c.ConfigFile + rulesFileBackupSuffix
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+	if err := os.WriteFile(path, existingRaw, 0600); err != nil {
+		logrus.WithError(err).Warn("Failed to back up config.json before dropping its rules array")
+		return
+	}
+	logrus.Infof("Rules now live only in the database; kept a copy of the previous config.json at %s", path)
 }
 
 // RefreshStatsFromStore hydrates service stats from the SQLite store.
@@ -573,7 +605,6 @@ func (c *Config) CloseStores() error {
 func (c *Config) CreateDefaultConfig() error {
 	// Create a default Rule
 	c.Rules = []typ.Rule{}
-	c.DefaultRequestID = 0
 	// Set default auth tokens if not already set. Always generate secure random
 	// values for new installs — never assign the well-known legacy defaults.
 	if c.UserToken == "" {
