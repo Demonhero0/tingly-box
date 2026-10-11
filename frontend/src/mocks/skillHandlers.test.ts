@@ -4,7 +4,7 @@ import { createSkillHandlers } from './skillHandlers';
 
 const server = setupServer();
 const base = `${window.location.origin}/api/v2`;
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

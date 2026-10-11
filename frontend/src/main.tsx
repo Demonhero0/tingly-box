@@ -11,7 +11,7 @@ async function enableMocking() {
 
   const { worker } = await import('./mocks/browser')
   await worker.start({
-    onUnhandledRequest: 'bypass',
+    onUnhandledFrame: 'bypass',
   })
 
   // Auto-inject a mock auth token so the app skips the login screen in mock mode.
