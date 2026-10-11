@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tingly-dev/tingly-project/internal/config"
 	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-project/internal/project"
 	"github.com/tingly-dev/tingly-project/internal/server"
 )
 
@@ -51,7 +52,7 @@ func rootCmd() *cobra.Command {
 				return err
 			}
 			defer store.Close()
-			spec, err := server.OpenAPI(store)
+			spec, err := server.OpenAPI(server.Deps{Store: store, Layout: project.Layout{Root: os.TempDir()}})
 			if err != nil {
 				return err
 			}
@@ -72,7 +73,7 @@ func rootCmd() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:           "tingly-project",
-		Short:         "Claude-style Projects (instructions, knowledge, memory, chats) on top of Tingly Box",
+		Short:         "Claude-style Projects: a coordinator conversation running Claude Code threads, on top of Tingly Box",
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE:          serve.RunE,
@@ -89,10 +90,12 @@ func runServe(cfg config.Config) error {
 	}
 	defer store.Close()
 
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(store),
+		Handler:           server.New(ctx, server.Deps{Store: store, Layout: project.Layout{Root: cfg.ProjectsDir()}}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	ln, err := net.Listen("tcp", addr)
@@ -111,9 +114,9 @@ func runServe(cfg config.Config) error {
 			return err
 		}
 	case <-sig:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return srv.Shutdown(ctx)
+		return srv.Shutdown(shutdownCtx)
 	}
 	return nil
 }

@@ -1,64 +1,143 @@
 // Package db owns persistence for tingly-project: the gorm models and the
-// Store that every HTTP module reads and writes through.
+// Store that every HTTP module and the project runtime read and write through.
 package db
 
 import (
 	"time"
 )
 
-// Project groups conversations around shared instructions and knowledge,
-// the same unit as a Claude Project.
+// Repo is a local git repository a project's threads work in.
+type Repo struct {
+	Path       string `json:"path"`
+	BaseBranch string `json:"base_branch"`
+}
+
+// Project is one ongoing stream of work: a goal, standing instructions, the
+// repositories threads work in, and the coordinator conversation that routes
+// work to threads. Memory and library files live on disk in the project dir.
 type Project struct {
 	ID           string `gorm:"primaryKey;size:36" json:"id"`
 	Name         string `gorm:"size:200;not null" json:"name"`
-	Description  string `gorm:"type:text" json:"description"`
+	Goal         string `gorm:"type:text" json:"goal"`
 	Instructions string `gorm:"type:text" json:"instructions"`
-	// Memory is a model-written summary of what was learned across the
-	// project's chats. It is part of every chat's context and user-editable.
-	Memory          string     `gorm:"type:text" json:"memory"`
-	MemoryUpdatedAt *time.Time `json:"memory_updated_at,omitempty"`
-	Starred         bool       `json:"starred"`
-	ArchivedAt      *time.Time `json:"archived_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	Repos        []Repo `gorm:"serializer:json;type:text" json:"repos"`
+	// CoordinatorModel / ThreadModel are empty for "connection default".
+	CoordinatorModel string `gorm:"size:200" json:"coordinator_model"`
+	ThreadModel      string `gorm:"size:200" json:"thread_model"`
+	// ThreadPermissionMode is the Claude Code permission mode threads run in.
+	ThreadPermissionMode string     `gorm:"size:40" json:"thread_permission_mode"`
+	Paused               bool       `json:"paused"`
+	Starred              bool       `json:"starred"`
+	ArchivedAt           *time.Time `json:"archived_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
-// KnowledgeFile is a text document attached to a project. Its content is
-// placed in the system prompt of every conversation in that project.
-type KnowledgeFile struct {
+// Project message kinds.
+const (
+	MsgText          = "text"           // plain user or coordinator text
+	MsgThreadStarted = "thread_started" // coordinator started threads (payload: thread ids)
+	MsgSuggestions   = "suggestions"    // coordinator proposed threads (payload: suggestions)
+	MsgThreadUpdate  = "thread_update"  // a thread finished, failed or needs input
+	MsgError         = "error"          // the coordinator turn failed
+)
+
+// ProjectMessage is one entry of the project conversation.
+type ProjectMessage struct {
+	ID        string `gorm:"primaryKey;size:36" json:"id"`
+	ProjectID string `gorm:"size:36;index;not null" json:"project_id"`
+	// Role is user, assistant (the coordinator) or system.
+	Role    string `gorm:"size:20;not null" json:"role"`
+	Kind    string `gorm:"size:30;not null" json:"kind"`
+	Content string `gorm:"type:text" json:"content"`
+	// Payload is kind-specific JSON.
+	Payload   string    `gorm:"type:text" json:"payload,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Thread statuses, matching the Overview groups.
+const (
+	ThreadWorking  = "working"
+	ThreadWaiting  = "waiting"
+	ThreadReady    = "ready"
+	ThreadIdle     = "idle"
+	ThreadResolved = "resolved"
+)
+
+// Thread is one worker: a Claude Code session on its own branch.
+type Thread struct {
+	ID        string `gorm:"primaryKey;size:36" json:"id"`
+	ProjectID string `gorm:"size:36;index;not null" json:"project_id"`
+	Title     string `gorm:"size:300" json:"title"`
+	Task      string `gorm:"type:text" json:"task"`
+	Status    string `gorm:"size:20;index" json:"status"`
+	// WaitReason says why a waiting thread needs the user.
+	WaitReason string `gorm:"type:text" json:"wait_reason,omitempty"`
+	// Origin is coordinator, suggestion or user.
+	Origin       string `gorm:"size:20" json:"origin"`
+	RepoPath     string `gorm:"type:text" json:"repo_path,omitempty"`
+	BaseBranch   string `gorm:"size:200" json:"base_branch,omitempty"`
+	Branch       string `gorm:"size:200" json:"branch,omitempty"`
+	Worktree     string `gorm:"type:text" json:"worktree"`
+	SessionID    string `gorm:"size:64" json:"session_id,omitempty"`
+	Model        string `gorm:"size:200" json:"model,omitempty"`
+	LastReport   string `gorm:"type:text" json:"last_report,omitempty"`
+	CommitsAhead int    `json:"commits_ahead"`
+	FilesChanged int    `json:"files_changed"`
+	Uncommitted  bool   `json:"uncommitted"`
+	Turns        int    `json:"turns"`
+	InputTokens  int64  `json:"input_tokens"`
+	OutputTokens int64  `json:"output_tokens"`
+	// MergedAt is set when the branch was merged from the Overview.
+	MergedAt   *time.Time `json:"merged_at,omitempty"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+}
+
+// Thread event kinds.
+const (
+	EvUser       = "user"        // a message to the thread (from the user or the coordinator)
+	EvAssistant  = "assistant"   // the thread's text
+	EvToolUse    = "tool_use"    // a tool call (content: tool name, payload: input)
+	EvToolResult = "tool_result" // a tool's output
+	EvApproval   = "approval"    // a permission request (payload: request + answer)
+	EvAsk        = "ask"         // a question for the user
+	EvSystem     = "system"      // lifecycle notes
+	EvError      = "error"
+	EvReport     = "report" // end-of-turn summary sent to the coordinator
+)
+
+// ThreadEvent is one step of a thread's transcript.
+type ThreadEvent struct {
+	ID       string `gorm:"primaryKey;size:36" json:"id"`
+	ThreadID string `gorm:"size:36;index;not null" json:"thread_id"`
+	Kind     string `gorm:"size:20;not null" json:"kind"`
+	Content  string `gorm:"type:text" json:"content"`
+	Payload  string `gorm:"type:text" json:"payload,omitempty"`
+	// From says who sent a user event: user or coordinator.
+	From      string    `gorm:"size:20" json:"from,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Conversation is a standalone chat, outside any project.
+type Conversation struct {
 	ID        string    `gorm:"primaryKey;size:36" json:"id"`
-	ProjectID string    `gorm:"size:36;index;not null" json:"project_id"`
-	Name      string    `gorm:"size:300;not null" json:"name"`
-	MimeType  string    `gorm:"size:100" json:"mime_type"`
-	Content   string    `gorm:"type:text" json:"content"`
-	Size      int64     `json:"size"`
-	Tokens    int       `json:"tokens"`
+	Title     string    `gorm:"size:300" json:"title"`
+	Model     string    `gorm:"size:200" json:"model"`
+	Starred   bool      `json:"starred"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// Conversation is one chat thread. ProjectID is empty for chats that do not
-// belong to a project.
-type Conversation struct {
-	ID        string `gorm:"primaryKey;size:36" json:"id"`
-	ProjectID string `gorm:"size:36;index" json:"project_id"`
-	Title     string `gorm:"size:300" json:"title"`
-	Model     string `gorm:"size:200" json:"model"`
-	Starred   bool   `json:"starred"`
-	// MemoryDisabled chats neither read nor feed project memory. It can only
-	// be chosen before the first message, like claude.ai.
-	MemoryDisabled bool      `json:"memory_disabled"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Message roles.
 const (
 	RoleUser      = "user"
 	RoleAssistant = "assistant"
+	RoleSystem    = "system"
 )
 
-// Message is one turn in a conversation.
+// Message is one turn in a standalone chat.
 type Message struct {
 	ID             string    `gorm:"primaryKey;size:36" json:"id"`
 	ConversationID string    `gorm:"size:36;index;not null" json:"conversation_id"`

@@ -44,7 +44,7 @@ func Open(path string) (*Store, error) {
 		}
 		sqlDB.SetMaxOpenConns(1)
 	}
-	if err := g.AutoMigrate(&Project{}, &KnowledgeFile{}, &Conversation{}, &Message{}, &Setting{}); err != nil {
+	if err := g.AutoMigrate(&Project{}, &ProjectMessage{}, &Thread{}, &ThreadEvent{}, &Conversation{}, &Message{}, &Setting{}); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return &Store{db: g}, nil
@@ -73,209 +73,13 @@ func likePattern(q string) string {
 	return "%" + q + "%"
 }
 
-// ---- Projects ----
-
-// ProjectStats are aggregates shown on project cards.
-type ProjectStats struct {
-	ConversationCount int
-	KnowledgeTokens   int
-	KnowledgeCount    int
-	LastActivityAt    time.Time
-}
-
-// ListProjects returns projects matching q (name/description), archived or
-// active, starred first then most recently active.
-func (s *Store) ListProjects(q string, archived bool) ([]Project, map[string]ProjectStats, error) {
-	var projects []Project
-	tx := s.db.Model(&Project{})
-	if archived {
-		tx = tx.Where("archived_at IS NOT NULL")
-	} else {
-		tx = tx.Where("archived_at IS NULL")
-	}
-	if q = strings.TrimSpace(q); q != "" {
-		p := likePattern(q)
-		tx = tx.Where(`name LIKE ? ESCAPE '\' OR description LIKE ? ESCAPE '\'`, p, p)
-	}
-	if err := tx.Find(&projects).Error; err != nil {
-		return nil, nil, err
-	}
-	stats := make(map[string]ProjectStats, len(projects))
-	for _, p := range projects {
-		stats[p.ID] = ProjectStats{LastActivityAt: p.UpdatedAt}
-	}
-
-	type convAgg struct {
-		ProjectID string
-		N         int
-		Last      string
-	}
-	var convs []convAgg
-	if err := s.db.Model(&Conversation{}).
-		Select("project_id, COUNT(*) AS n, MAX(updated_at) AS last").
-		Where("project_id <> ''").Group("project_id").Scan(&convs).Error; err != nil {
-		return nil, nil, err
-	}
-	for _, a := range convs {
-		st, ok := stats[a.ProjectID]
-		if !ok {
-			continue
-		}
-		st.ConversationCount = a.N
-		if t, ok := parseSQLiteTime(a.Last); ok && t.After(st.LastActivityAt) {
-			st.LastActivityAt = t
-		}
-		stats[a.ProjectID] = st
-	}
-
-	type kAgg struct {
-		ProjectID string
-		N         int
-		Tokens    int
-	}
-	var ks []kAgg
-	if err := s.db.Model(&KnowledgeFile{}).
-		Select("project_id, COUNT(*) AS n, COALESCE(SUM(tokens),0) AS tokens").
-		Group("project_id").Scan(&ks).Error; err != nil {
-		return nil, nil, err
-	}
-	for _, a := range ks {
-		st, ok := stats[a.ProjectID]
-		if !ok {
-			continue
-		}
-		st.KnowledgeCount = a.N
-		st.KnowledgeTokens = a.Tokens
-		stats[a.ProjectID] = st
-	}
-	return projects, stats, nil
-}
-
-// parseSQLiteTime parses the text form SQLite returns for MAX() over a
-// datetime column.
-func parseSQLiteTime(s string) (time.Time, bool) {
-	for _, layout := range []string{
-		"2006-01-02 15:04:05.999999999-07:00",
-		"2006-01-02 15:04:05.999999999Z07:00",
-		time.RFC3339Nano,
-		"2006-01-02 15:04:05",
-	} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
-}
-
-// CreateProject inserts a new project.
-func (s *Store) CreateProject(p *Project) error {
-	p.ID = newID()
-	return s.db.Create(p).Error
-}
-
-// GetProject loads a project by ID.
-func (s *Store) GetProject(id string) (*Project, error) {
-	var p Project
-	if err := s.db.First(&p, "id = ?", id).Error; err != nil {
-		return nil, notFound(err)
-	}
-	return &p, nil
-}
-
-// SaveProject writes all fields of p.
-func (s *Store) SaveProject(p *Project) error {
-	return s.db.Save(p).Error
-}
-
-// TouchProject bumps a project's UpdatedAt.
-func (s *Store) TouchProject(id string) error {
-	return s.db.Model(&Project{}).Where("id = ?", id).Update("updated_at", time.Now()).Error
-}
-
-// DeleteProject removes a project with its knowledge, conversations and
-// messages.
-func (s *Store) DeleteProject(id string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		convIDs := tx.Model(&Conversation{}).Select("id").Where("project_id = ?", id)
-		if err := tx.Where("conversation_id IN (?)", convIDs).Delete(&Message{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("project_id = ?", id).Delete(&Conversation{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("project_id = ?", id).Delete(&KnowledgeFile{}).Error; err != nil {
-			return err
-		}
-		res := tx.Where("id = ?", id).Delete(&Project{})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return ErrNotFound
-		}
-		return nil
-	})
-}
-
-// ---- Knowledge ----
-
-// ListKnowledge returns a project's files without their content, oldest first.
-func (s *Store) ListKnowledge(projectID string) ([]KnowledgeFile, error) {
-	var files []KnowledgeFile
-	err := s.db.Omit("content").Where("project_id = ?", projectID).Order("created_at ASC").Find(&files).Error
-	return files, err
-}
-
-// ListKnowledgeWithContent returns a project's files including content,
-// oldest first (the order they appear in the system prompt).
-func (s *Store) ListKnowledgeWithContent(projectID string) ([]KnowledgeFile, error) {
-	var files []KnowledgeFile
-	err := s.db.Where("project_id = ?", projectID).Order("created_at ASC").Find(&files).Error
-	return files, err
-}
-
-// CreateKnowledge inserts a knowledge file.
-func (s *Store) CreateKnowledge(f *KnowledgeFile) error {
-	f.ID = newID()
-	return s.db.Create(f).Error
-}
-
-// GetKnowledge loads a knowledge file including its content.
-func (s *Store) GetKnowledge(id string) (*KnowledgeFile, error) {
-	var f KnowledgeFile
-	if err := s.db.First(&f, "id = ?", id).Error; err != nil {
-		return nil, notFound(err)
-	}
-	return &f, nil
-}
-
-// SaveKnowledge writes all fields of f.
-func (s *Store) SaveKnowledge(f *KnowledgeFile) error {
-	return s.db.Save(f).Error
-}
-
-// DeleteKnowledge removes a knowledge file.
-func (s *Store) DeleteKnowledge(id string) error {
-	res := s.db.Where("id = ?", id).Delete(&KnowledgeFile{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
-
 // ---- Conversations ----
 
 // ConversationFilter narrows ListConversations.
 type ConversationFilter struct {
-	// ProjectID limits to one project; "none" limits to chats outside any
-	// project; empty means all.
-	ProjectID string
-	Query     string
-	Starred   bool
-	Limit     int
+	Query   string
+	Starred bool
+	Limit   int
 }
 
 // ListConversations returns conversations, most recently updated first. The
@@ -283,13 +87,6 @@ type ConversationFilter struct {
 func (s *Store) ListConversations(f ConversationFilter) ([]Conversation, error) {
 	var convs []Conversation
 	tx := s.db.Model(&Conversation{})
-	switch f.ProjectID {
-	case "":
-	case "none":
-		tx = tx.Where("project_id = ''")
-	default:
-		tx = tx.Where("project_id = ?", f.ProjectID)
-	}
 	if f.Starred {
 		tx = tx.Where("starred = ?", true)
 	}
@@ -401,38 +198,6 @@ func (s *Store) PutSetting(key string, v any) error {
 	return s.db.Save(&Setting{Key: key, Value: string(b), UpdatedAt: time.Now()}).Error
 }
 
-// ProjectNames maps every project ID to its name.
-func (s *Store) ProjectNames() (map[string]string, error) {
-	var rows []Project
-	if err := s.db.Select("id", "name").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make(map[string]string, len(rows))
-	for _, p := range rows {
-		out[p.ID] = p.Name
-	}
-	return out, nil
-}
-
-// MemoryConversations returns a project's memory-enabled conversations
-// updated after since (all of them when since is nil), newest first.
-func (s *Store) MemoryConversations(projectID string, since *time.Time, limit int) ([]Conversation, error) {
-	var convs []Conversation
-	tx := s.db.Where("project_id = ? AND memory_disabled = ?", projectID, false)
-	if since != nil {
-		tx = tx.Where("updated_at > ?", *since)
-	}
-	err := tx.Order("updated_at DESC").Limit(limit).Find(&convs).Error
-	return convs, err
-}
-
-// SetProjectMemory stores a project's memory without touching UpdatedAt,
-// so a background memory refresh does not reorder the project list.
-func (s *Store) SetProjectMemory(id, memory string, at time.Time) error {
-	return s.db.Model(&Project{}).Where("id = ?", id).
-		UpdateColumns(map[string]any{"memory": memory, "memory_updated_at": at}).Error
-}
-
 // SetConversationTitle renames a conversation without bumping UpdatedAt.
 func (s *Store) SetConversationTitle(id, title string) error {
 	return s.db.Model(&Conversation{}).Where("id = ?", id).UpdateColumn("title", title).Error
@@ -447,10 +212,8 @@ func (s *Store) SetConversationModel(id, model string) error {
 // bumping UpdatedAt, so renaming or starring keeps its place in "recent".
 func (s *Store) SaveConversationMeta(c *Conversation) error {
 	return s.db.Model(&Conversation{}).Where("id = ?", c.ID).UpdateColumns(map[string]any{
-		"title":           c.Title,
-		"starred":         c.Starred,
-		"model":           c.Model,
-		"project_id":      c.ProjectID,
-		"memory_disabled": c.MemoryDisabled,
+		"title":   c.Title,
+		"starred": c.Starred,
+		"model":   c.Model,
 	}).Error
 }

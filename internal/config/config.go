@@ -33,3 +33,8 @@ func DefaultDataDir() string {
 func (c Config) DBPath() string {
 	return filepath.Join(c.DataDir, "tingly-project.db")
 }
+
+// ProjectsDir holds each project's memory, library and thread worktrees.
+func (c Config) ProjectsDir() string {
+	return filepath.Join(c.DataDir, "projects")
+}

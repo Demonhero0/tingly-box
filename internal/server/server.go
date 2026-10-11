@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -10,31 +11,34 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
 	"github.com/tingly-dev/tingly-project/frontend"
-	"github.com/tingly-dev/tingly-project/internal/db"
 	"github.com/tingly-dev/tingly-project/internal/server/module"
 )
 
 // Version is set at build time.
 var Version = "dev"
 
-// New builds the engine with all routes.
-func New(store *db.Store) *gin.Engine {
+// New builds the engine with all routes and starts the project runtime's
+// background work, which stops when ctx ends.
+func New(ctx context.Context, d Deps) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	manager := newManager(engine)
-	module.Mount(&module.Routes{API: manager.NewGroup("api", "v1", ""), Engine: engine}, apiModules(store)...)
+	mods, svc := build(d)
+	module.Mount(&module.Routes{API: manager.NewGroup("api", "v1", ""), Engine: engine}, mods...)
 	manager.RegisterOpenAPIEndpoint("/api/openapi.json", swagger.VersionV3)
 	serveUI(engine)
+	svc.Start(ctx)
 	return engine
 }
 
 // OpenAPI renders the OpenAPI v3 document without starting a server.
-func OpenAPI(store *db.Store) (string, error) {
+func OpenAPI(d Deps) (string, error) {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	manager := newManager(engine)
-	module.Mount(&module.Routes{API: manager.NewGroup("api", "v1", ""), Engine: engine}, apiModules(store)...)
+	mods, _ := build(d)
+	module.Mount(&module.Routes{API: manager.NewGroup("api", "v1", ""), Engine: engine}, mods...)
 	return manager.GenerateOpenAPI(swagger.VersionV3)
 }
 
@@ -42,7 +46,7 @@ func newManager(engine *gin.Engine) *swagger.RouteManager {
 	m := swagger.NewRouteManager(engine)
 	m.SetSwaggerInfo(swagger.SwaggerInfo{
 		Title:       "Tingly Project API",
-		Description: "Projects, knowledge, memory and chats for tingly-project.",
+		Description: "Projects (coordinator conversation and Claude Code threads), memory, library and chats.",
 		Version:     "1.0.0",
 		BasePath:    "/",
 	})

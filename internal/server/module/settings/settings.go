@@ -6,6 +6,8 @@ package settings
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -131,16 +133,45 @@ func (s *Service) ResolveModel(ctx context.Context, conn Connection, explicit st
 	return models[0].ID, nil
 }
 
-// ClientAndModel returns a client for the saved connection and the model
-// background jobs (titles, memory) run on.
-func (s *Service) ClientAndModel(ctx context.Context) (llm.Client, string, error) {
+// ClientFor returns a client for the saved connection and the model to use:
+// model if set, else the resolved default.
+func (s *Service) ClientFor(ctx context.Context, model string) (llm.Client, string, error) {
 	client, conn, err := s.Client()
 	if err != nil {
 		return nil, "", err
 	}
-	model, err := s.ResolveModel(ctx, conn, "")
+	model, err = s.ResolveModel(ctx, conn, model)
 	if err != nil {
 		return nil, "", err
 	}
 	return client, model, nil
+}
+
+// ThreadEnv points Claude Code threads at the saved connection when it
+// speaks the Anthropic API (the default: a local Tingly Box), so threads go
+// through the same gateway and model routing. Otherwise threads use the
+// CLI's own login and default model.
+func (s *Service) ThreadEnv(ctx context.Context) ([]string, string) {
+	conn, err := s.Connection()
+	if err != nil || conn.APIStyle != llm.StyleAnthropic || conn.BaseURL == "" {
+		return nil, ""
+	}
+	env := []string{"ANTHROPIC_BASE_URL=" + strings.TrimRight(conn.BaseURL, "/")}
+	if conn.APIKey != "" {
+		env = append(env, "ANTHROPIC_AUTH_TOKEN="+conn.APIKey, "ANTHROPIC_API_KEY=")
+	}
+	model, _ := s.ResolveModel(ctx, conn, "")
+	return env, model
+}
+
+// ClaudeCLIPath is the Claude Code CLI threads run, or "" if none is found.
+func ClaudeCLIPath() string {
+	if p := os.Getenv("CLAUDE_CLI_PATH"); p != "" {
+		return p
+	}
+	p, err := exec.LookPath("claude")
+	if err != nil {
+		return ""
+	}
+	return p
 }

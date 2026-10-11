@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/openai/openai-go/v3"
@@ -28,9 +29,26 @@ func (o *openaiClient) Stream(ctx context.Context, req Request, onDelta func(str
 		msgs = append(msgs, openai.SystemMessage(req.System))
 	}
 	for _, m := range req.Messages {
+		for _, r := range m.ToolResults {
+			msgs = append(msgs, openai.ToolMessage(r.Content, r.CallID))
+		}
 		if m.Role == "assistant" {
-			msgs = append(msgs, openai.AssistantMessage(m.Content))
-		} else {
+			a := openai.ChatCompletionAssistantMessageParam{}
+			if m.Content != "" {
+				a.Content.OfString = openai.String(m.Content)
+			}
+			for _, c := range m.ToolCalls {
+				a.ToolCalls = append(a.ToolCalls, openai.ChatCompletionMessageToolCallUnionParam{
+					OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
+						ID:       c.ID,
+						Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{Name: c.Name, Arguments: string(nonEmptyJSON(c.Input))},
+					},
+				})
+			}
+			if m.Content != "" || len(a.ToolCalls) > 0 {
+				msgs = append(msgs, openai.ChatCompletionMessageParamUnion{OfAssistant: &a})
+			}
+		} else if m.Content != "" {
 			msgs = append(msgs, openai.UserMessage(m.Content))
 		}
 	}
@@ -42,28 +60,38 @@ func (o *openaiClient) Stream(ctx context.Context, req Request, onDelta func(str
 	if req.MaxTokens > 0 {
 		params.MaxCompletionTokens = openai.Int(int64(req.MaxTokens))
 	}
+	for _, t := range req.Tools {
+		params.Tools = append(params.Tools, openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
+			Name:        t.Name,
+			Description: openai.String(t.Description),
+			Parameters:  openai.FunctionParameters{"type": "object", "properties": t.Properties, "required": t.Required},
+		}))
+	}
 
 	var res Result
-	var text strings.Builder
+	var acc openai.ChatCompletionAccumulator
 	stream := o.client.Chat.Completions.NewStreaming(ctx, params)
 	defer stream.Close()
 	for stream.Next() {
 		chunk := stream.Current()
+		acc.AddChunk(chunk)
 		for _, ch := range chunk.Choices {
 			if ch.Delta.Content != "" {
-				text.WriteString(ch.Delta.Content)
 				onDelta(ch.Delta.Content)
-			}
-			if ch.FinishReason != "" {
-				res.StopReason = ch.FinishReason
 			}
 		}
 		if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
-			res.Usage.InputTokens = int(chunk.Usage.PromptTokens)
-			res.Usage.OutputTokens = int(chunk.Usage.CompletionTokens)
+			res.Usage = Usage{InputTokens: int(chunk.Usage.PromptTokens), OutputTokens: int(chunk.Usage.CompletionTokens)}
 		}
 	}
-	res.Text = text.String()
+	if len(acc.Choices) > 0 {
+		ch := acc.Choices[0]
+		res.Text = ch.Message.Content
+		res.StopReason = ch.FinishReason
+		for _, c := range ch.Message.ToolCalls {
+			res.ToolCalls = append(res.ToolCalls, ToolCall{ID: c.ID, Name: c.Function.Name, Input: json.RawMessage(nonEmptyJSON([]byte(c.Function.Arguments)))})
+		}
+	}
 	return res, stream.Err()
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/knowledge"
 	"github.com/tingly-dev/tingly-project/internal/llm"
 	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
 )
@@ -46,16 +45,6 @@ type StreamEvent struct {
 	Text    string      `json:"text,omitempty"`
 	Title   string      `json:"title,omitempty"`
 	Error   string      `json:"error,omitempty"`
-	// Context describes how project knowledge was included (assistant_message only).
-	Context *TurnContext `json:"context,omitempty"`
-}
-
-// TurnContext reports how a project's knowledge went into one turn.
-type TurnContext struct {
-	Mode            string `json:"mode"`
-	KnowledgeTokens int    `json:"knowledge_tokens"`
-	Excerpts        int    `json:"excerpts"`
-	MemoryUsed      bool   `json:"memory_used"`
 }
 
 func (h *Handler) send(c *gin.Context) {
@@ -137,11 +126,6 @@ func (h *Handler) turn(c *gin.Context, modelOverride string, prepare func(*db.Co
 		apierr.Store(c, err, "messages")
 		return
 	}
-	system, turnCtx, project, err := h.systemPrompt(conv, history)
-	if err != nil {
-		apierr.Store(c, err, "project")
-		return
-	}
 
 	sse := newSSE(c)
 	if userMsg != nil {
@@ -152,7 +136,6 @@ func (h *Handler) turn(c *gin.Context, modelOverride string, prepare func(*db.Co
 	start := time.Now()
 	res, streamErr := client.Stream(ctx, llm.Request{
 		Model:    model,
-		System:   system,
 		Messages: toLLM(history),
 	}, func(text string) {
 		sse.send(StreamEvent{Type: EventDelta, Text: text})
@@ -193,7 +176,7 @@ func (h *Handler) turn(c *gin.Context, modelOverride string, prepare func(*db.Co
 	if cancelled {
 		return
 	}
-	sse.send(StreamEvent{Type: EventAssistantMessage, Message: reply, Context: turnCtx})
+	sse.send(StreamEvent{Type: EventAssistantMessage, Message: reply})
 	if reply.Error != "" {
 		sse.send(StreamEvent{Type: EventError, Error: reply.Error})
 	}
@@ -204,53 +187,7 @@ func (h *Handler) turn(c *gin.Context, modelOverride string, prepare func(*db.Co
 			sse.send(StreamEvent{Type: EventTitle, Title: title})
 		}
 	}
-	if project != nil && !conv.MemoryDisabled && reply.Error == "" && h.memory != nil {
-		h.memory.Schedule(project.ID)
-	}
 	sse.send(StreamEvent{Type: EventDone})
-}
-
-// systemPrompt builds the project context for a conversation; chats outside
-// a project get none.
-func (h *Handler) systemPrompt(conv *db.Conversation, history []db.Message) (string, *TurnContext, *db.Project, error) {
-	if conv.ProjectID == "" {
-		return "", nil, nil, nil
-	}
-	p, err := h.store.GetProject(conv.ProjectID)
-	if errors.Is(err, db.ErrNotFound) {
-		return "", nil, nil, nil
-	}
-	if err != nil {
-		return "", nil, nil, err
-	}
-	files, err := h.store.ListKnowledgeWithContent(p.ID)
-	if err != nil {
-		return "", nil, nil, err
-	}
-	prompt := knowledge.Build(knowledge.PromptInput{
-		Project: p,
-		Files:   files,
-		Query:   retrievalQuery(history),
-		Memory:  !conv.MemoryDisabled,
-	})
-	return prompt.System, &TurnContext{
-		Mode:            prompt.Mode,
-		KnowledgeTokens: prompt.KnowledgeTokens,
-		Excerpts:        prompt.Excerpts,
-		MemoryUsed:      !conv.MemoryDisabled && strings.TrimSpace(p.Memory) != "",
-	}, p, nil
-}
-
-// retrievalQuery is the last two user messages, the best signal for what
-// knowledge the next reply needs.
-func retrievalQuery(history []db.Message) string {
-	var parts []string
-	for i := len(history) - 1; i >= 0 && len(parts) < 2; i-- {
-		if history[i].Role == db.RoleUser {
-			parts = append(parts, history[i].Content)
-		}
-	}
-	return strings.Join(parts, "\n")
 }
 
 // toLLM converts stored history to model messages: empty replies (failed

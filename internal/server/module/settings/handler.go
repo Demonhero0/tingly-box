@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/internal/knowledge"
 	"github.com/tingly-dev/tingly-project/internal/llm"
 	"github.com/tingly-dev/tingly-project/internal/server/module"
 	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
@@ -15,14 +14,23 @@ import (
 // SettingsResponse is the connection as shown to the UI. The API key itself
 // never leaves the server; only whether one is set and its last characters.
 type SettingsResponse struct {
-	APIStyle           string `json:"api_style" example:"anthropic"`
-	BaseURL            string `json:"base_url" example:"http://localhost:12580/tingly/anthropic"`
-	Endpoint           string `json:"endpoint" example:"http://localhost:12580/tingly/anthropic/v1/messages"`
-	APIKeySet          bool   `json:"api_key_set"`
-	APIKeyHint         string `json:"api_key_hint" example:"…a1b2"`
-	DefaultModel       string `json:"default_model"`
-	DefaultBaseURL     string `json:"default_base_url"`
-	ContextLimitTokens int    `json:"context_limit_tokens"`
+	APIStyle       string `json:"api_style" example:"anthropic"`
+	BaseURL        string `json:"base_url" example:"http://localhost:12580/tingly/anthropic"`
+	Endpoint       string `json:"endpoint" example:"http://localhost:12580/tingly/anthropic/v1/messages"`
+	APIKeySet      bool   `json:"api_key_set"`
+	APIKeyHint     string `json:"api_key_hint" example:"…a1b2"`
+	DefaultModel   string `json:"default_model"`
+	DefaultBaseURL string `json:"default_base_url"`
+	// Threads describes how project threads (Claude Code sessions) run.
+	Threads ThreadRuntime `json:"threads"`
+}
+
+// ThreadRuntime is the Claude Code CLI threads run with.
+type ThreadRuntime struct {
+	CLIPath string `json:"cli_path"`
+	// ViaConnection is true when threads use this connection (Anthropic
+	// style); otherwise they use the CLI's own login.
+	ViaConnection bool `json:"via_connection"`
 }
 
 // ConnectionDraft is a connection as edited in the settings form. A nil
@@ -105,14 +113,14 @@ func toResponse(conn Connection) SettingsResponse {
 		}
 	}
 	return SettingsResponse{
-		APIStyle:           conn.APIStyle,
-		BaseURL:            conn.BaseURL,
-		Endpoint:           llm.Endpoint(conn.LLM()),
-		APIKeySet:          conn.APIKey != "",
-		APIKeyHint:         hint,
-		DefaultModel:       conn.DefaultModel,
-		DefaultBaseURL:     DefaultBaseURL,
-		ContextLimitTokens: knowledge.ContextLimitTokens,
+		APIStyle:       conn.APIStyle,
+		BaseURL:        conn.BaseURL,
+		Endpoint:       llm.Endpoint(conn.LLM()),
+		APIKeySet:      conn.APIKey != "",
+		APIKeyHint:     hint,
+		DefaultModel:   conn.DefaultModel,
+		DefaultBaseURL: DefaultBaseURL,
+		Threads:        ThreadRuntime{CLIPath: ClaudeCLIPath(), ViaConnection: conn.APIStyle == llm.StyleAnthropic},
 	}
 }
 

@@ -8,6 +8,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -29,6 +30,33 @@ type Connection struct {
 type Message struct {
 	Role    string // "user" or "assistant"
 	Content string
+	// ToolCalls are the tools an assistant turn called.
+	ToolCalls []ToolCall
+	// ToolResults answer the previous assistant turn's ToolCalls (user turn).
+	ToolResults []ToolResult
+}
+
+// Tool is a function the model may call.
+type Tool struct {
+	Name        string
+	Description string
+	// Properties is the JSON Schema "properties" object of the input.
+	Properties map[string]any
+	Required   []string
+}
+
+// ToolCall is one call the model made.
+type ToolCall struct {
+	ID    string
+	Name  string
+	Input json.RawMessage
+}
+
+// ToolResult is the outcome of a ToolCall, sent back to the model.
+type ToolResult struct {
+	CallID  string
+	Content string
+	IsError bool
 }
 
 // Request is a single generation.
@@ -36,6 +64,7 @@ type Request struct {
 	Model     string
 	System    string
 	Messages  []Message
+	Tools     []Tool
 	MaxTokens int
 }
 
@@ -48,6 +77,7 @@ type Usage struct {
 // Result is the outcome of a completed generation.
 type Result struct {
 	Text       string
+	ToolCalls  []ToolCall
 	StopReason string
 	Usage      Usage
 }

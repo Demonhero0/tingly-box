@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Tingly Project API",
-    "description": "Projects, knowledge, memory and chats for tingly-project.",
+    "description": "Projects (coordinator conversation and Claude Code threads), memory, library and chats.",
     "version": "1.0.0"
   },
   "paths": {
@@ -15,15 +15,6 @@
         "description": "List conversations, most recent first",
         "operationId": "apiV1ConversationsGet",
         "parameters": [
-          {
-            "name": "project_id",
-            "in": "query",
-            "description": "Project ID, or \"none\" for chats outside any project",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "q",
             "in": "query",
@@ -69,8 +60,8 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Start a conversation, optionally inside a project",
-        "description": "Start a conversation, optionally inside a project",
+        "summary": "Start a standalone chat",
+        "description": "Start a standalone chat",
         "operationId": "apiV1ConversationsPost",
         "requestBody": {
           "description": "Request body",
@@ -164,8 +155,8 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Rename, star, change model, or move a conversation between projects",
-        "description": "Rename, star, change model, or move a conversation between projects",
+        "summary": "Rename, star or change the model of a chat",
+        "description": "Rename, star or change the model of a chat",
         "operationId": "apiV1ConversationsIdPatch",
         "parameters": [
           {
@@ -313,112 +304,6 @@
         }
       }
     },
-    "/api/v1/knowledge/{id}": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get a knowledge file with its content",
-        "description": "Get a knowledge file with its content",
-        "operationId": "apiV1KnowledgeIdGet",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/KnowledgeFile"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Delete a knowledge file",
-        "description": "Delete a knowledge file",
-        "operationId": "apiV1KnowledgeIdDelete",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OKResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Rename or rewrite a knowledge file",
-        "description": "Rename or rewrite a knowledge file",
-        "operationId": "apiV1KnowledgeIdPatch",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "description": "Request body",
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateKnowledgeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/KnowledgeFileSummary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/models": {
       "get": {
         "tags": [
@@ -446,14 +331,14 @@
         "tags": [
           "projects"
         ],
-        "summary": "List projects",
-        "description": "List projects",
+        "summary": "List projects with thread counts per Overview group",
+        "description": "List projects with thread counts per Overview group",
         "operationId": "apiV1ProjectsGet",
         "parameters": [
           {
             "name": "q",
             "in": "query",
-            "description": "Search name and description",
+            "description": "Search name and goal",
             "required": false,
             "schema": {
               "type": "string"
@@ -462,7 +347,7 @@
           {
             "name": "archived",
             "in": "query",
-            "description": "List archived projects instead of active ones",
+            "description": "List archived projects",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -519,8 +404,8 @@
         "tags": [
           "projects"
         ],
-        "summary": "Get a project with its knowledge",
-        "description": "Get a project with its knowledge",
+        "summary": "Get a project with its threads",
+        "description": "Get a project with its threads",
         "operationId": "apiV1ProjectsIdGet",
         "parameters": [
           {
@@ -550,8 +435,8 @@
         "tags": [
           "projects"
         ],
-        "summary": "Delete a project with its knowledge and conversations. Archived projects must be unarchived first.",
-        "description": "Delete a project with its knowledge and conversations. Archived projects must be unarchived first.",
+        "summary": "Delete a project with its threads, memory and library. Branches are kept.",
+        "description": "Delete a project with its threads, memory and library. Branches are kept.",
         "operationId": "apiV1ProjectsIdDelete",
         "parameters": [
           {
@@ -581,8 +466,8 @@
         "tags": [
           "projects"
         ],
-        "summary": "Update a project",
-        "description": "Update a project",
+        "summary": "Update project settings; pause, resume, archive, unarchive, star",
+        "description": "Update project settings; pause, resume, archive, unarchive, star",
         "operationId": "apiV1ProjectsIdPatch",
         "parameters": [
           {
@@ -620,14 +505,111 @@
         }
       }
     },
-    "/api/v1/projects/{id}/context": {
+    "/api/v1/projects/{id}/events": {
       "get": {
         "tags": [
           "projects"
         ],
-        "summary": "Get the system prompt sent with conversations in the project",
-        "description": "Get the system prompt sent with conversations in the project",
-        "operationId": "apiV1ProjectsIdContextGet",
+        "summary": "Server-sent events for the project page: message, message_delta, thread, thread_event, project",
+        "description": "Server-sent events for the project page: message, message_delta, thread, thread_event, project",
+        "operationId": "apiV1ProjectsIdEventsGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/library": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List library files (uploads and thread outputs)",
+        "description": "List library files (uploads and thread outputs)",
+        "operationId": "apiV1ProjectsIdLibraryGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Upload files (multipart field \"files\") to the library",
+        "description": "Upload files (multipart field \"files\") to the library",
+        "operationId": "apiV1ProjectsIdLibraryPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/library/file": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Download a library file",
+        "description": "Download a library file",
+        "operationId": "apiV1ProjectsIdLibraryFileGet",
         "parameters": [
           {
             "name": "id",
@@ -639,9 +621,9 @@
             }
           },
           {
-            "name": "q",
+            "name": "path",
             "in": "query",
-            "description": "Sample user message to rank knowledge against in retrieval mode",
+            "description": "Library-relative path",
             "required": false,
             "schema": {
               "type": "string"
@@ -654,7 +636,47 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ContextResponse"
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Delete a library file",
+        "description": "Delete a library file",
+        "operationId": "apiV1ProjectsIdLibraryFileDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "description": "Library-relative path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
                 }
               }
             }
@@ -662,14 +684,14 @@
         }
       }
     },
-    "/api/v1/projects/{id}/knowledge": {
-      "post": {
+    "/api/v1/projects/{id}/memory": {
+      "get": {
         "tags": [
-          "knowledge"
+          "projects"
         ],
-        "summary": "Upload text files (multipart field \"files\") as project knowledge",
-        "description": "Upload text files (multipart field \"files\") as project knowledge",
-        "operationId": "apiV1ProjectsIdKnowledgePost",
+        "summary": "List memory files",
+        "description": "List memory files",
+        "operationId": "apiV1ProjectsIdMemoryGet",
         "parameters": [
           {
             "name": "id",
@@ -687,7 +709,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UploadResponse"
+                  "$ref": "#/components/schemas/MemoryResponse"
                 }
               }
             }
@@ -695,14 +717,187 @@
         }
       }
     },
-    "/api/v1/projects/{id}/knowledge/text": {
+    "/api/v1/projects/{id}/memory/{name}": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Read a memory file",
+        "description": "Read a memory file",
+        "operationId": "apiV1ProjectsIdMemoryNameGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Resource name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryFileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Write a memory file",
+        "description": "Write a memory file",
+        "operationId": "apiV1ProjectsIdMemoryNamePut",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Resource name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteMemoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryFileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Delete a memory file",
+        "description": "Delete a memory file",
+        "operationId": "apiV1ProjectsIdMemoryNameDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Resource name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/messages": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "The project conversation",
+        "description": "The project conversation",
+        "operationId": "apiV1ProjectsIdMessagesGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Latest N messages",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
-          "knowledge"
+          "projects"
         ],
-        "summary": "Add pasted text as project knowledge",
-        "description": "Add pasted text as project knowledge",
-        "operationId": "apiV1ProjectsIdKnowledgeTextPost",
+        "summary": "Send work or a question to the coordinator; its reply arrives on the event stream",
+        "description": "Send work or a question to the coordinator; its reply arrives on the event stream",
+        "operationId": "apiV1ProjectsIdMessagesPost",
         "parameters": [
           {
             "name": "id",
@@ -720,7 +915,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddTextRequest"
+                "$ref": "#/components/schemas/PostMessageRequest"
               }
             }
           }
@@ -731,7 +926,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KnowledgeFileSummary"
+                  "$ref": "#/components/schemas/ProjectMessage"
                 }
               }
             }
@@ -739,14 +934,67 @@
         }
       }
     },
-    "/api/v1/projects/{id}/memory/refresh": {
+    "/api/v1/projects/{id}/messages/{mid}/start": {
       "post": {
         "tags": [
           "projects"
         ],
-        "summary": "Fold the project's recent chats into its memory now",
-        "description": "Fold the project's recent chats into its memory now",
-        "operationId": "apiV1ProjectsIdMemoryRefreshPost",
+        "summary": "Start threads the coordinator proposed",
+        "description": "Start threads the coordinator proposed",
+        "operationId": "apiV1ProjectsIdMessagesMidStartPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSuggestionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/usage": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Token use by model and by thread",
+        "description": "Token use by model and by thread",
+        "operationId": "apiV1ProjectsIdUsageGet",
         "parameters": [
           {
             "name": "id",
@@ -764,7 +1012,40 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Project"
+                  "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/repos/inspect": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Check a local repository path and return its root and current branch",
+        "description": "Check a local repository path and return its root and current branch",
+        "operationId": "apiV1ReposInspectPost",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectRepoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectRepoResponse"
                 }
               }
             }
@@ -890,61 +1171,306 @@
           }
         }
       }
+    },
+    "/api/v1/threads/{id}": {
+      "get": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A thread with its transcript",
+        "description": "A thread with its transcript",
+        "operationId": "apiV1ThreadsIdGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/diff": {
+      "get": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "The thread's changes against its base branch",
+        "description": "The thread's changes against its base branch",
+        "operationId": "apiV1ThreadsIdDiffGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Diff"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/merge": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.",
+        "description": "Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.",
+        "operationId": "apiV1ThreadsIdMergePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "merge blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeBlockedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/messages": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Send a message straight to the thread (runs after its current turn)",
+        "description": "Send a message straight to the thread (runs after its current turn)",
+        "operationId": "apiV1ThreadsIdMessagesPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/reopen": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Reopen a resolved thread",
+        "description": "Reopen a resolved thread",
+        "operationId": "apiV1ThreadsIdReopenPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/resolve": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Mark the thread resolved",
+        "description": "Mark the thread resolved",
+        "operationId": "apiV1ThreadsIdResolvePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/respond": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Answer a permission request or question the thread is waiting on",
+        "description": "Answer a permission request or question the thread is waiting on",
+        "operationId": "apiV1ThreadsIdRespondPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/threads/{id}/stop": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Interrupt the thread's running turn",
+        "description": "Interrupt the thread's running turn",
+        "operationId": "apiV1ThreadsIdStopPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
-      "AddTextRequest": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "Field content"
-          },
-          "name": {
-            "type": "string",
-            "description": "Field name"
-          }
-        },
-        "required": [
-          "name",
-          "content"
-        ]
-      },
-      "Capacity": {
-        "type": "object",
-        "properties": {
-          "inline_budget": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field inline_budget"
-          },
-          "knowledge_tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field knowledge_tokens"
-          },
-          "max_tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field max_tokens"
-          },
-          "mode": {
-            "type": "string",
-            "description": "Field mode",
-            "enum": [
-              "inline",
-              "retrieval"
-            ]
-          }
-        },
-        "required": [
-          "knowledge_tokens",
-          "inline_budget",
-          "max_tokens",
-          "mode"
-        ]
-      },
       "ConnectionDraft": {
         "type": "object",
         "properties": {
@@ -975,41 +1501,6 @@
           "default_model"
         ]
       },
-      "ContextResponse": {
-        "type": "object",
-        "properties": {
-          "excerpts": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field excerpts"
-          },
-          "knowledge_tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field knowledge_tokens"
-          },
-          "mode": {
-            "type": "string",
-            "description": "Field mode"
-          },
-          "system_prompt": {
-            "type": "string",
-            "description": "Field system_prompt"
-          },
-          "tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field tokens"
-          }
-        },
-        "required": [
-          "system_prompt",
-          "tokens",
-          "mode",
-          "knowledge_tokens",
-          "excerpts"
-        ]
-      },
       "Conversation": {
         "type": "object",
         "properties": {
@@ -1022,17 +1513,9 @@
             "type": "string",
             "description": "Field id"
           },
-          "memory_disabled": {
-            "type": "boolean",
-            "description": "Field memory_disabled"
-          },
           "model": {
             "type": "string",
             "description": "Field model"
-          },
-          "project_id": {
-            "type": "string",
-            "description": "Field project_id"
           },
           "starred": {
             "type": "boolean",
@@ -1050,11 +1533,9 @@
         },
         "required": [
           "id",
-          "project_id",
           "title",
           "model",
           "starred",
-          "memory_disabled",
           "created_at",
           "updated_at"
         ]
@@ -1071,9 +1552,6 @@
             "items": {
               "$ref": "#/components/schemas/Message"
             }
-          },
-          "project": {
-            "$ref": "#/components/schemas/ProjectRef"
           }
         },
         "required": [
@@ -1088,7 +1566,7 @@
             "type": "array",
             "description": "Field conversations",
             "items": {
-              "$ref": "#/components/schemas/ConversationSummary"
+              "$ref": "#/components/schemas/Conversation"
             }
           }
         },
@@ -1096,95 +1574,94 @@
           "conversations"
         ]
       },
-      "ConversationSummary": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field created_at"
-          },
-          "id": {
-            "type": "string",
-            "description": "Field id"
-          },
-          "memory_disabled": {
-            "type": "boolean",
-            "description": "Field memory_disabled"
-          },
-          "model": {
-            "type": "string",
-            "description": "Field model"
-          },
-          "project_id": {
-            "type": "string",
-            "description": "Field project_id"
-          },
-          "project_name": {
-            "type": "string",
-            "description": "Field project_name"
-          },
-          "starred": {
-            "type": "boolean",
-            "description": "Field starred"
-          },
-          "title": {
-            "type": "string",
-            "description": "Field title"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field updated_at"
-          }
-        },
-        "required": [
-          "id",
-          "project_id",
-          "title",
-          "model",
-          "starred",
-          "memory_disabled",
-          "created_at",
-          "updated_at",
-          "project_name"
-        ]
-      },
       "CreateConversationRequest": {
         "type": "object",
         "properties": {
-          "memory_disabled": {
-            "type": "boolean",
-            "description": "Field memory_disabled"
-          },
           "model": {
             "type": "string",
             "description": "Field model"
-          },
-          "project_id": {
-            "type": "string",
-            "description": "Field project_id"
           }
         }
       },
       "CreateProjectRequest": {
         "type": "object",
         "properties": {
-          "description": {
+          "goal": {
             "type": "string",
-            "description": "Field description"
-          },
-          "instructions": {
-            "type": "string",
-            "description": "Field instructions"
+            "description": "Field goal"
           },
           "name": {
             "type": "string",
             "description": "Field name"
+          },
+          "repos": {
+            "type": "array",
+            "description": "Field repos",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "name"
+        ]
+      },
+      "Diff": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "description": "Field base"
+          },
+          "branch": {
+            "type": "string",
+            "description": "Field branch"
+          },
+          "patch": {
+            "type": "string",
+            "description": "Field patch"
+          },
+          "stat": {
+            "type": "string",
+            "description": "Field stat"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Field truncated"
+          },
+          "uncommitted": {
+            "type": "string",
+            "description": "Field uncommitted"
+          }
+        },
+        "required": [
+          "base",
+          "branch",
+          "stat",
+          "patch",
+          "uncommitted",
+          "truncated"
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Field data"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type"
+          }
+        },
+        "required": [
+          "type",
+          "project_id",
+          "data"
         ]
       },
       "HealthResponse": {
@@ -1205,111 +1682,171 @@
           "version"
         ]
       },
-      "KnowledgeFile": {
+      "InspectRepoRequest": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Field path"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "InspectRepoResponse": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string",
+            "description": "Field branch"
+          },
+          "dirty": {
+            "type": "boolean",
+            "description": "Field dirty"
+          },
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "Field ok"
+          },
+          "root": {
+            "type": "string",
+            "description": "Field root"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "LibraryFile": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "description": "Field origin"
+          },
+          "path": {
+            "type": "string",
+            "description": "Field path"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field size"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "path",
+          "size",
+          "updated_at",
+          "origin"
+        ]
+      },
+      "LibraryResponse": {
+        "type": "object",
+        "properties": {
+          "dir": {
+            "type": "string",
+            "description": "Field dir"
+          },
+          "files": {
+            "type": "array",
+            "description": "Field files",
+            "items": {
+              "$ref": "#/components/schemas/LibraryFile"
+            }
+          }
+        },
+        "required": [
+          "dir",
+          "files"
+        ]
+      },
+      "MemoryFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field size"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          }
+        },
+        "required": [
+          "name",
+          "size",
+          "updated_at"
+        ]
+      },
+      "MemoryFileResponse": {
         "type": "object",
         "properties": {
           "content": {
             "type": "string",
             "description": "Field content"
           },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field created_at"
-          },
-          "id": {
-            "type": "string",
-            "description": "Field id"
-          },
-          "mime_type": {
-            "type": "string",
-            "description": "Field mime_type"
-          },
           "name": {
             "type": "string",
             "description": "Field name"
-          },
-          "project_id": {
-            "type": "string",
-            "description": "Field project_id"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field size"
-          },
-          "tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field tokens"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field updated_at"
           }
         },
         "required": [
-          "id",
-          "project_id",
           "name",
-          "mime_type",
-          "content",
-          "size",
-          "tokens",
-          "created_at",
-          "updated_at"
+          "content"
         ]
       },
-      "KnowledgeFileSummary": {
+      "MemoryResponse": {
         "type": "object",
         "properties": {
-          "created_at": {
+          "dir": {
             "type": "string",
-            "format": "date-time",
-            "description": "Field created_at"
+            "description": "Field dir"
           },
-          "id": {
-            "type": "string",
-            "description": "Field id"
-          },
-          "mime_type": {
-            "type": "string",
-            "description": "Field mime_type"
-          },
-          "name": {
-            "type": "string",
-            "description": "Field name"
-          },
-          "project_id": {
-            "type": "string",
-            "description": "Field project_id"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field size"
-          },
-          "tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field tokens"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field updated_at"
+          "files": {
+            "type": "array",
+            "description": "Field files",
+            "items": {
+              "$ref": "#/components/schemas/MemoryFile"
+            }
           }
         },
         "required": [
-          "id",
-          "project_id",
-          "name",
-          "mime_type",
-          "size",
-          "tokens",
-          "created_at",
-          "updated_at"
+          "dir",
+          "files"
+        ]
+      },
+      "MergeBlockedResponse": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Field command"
+          },
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          }
+        },
+        "required": [
+          "error",
+          "command"
         ]
       },
       "Message": {
@@ -1367,6 +1904,21 @@
           "created_at"
         ]
       },
+      "MessagesResponse": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "description": "Field messages",
+            "items": {
+              "$ref": "#/components/schemas/ProjectMessage"
+            }
+          }
+        },
+        "required": [
+          "messages"
+        ]
+      },
       "Model": {
         "type": "object",
         "properties": {
@@ -1382,6 +1934,36 @@
         "required": [
           "id",
           "display_name"
+        ]
+      },
+      "ModelUsage": {
+        "type": "object",
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field input_tokens"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field output_tokens"
+          },
+          "threads": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field threads"
+          }
+        },
+        "required": [
+          "model",
+          "threads",
+          "input_tokens",
+          "output_tokens"
         ]
       },
       "ModelsResponse": {
@@ -1415,6 +1997,18 @@
           "ok"
         ]
       },
+      "PostMessageRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
       "Project": {
         "type": "object",
         "properties": {
@@ -1423,14 +2017,18 @@
             "format": "date-time",
             "description": "Field archived_at"
           },
+          "coordinator_model": {
+            "type": "string",
+            "description": "Field coordinator_model"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "description": "Field created_at"
           },
-          "description": {
+          "goal": {
             "type": "string",
-            "description": "Field description"
+            "description": "Field goal"
           },
           "id": {
             "type": "string",
@@ -1440,22 +2038,32 @@
             "type": "string",
             "description": "Field instructions"
           },
-          "memory": {
-            "type": "string",
-            "description": "Field memory"
-          },
-          "memory_updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field memory_updated_at"
-          },
           "name": {
             "type": "string",
             "description": "Field name"
           },
+          "paused": {
+            "type": "boolean",
+            "description": "Field paused"
+          },
+          "repos": {
+            "type": "array",
+            "description": "Field repos",
+            "items": {
+              "$ref": "#/components/schemas/Repo"
+            }
+          },
           "starred": {
             "type": "boolean",
             "description": "Field starred"
+          },
+          "thread_model": {
+            "type": "string",
+            "description": "Field thread_model"
+          },
+          "thread_permission_mode": {
+            "type": "string",
+            "description": "Field thread_permission_mode"
           },
           "updated_at": {
             "type": "string",
@@ -1466,9 +2074,13 @@
         "required": [
           "id",
           "name",
-          "description",
+          "goal",
           "instructions",
-          "memory",
+          "repos",
+          "coordinator_model",
+          "thread_model",
+          "thread_permission_mode",
+          "paused",
           "starred",
           "created_at",
           "updated_at"
@@ -1477,24 +2089,29 @@
       "ProjectDetailResponse": {
         "type": "object",
         "properties": {
-          "capacity": {
-            "$ref": "#/components/schemas/Capacity"
+          "coordinator_busy": {
+            "type": "boolean",
+            "description": "Field coordinator_busy"
           },
-          "knowledge": {
-            "type": "array",
-            "description": "Field knowledge",
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeFileSummary"
-            }
+          "counts": {
+            "$ref": "#/components/schemas/ThreadCounts"
           },
           "project": {
             "$ref": "#/components/schemas/Project"
+          },
+          "threads": {
+            "type": "array",
+            "description": "Field threads",
+            "items": {
+              "$ref": "#/components/schemas/Thread"
+            }
           }
         },
         "required": [
           "project",
-          "knowledge",
-          "capacity"
+          "threads",
+          "counts",
+          "coordinator_busy"
         ]
       },
       "ProjectListResponse": {
@@ -1512,26 +2129,46 @@
           "projects"
         ]
       },
-      "ProjectRef": {
+      "ProjectMessage": {
         "type": "object",
         "properties": {
-          "archived": {
-            "type": "boolean",
-            "description": "Field archived"
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
           },
           "id": {
             "type": "string",
             "description": "Field id"
           },
-          "name": {
+          "kind": {
             "type": "string",
-            "description": "Field name"
+            "description": "Field kind"
+          },
+          "payload": {
+            "type": "string",
+            "description": "Field payload"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "role": {
+            "type": "string",
+            "description": "Field role"
           }
         },
         "required": [
           "id",
-          "name",
-          "archived"
+          "project_id",
+          "role",
+          "kind",
+          "content",
+          "created_at"
         ]
       },
       "ProjectSummary": {
@@ -1542,19 +2179,18 @@
             "format": "date-time",
             "description": "Field archived_at"
           },
-          "conversation_count": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field conversation_count"
+          "coordinator_model": {
+            "type": "string",
+            "description": "Field coordinator_model"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "description": "Field created_at"
           },
-          "description": {
+          "goal": {
             "type": "string",
-            "description": "Field description"
+            "description": "Field goal"
           },
           "id": {
             "type": "string",
@@ -1564,37 +2200,35 @@
             "type": "string",
             "description": "Field instructions"
           },
-          "knowledge_count": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field knowledge_count"
-          },
-          "knowledge_tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field knowledge_tokens"
-          },
-          "last_activity_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field last_activity_at"
-          },
-          "memory": {
-            "type": "string",
-            "description": "Field memory"
-          },
-          "memory_updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Field memory_updated_at"
-          },
           "name": {
             "type": "string",
             "description": "Field name"
           },
+          "paused": {
+            "type": "boolean",
+            "description": "Field paused"
+          },
+          "repos": {
+            "type": "array",
+            "description": "Field repos",
+            "items": {
+              "$ref": "#/components/schemas/Repo"
+            }
+          },
           "starred": {
             "type": "boolean",
             "description": "Field starred"
+          },
+          "thread_model": {
+            "type": "string",
+            "description": "Field thread_model"
+          },
+          "thread_permission_mode": {
+            "type": "string",
+            "description": "Field thread_permission_mode"
+          },
+          "threads": {
+            "$ref": "#/components/schemas/ThreadCounts"
           },
           "updated_at": {
             "type": "string",
@@ -1605,16 +2239,17 @@
         "required": [
           "id",
           "name",
-          "description",
+          "goal",
           "instructions",
-          "memory",
+          "repos",
+          "coordinator_model",
+          "thread_model",
+          "thread_permission_mode",
+          "paused",
           "starred",
           "created_at",
           "updated_at",
-          "conversation_count",
-          "knowledge_count",
-          "knowledge_tokens",
-          "last_activity_at"
+          "threads"
         ]
       },
       "RegenerateRequest": {
@@ -1626,21 +2261,50 @@
           }
         }
       },
-      "RejectedFile": {
+      "Repo": {
         "type": "object",
         "properties": {
-          "name": {
+          "base_branch": {
             "type": "string",
-            "description": "Field name"
+            "description": "Field base_branch"
           },
-          "reason": {
+          "path": {
             "type": "string",
-            "description": "Field reason"
+            "description": "Field path"
           }
         },
         "required": [
-          "name",
-          "reason"
+          "path",
+          "base_branch"
+        ]
+      },
+      "RespondRequest": {
+        "type": "object",
+        "properties": {
+          "allow": {
+            "type": "boolean",
+            "description": "Field allow"
+          },
+          "answer": {
+            "type": "string",
+            "description": "Field answer"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Field request_id"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Field scope",
+            "enum": [
+              "once",
+              "thread"
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "allow"
         ]
       },
       "SendMessageRequest": {
@@ -1653,6 +2317,18 @@
           "model": {
             "type": "string",
             "description": "Field model"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "SendRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
           }
         },
         "required": [
@@ -1681,11 +2357,6 @@
             "description": "Field base_url",
             "example": "http://localhost:12580/tingly/anthropic"
           },
-          "context_limit_tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field context_limit_tokens"
-          },
           "default_base_url": {
             "type": "string",
             "description": "Field default_base_url"
@@ -1698,6 +2369,9 @@
             "type": "string",
             "description": "Field endpoint",
             "example": "http://localhost:12580/tingly/anthropic/v1/messages"
+          },
+          "threads": {
+            "$ref": "#/components/schemas/ThreadRuntime"
           }
         },
         "required": [
@@ -1708,15 +2382,25 @@
           "api_key_hint",
           "default_model",
           "default_base_url",
-          "context_limit_tokens"
+          "threads"
         ]
+      },
+      "StartSuggestionsRequest": {
+        "type": "object",
+        "properties": {
+          "indexes": {
+            "type": "array",
+            "description": "Field indexes",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
       },
       "StreamEvent": {
         "type": "object",
         "properties": {
-          "context": {
-            "$ref": "#/components/schemas/TurnContext"
-          },
           "error": {
             "type": "string",
             "description": "Field error"
@@ -1819,49 +2503,298 @@
           "latency_ms"
         ]
       },
-      "TurnContext": {
+      "Thread": {
         "type": "object",
         "properties": {
-          "excerpts": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field excerpts"
-          },
-          "knowledge_tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Field knowledge_tokens"
-          },
-          "memory_used": {
-            "type": "boolean",
-            "description": "Field memory_used"
-          },
-          "mode": {
+          "base_branch": {
             "type": "string",
-            "description": "Field mode"
-          }
-        },
-        "required": [
-          "mode",
-          "knowledge_tokens",
-          "excerpts",
-          "memory_used"
-        ]
-      },
-      "UpdateConversationRequest": {
-        "type": "object",
-        "properties": {
-          "memory_disabled": {
-            "type": "boolean",
-            "description": "Field memory_disabled"
+            "description": "Field base_branch"
+          },
+          "branch": {
+            "type": "string",
+            "description": "Field branch"
+          },
+          "commits_ahead": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field commits_ahead"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "files_changed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field files_changed"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field input_tokens"
+          },
+          "last_report": {
+            "type": "string",
+            "description": "Field last_report"
+          },
+          "merged_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field merged_at"
           },
           "model": {
             "type": "string",
             "description": "Field model"
           },
+          "origin": {
+            "type": "string",
+            "description": "Field origin"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field output_tokens"
+          },
           "project_id": {
             "type": "string",
             "description": "Field project_id"
+          },
+          "repo_path": {
+            "type": "string",
+            "description": "Field repo_path"
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field resolved_at"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Field session_id"
+          },
+          "status": {
+            "type": "string",
+            "description": "Field status"
+          },
+          "task": {
+            "type": "string",
+            "description": "Field task"
+          },
+          "title": {
+            "type": "string",
+            "description": "Field title"
+          },
+          "turns": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field turns"
+          },
+          "uncommitted": {
+            "type": "boolean",
+            "description": "Field uncommitted"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          },
+          "wait_reason": {
+            "type": "string",
+            "description": "Field wait_reason"
+          },
+          "worktree": {
+            "type": "string",
+            "description": "Field worktree"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "title",
+          "task",
+          "status",
+          "origin",
+          "worktree",
+          "commits_ahead",
+          "files_changed",
+          "uncommitted",
+          "turns",
+          "input_tokens",
+          "output_tokens",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "ThreadCounts": {
+        "type": "object",
+        "properties": {
+          "idle": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field idle"
+          },
+          "ready": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field ready"
+          },
+          "resolved": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field resolved"
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field waiting"
+          },
+          "working": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field working"
+          }
+        },
+        "required": [
+          "working",
+          "waiting",
+          "ready",
+          "idle",
+          "resolved"
+        ]
+      },
+      "ThreadDetailResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "description": "Field events",
+            "items": {
+              "$ref": "#/components/schemas/ThreadEvent"
+            }
+          },
+          "running": {
+            "type": "boolean",
+            "description": "Field running"
+          },
+          "thread": {
+            "$ref": "#/components/schemas/Thread"
+          }
+        },
+        "required": [
+          "thread",
+          "events",
+          "running"
+        ]
+      },
+      "ThreadEvent": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "from": {
+            "type": "string",
+            "description": "Field from"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Field kind"
+          },
+          "payload": {
+            "type": "string",
+            "description": "Field payload"
+          },
+          "thread_id": {
+            "type": "string",
+            "description": "Field thread_id"
+          }
+        },
+        "required": [
+          "id",
+          "thread_id",
+          "kind",
+          "content",
+          "created_at"
+        ]
+      },
+      "ThreadRuntime": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "description": "Field cli_path"
+          },
+          "via_connection": {
+            "type": "boolean",
+            "description": "Field via_connection"
+          }
+        },
+        "required": [
+          "cli_path",
+          "via_connection"
+        ]
+      },
+      "ThreadUsage": {
+        "type": "object",
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field input_tokens"
+          },
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field output_tokens"
+          },
+          "thread_id": {
+            "type": "string",
+            "description": "Field thread_id"
+          },
+          "title": {
+            "type": "string",
+            "description": "Field title"
+          },
+          "turns": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field turns"
+          }
+        },
+        "required": [
+          "thread_id",
+          "title",
+          "model",
+          "turns",
+          "input_tokens",
+          "output_tokens"
+        ]
+      },
+      "UpdateConversationRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Field model"
           },
           "starred": {
             "type": "boolean",
@@ -1873,19 +2806,6 @@
           }
         }
       },
-      "UpdateKnowledgeRequest": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "Field content"
-          },
-          "name": {
-            "type": "string",
-            "description": "Field name"
-          }
-        }
-      },
       "UpdateProjectRequest": {
         "type": "object",
         "properties": {
@@ -1893,49 +2813,86 @@
             "type": "boolean",
             "description": "Field archived"
           },
-          "description": {
+          "coordinator_model": {
             "type": "string",
-            "description": "Field description"
+            "description": "Field coordinator_model"
+          },
+          "goal": {
+            "type": "string",
+            "description": "Field goal"
           },
           "instructions": {
             "type": "string",
             "description": "Field instructions"
           },
-          "memory": {
-            "type": "string",
-            "description": "Field memory"
-          },
           "name": {
             "type": "string",
             "description": "Field name"
           },
+          "paused": {
+            "type": "boolean",
+            "description": "Field paused"
+          },
+          "repos": {
+            "type": "array",
+            "description": "Field repos",
+            "items": {
+              "type": "string"
+            }
+          },
           "starred": {
             "type": "boolean",
             "description": "Field starred"
+          },
+          "thread_model": {
+            "type": "string",
+            "description": "Field thread_model"
+          },
+          "thread_permission_mode": {
+            "type": "string",
+            "description": "Field thread_permission_mode",
+            "enum": [
+              "default",
+              "acceptEdits",
+              "auto",
+              "bypassPermissions"
+            ]
           }
         }
       },
-      "UploadResponse": {
+      "UsageResponse": {
         "type": "object",
         "properties": {
-          "files": {
+          "by_model": {
             "type": "array",
-            "description": "Field files",
+            "description": "Field by_model",
             "items": {
-              "$ref": "#/components/schemas/KnowledgeFileSummary"
+              "$ref": "#/components/schemas/ModelUsage"
             }
           },
-          "rejected": {
+          "by_thread": {
             "type": "array",
-            "description": "Field rejected",
+            "description": "Field by_thread",
             "items": {
-              "$ref": "#/components/schemas/RejectedFile"
+              "$ref": "#/components/schemas/ThreadUsage"
             }
           }
         },
         "required": [
-          "files",
-          "rejected"
+          "by_model",
+          "by_thread"
+        ]
+      },
+      "WriteMemoryRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Field content"
+          }
+        },
+        "required": [
+          "content"
         ]
       }
     },
@@ -1955,10 +2912,6 @@
       "description": "Operations related to conversations"
     },
     {
-      "name": "knowledge",
-      "description": "Operations related to knowledge"
-    },
-    {
       "name": "projects",
       "description": "Operations related to projects"
     },
@@ -1969,6 +2922,10 @@
     {
       "name": "system",
       "description": "Operations related to system"
+    },
+    {
+      "name": "threads",
+      "description": "Operations related to threads"
     }
   ]
 }

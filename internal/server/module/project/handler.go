@@ -1,32 +1,40 @@
-// Package project serves projects and their knowledge: the custom
-// instructions and documents that every conversation in a project starts with.
+// Package project serves Projects: the project list and settings, the
+// project conversation with its coordinator, the live event stream, memory,
+// library and usage. Threads are served by the thread module.
 package project
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
 	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/knowledge"
+	rt "github.com/tingly-dev/tingly-project/internal/project"
 	"github.com/tingly-dev/tingly-project/internal/server/module"
 	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
 )
 
-// ProjectSummary is a project as listed on the projects page.
+// ThreadCounts is how many threads a project has in each Overview group.
+type ThreadCounts struct {
+	Working  int `json:"working"`
+	Waiting  int `json:"waiting"`
+	Ready    int `json:"ready"`
+	Idle     int `json:"idle"`
+	Resolved int `json:"resolved"`
+}
+
+// ProjectSummary is a project card.
 type ProjectSummary struct {
 	db.Project
-	ConversationCount int       `json:"conversation_count"`
-	KnowledgeCount    int       `json:"knowledge_count"`
-	KnowledgeTokens   int       `json:"knowledge_tokens"`
-	LastActivityAt    time.Time `json:"last_activity_at"`
+	Threads ThreadCounts `json:"threads"`
 }
 
 // ProjectListResponse lists projects.
@@ -34,202 +42,238 @@ type ProjectListResponse struct {
 	Projects []ProjectSummary `json:"projects"`
 }
 
-// KnowledgeFileSummary is a knowledge file without its content.
-type KnowledgeFileSummary struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	Name      string    `json:"name"`
-	MimeType  string    `json:"mime_type"`
-	Size      int64     `json:"size"`
-	Tokens    int       `json:"tokens"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// Capacity is how much knowledge the project holds against its budgets.
-type Capacity struct {
-	// KnowledgeTokens is the estimated size of all knowledge files.
-	KnowledgeTokens int `json:"knowledge_tokens"`
-	// InlineBudget is the size up to which knowledge is sent in full.
-	InlineBudget int `json:"inline_budget"`
-	// MaxTokens is the hard cap, reachable in retrieval mode.
-	MaxTokens int `json:"max_tokens"`
-	// Mode is "inline" or "retrieval"; it switches automatically.
-	Mode string `json:"mode" enum:"inline,retrieval"`
-}
-
-// ProjectDetailResponse is a project with its knowledge.
+// ProjectDetailResponse is everything the project page needs at load.
 type ProjectDetailResponse struct {
-	Project   db.Project             `json:"project"`
-	Knowledge []KnowledgeFileSummary `json:"knowledge"`
-	Capacity  Capacity               `json:"capacity"`
+	Project db.Project   `json:"project"`
+	Threads []db.Thread  `json:"threads"`
+	Counts  ThreadCounts `json:"counts"`
+	// CoordinatorBusy is true while the coordinator is working on a turn.
+	CoordinatorBusy bool `json:"coordinator_busy"`
 }
 
-// CreateProjectRequest creates a project.
+// CreateProjectRequest is the New project dialog.
 type CreateProjectRequest struct {
-	Name         string `json:"name" binding:"required"`
-	Description  string `json:"description,omitempty"`
-	Instructions string `json:"instructions,omitempty"`
+	Name string `json:"name" binding:"required"`
+	Goal string `json:"goal,omitempty"`
+	// Repos are local repository paths; each thread branches from the
+	// repository's current branch.
+	Repos []string `json:"repos,omitempty"`
 }
 
 // UpdateProjectRequest changes the fields that are set.
 type UpdateProjectRequest struct {
-	Name         *string `json:"name,omitempty"`
-	Description  *string `json:"description,omitempty"`
-	Instructions *string `json:"instructions,omitempty"`
-	Memory       *string `json:"memory,omitempty"`
-	Starred      *bool   `json:"starred,omitempty"`
-	Archived     *bool   `json:"archived,omitempty"`
+	Name                 *string   `json:"name,omitempty"`
+	Goal                 *string   `json:"goal,omitempty"`
+	Instructions         *string   `json:"instructions,omitempty"`
+	Repos                *[]string `json:"repos,omitempty"`
+	CoordinatorModel     *string   `json:"coordinator_model,omitempty"`
+	ThreadModel          *string   `json:"thread_model,omitempty"`
+	ThreadPermissionMode *string   `json:"thread_permission_mode,omitempty" enum:"default,acceptEdits,auto,bypassPermissions"`
+	Starred              *bool     `json:"starred,omitempty"`
+	Paused               *bool     `json:"paused,omitempty"`
+	Archived             *bool     `json:"archived,omitempty"`
 }
 
-// ContextResponse is the exact system prompt a project's conversations get.
-// In retrieval mode it is computed for the query parameter "q".
-type ContextResponse struct {
-	SystemPrompt    string `json:"system_prompt"`
-	Tokens          int    `json:"tokens"`
-	Mode            string `json:"mode"`
-	KnowledgeTokens int    `json:"knowledge_tokens"`
-	Excerpts        int    `json:"excerpts"`
+// MessagesResponse is the project conversation.
+type MessagesResponse struct {
+	Messages []db.ProjectMessage `json:"messages"`
 }
 
-// MemoryRefresher folds recent chats into a project's memory.
-type MemoryRefresher interface {
-	Refresh(ctx context.Context, projectID string) (*db.Project, error)
-}
-
-// AddTextRequest adds pasted text as a knowledge file.
-type AddTextRequest struct {
-	Name    string `json:"name" binding:"required"`
+// PostMessageRequest sends work or a question to the coordinator.
+type PostMessageRequest struct {
 	Content string `json:"content" binding:"required"`
 }
 
-// UpdateKnowledgeRequest renames or rewrites a knowledge file.
-type UpdateKnowledgeRequest struct {
-	Name    *string `json:"name,omitempty"`
-	Content *string `json:"content,omitempty"`
+// StartSuggestionsRequest starts proposed threads; empty indexes start all.
+type StartSuggestionsRequest struct {
+	Indexes []int `json:"indexes,omitempty"`
 }
 
-// RejectedFile is an upload that could not be used as knowledge.
-type RejectedFile struct {
-	Name   string `json:"name"`
-	Reason string `json:"reason"`
+// MemoryResponse lists memory files.
+type MemoryResponse struct {
+	Dir   string          `json:"dir"`
+	Files []rt.MemoryFile `json:"files"`
 }
 
-// UploadResponse reports accepted and rejected uploads.
-type UploadResponse struct {
-	Files    []KnowledgeFileSummary `json:"files"`
-	Rejected []RejectedFile         `json:"rejected"`
+// MemoryFileResponse is one memory file.
+type MemoryFileResponse struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 
-// OKResponse acknowledges a deletion.
+// WriteMemoryRequest writes a memory file.
+type WriteMemoryRequest struct {
+	Content string `json:"content"`
+}
+
+// LibraryResponse lists library files.
+type LibraryResponse struct {
+	Dir   string           `json:"dir"`
+	Files []rt.LibraryFile `json:"files"`
+}
+
+// UsageResponse is token use by model and by thread.
+type UsageResponse struct {
+	ByModel  []db.ModelUsage `json:"by_model"`
+	ByThread []ThreadUsage   `json:"by_thread"`
+}
+
+// ThreadUsage is one thread's token use.
+type ThreadUsage struct {
+	ThreadID     string `json:"thread_id"`
+	Title        string `json:"title"`
+	Model        string `json:"model"`
+	Turns        int    `json:"turns"`
+	InputTokens  int64  `json:"input_tokens"`
+	OutputTokens int64  `json:"output_tokens"`
+}
+
+// InspectRepoRequest checks a local repository path.
+type InspectRepoRequest struct {
+	Path string `json:"path" binding:"required"`
+}
+
+// InspectRepoResponse is the concrete repository a path resolves to.
+type InspectRepoResponse struct {
+	OK     bool   `json:"ok"`
+	Root   string `json:"root,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	Dirty  bool   `json:"dirty,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// OKResponse acknowledges an action.
 type OKResponse struct {
 	OK bool `json:"ok"`
 }
 
-// Handler is the project HTTP module.
+// Handler is the Projects HTTP module.
 type Handler struct {
-	store  *db.Store
-	memory MemoryRefresher
+	svc *rt.Service
 }
 
-// NewHandler builds the project module.
-func NewHandler(store *db.Store, memory MemoryRefresher) *Handler {
-	return &Handler{store: store, memory: memory}
-}
+// NewHandler builds the module.
+func NewHandler(svc *rt.Service) *Handler { return &Handler{svc: svc} }
 
 var _ module.Module = (*Handler)(nil)
 
-// RegisterRoutes mounts project and knowledge endpoints.
-func (h *Handler) RegisterRoutes(rt *module.Routes) {
-	api := rt.API
-	api.GET("/projects", h.list,
-		swagger.WithTags("projects"),
-		swagger.WithDescription("List projects"),
-		swagger.WithQuery("q", "string", "Search name and description"),
-		swagger.WithQuery("archived", "boolean", "List archived projects instead of active ones"),
+// RegisterRoutes mounts the Projects endpoints.
+func (h *Handler) RegisterRoutes(r *module.Routes) {
+	api := r.API
+	tag := swagger.WithTags("projects")
+	api.GET("/projects", h.list, tag,
+		swagger.WithDescription("List projects with thread counts per Overview group"),
+		swagger.WithQuery("q", "string", "Search name and goal"),
+		swagger.WithQuery("archived", "boolean", "List archived projects"),
 		swagger.WithResponseModel(ProjectListResponse{}))
-	api.POST("/projects", h.create,
-		swagger.WithTags("projects"),
+	api.POST("/projects", h.create, tag,
 		swagger.WithDescription("Create a project"),
 		swagger.WithRequestModel(CreateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
-	api.GET("/projects/:id", h.get,
-		swagger.WithTags("projects"),
-		swagger.WithDescription("Get a project with its knowledge"),
+	api.POST("/repos/inspect", h.inspectRepo, tag,
+		swagger.WithDescription("Check a local repository path and return its root and current branch"),
+		swagger.WithRequestModel(InspectRepoRequest{}),
+		swagger.WithResponseModel(InspectRepoResponse{}))
+	api.GET("/projects/:id", h.get, tag,
+		swagger.WithDescription("Get a project with its threads"),
 		swagger.WithResponseModel(ProjectDetailResponse{}))
-	api.PATCH("/projects/:id", h.update,
-		swagger.WithTags("projects"),
-		swagger.WithDescription("Update a project"),
+	api.PATCH("/projects/:id", h.update, tag,
+		swagger.WithDescription("Update project settings; pause, resume, archive, unarchive, star"),
 		swagger.WithRequestModel(UpdateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
-	api.DELETE("/projects/:id", h.delete,
-		swagger.WithTags("projects"),
-		swagger.WithDescription("Delete a project with its knowledge and conversations. Archived projects must be unarchived first."),
+	api.DELETE("/projects/:id", h.delete, tag,
+		swagger.WithDescription("Delete a project with its threads, memory and library. Branches are kept."),
 		swagger.WithResponseModel(OKResponse{}))
-	api.GET("/projects/:id/context", h.context,
-		swagger.WithTags("projects"),
-		swagger.WithDescription("Get the system prompt sent with conversations in the project"),
-		swagger.WithQuery("q", "string", "Sample user message to rank knowledge against in retrieval mode"),
-		swagger.WithResponseModel(ContextResponse{}))
-	api.POST("/projects/:id/memory/refresh", h.refreshMemory,
-		swagger.WithTags("projects"),
-		swagger.WithDescription("Fold the project's recent chats into its memory now"),
-		swagger.WithResponseModel(db.Project{}))
 
-	api.POST("/projects/:id/knowledge", h.upload,
-		swagger.WithTags("knowledge"),
-		swagger.WithDescription("Upload text files (multipart field \"files\") as project knowledge"),
-		swagger.WithResponseModel(UploadResponse{}))
-	api.POST("/projects/:id/knowledge/text", h.addText,
-		swagger.WithTags("knowledge"),
-		swagger.WithDescription("Add pasted text as project knowledge"),
-		swagger.WithRequestModel(AddTextRequest{}),
-		swagger.WithResponseModel(KnowledgeFileSummary{}))
-	api.GET("/knowledge/:id", h.getKnowledge,
-		swagger.WithTags("knowledge"),
-		swagger.WithDescription("Get a knowledge file with its content"),
-		swagger.WithResponseModel(db.KnowledgeFile{}))
-	api.PATCH("/knowledge/:id", h.updateKnowledge,
-		swagger.WithTags("knowledge"),
-		swagger.WithDescription("Rename or rewrite a knowledge file"),
-		swagger.WithRequestModel(UpdateKnowledgeRequest{}),
-		swagger.WithResponseModel(KnowledgeFileSummary{}))
-	api.DELETE("/knowledge/:id", h.deleteKnowledge,
-		swagger.WithTags("knowledge"),
-		swagger.WithDescription("Delete a knowledge file"),
+	api.GET("/projects/:id/messages", h.messages, tag,
+		swagger.WithDescription("The project conversation"),
+		swagger.WithQuery("limit", "integer", "Latest N messages"),
+		swagger.WithResponseModel(MessagesResponse{}))
+	api.POST("/projects/:id/messages", h.post, tag,
+		swagger.WithDescription("Send work or a question to the coordinator; its reply arrives on the event stream"),
+		swagger.WithRequestModel(PostMessageRequest{}),
+		swagger.WithResponseModel(db.ProjectMessage{}))
+	api.POST("/projects/:id/messages/:mid/start", h.startSuggestions, tag,
+		swagger.WithDescription("Start threads the coordinator proposed"),
+		swagger.WithRequestModel(StartSuggestionsRequest{}),
+		swagger.WithResponseModel(db.ProjectMessage{}))
+	api.GET("/projects/:id/events", h.events, tag,
+		swagger.WithDescription("Server-sent events for the project page: message, message_delta, thread, thread_event, project"),
+		swagger.WithResponseModel(rt.Event{}))
+
+	api.GET("/projects/:id/memory", h.listMemory, tag,
+		swagger.WithDescription("List memory files"),
+		swagger.WithResponseModel(MemoryResponse{}))
+	api.GET("/projects/:id/memory/:name", h.readMemory, tag,
+		swagger.WithDescription("Read a memory file"),
+		swagger.WithResponseModel(MemoryFileResponse{}))
+	api.PUT("/projects/:id/memory/:name", h.writeMemory, tag,
+		swagger.WithDescription("Write a memory file"),
+		swagger.WithRequestModel(WriteMemoryRequest{}),
+		swagger.WithResponseModel(MemoryFileResponse{}))
+	api.DELETE("/projects/:id/memory/:name", h.deleteMemory, tag,
+		swagger.WithDescription("Delete a memory file"),
 		swagger.WithResponseModel(OKResponse{}))
+
+	api.GET("/projects/:id/library", h.listLibrary, tag,
+		swagger.WithDescription("List library files (uploads and thread outputs)"),
+		swagger.WithResponseModel(LibraryResponse{}))
+	api.POST("/projects/:id/library", h.uploadLibrary, tag,
+		swagger.WithDescription("Upload files (multipart field \"files\") to the library"),
+		swagger.WithResponseModel(LibraryResponse{}))
+	api.GET("/projects/:id/library/file", h.downloadLibrary, tag,
+		swagger.WithDescription("Download a library file"),
+		swagger.WithQuery("path", "string", "Library-relative path"))
+	api.DELETE("/projects/:id/library/file", h.deleteLibrary, tag,
+		swagger.WithDescription("Delete a library file"),
+		swagger.WithQuery("path", "string", "Library-relative path"),
+		swagger.WithResponseModel(OKResponse{}))
+
+	api.GET("/projects/:id/usage", h.usage, tag,
+		swagger.WithDescription("Token use by model and by thread"),
+		swagger.WithResponseModel(UsageResponse{}))
 }
 
-func summarize(f db.KnowledgeFile) KnowledgeFileSummary {
-	return KnowledgeFileSummary{
-		ID: f.ID, ProjectID: f.ProjectID, Name: f.Name, MimeType: f.MimeType,
-		Size: f.Size, Tokens: f.Tokens, CreatedAt: f.CreatedAt, UpdatedAt: f.UpdatedAt,
+func counts(m map[string]int) ThreadCounts {
+	return ThreadCounts{Working: m[db.ThreadWorking], Waiting: m[db.ThreadWaiting], Ready: m[db.ThreadReady], Idle: m[db.ThreadIdle], Resolved: m[db.ThreadResolved]}
+}
+
+// storeErr maps runtime errors to statuses.
+func storeErr(c *gin.Context, err error, what string) {
+	switch {
+	case errors.Is(err, rt.ErrPaused), errors.Is(err, rt.ErrArchived), errors.Is(err, rt.ErrResolved):
+		apierr.Message(c, http.StatusConflict, err.Error())
+	case errors.Is(err, db.ErrNotFound):
+		apierr.Store(c, err, what)
+	default:
+		apierr.Message(c, http.StatusBadRequest, err.Error())
 	}
 }
 
+func (h *Handler) project(c *gin.Context) (*db.Project, bool) {
+	p, err := h.svc.Store.GetProject(c.Param("id"))
+	if err != nil {
+		apierr.Store(c, err, "project")
+		return nil, false
+	}
+	return p, true
+}
+
 func (h *Handler) list(c *gin.Context) {
-	projects, stats, err := h.store.ListProjects(c.Query("q"), c.Query("archived") == "true")
+	projects, err := h.svc.Store.ListProjects(c.Query("q"), c.Query("archived") == "true")
 	if err != nil {
 		apierr.Store(c, err, "projects")
 		return
 	}
+	all, err := h.svc.Store.ThreadCounts()
+	if err != nil {
+		apierr.Store(c, err, "threads")
+		return
+	}
 	out := make([]ProjectSummary, 0, len(projects))
 	for _, p := range projects {
-		st := stats[p.ID]
-		out = append(out, ProjectSummary{
-			Project:           p,
-			ConversationCount: st.ConversationCount,
-			KnowledgeCount:    st.KnowledgeCount,
-			KnowledgeTokens:   st.KnowledgeTokens,
-			LastActivityAt:    st.LastActivityAt,
-		})
+		out = append(out, ProjectSummary{Project: p, Threads: counts(all[p.ID])})
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Starred != out[j].Starred {
-			return out[i].Starred
-		}
-		return out[i].LastActivityAt.After(out[j].LastActivityAt)
-	})
 	c.JSON(http.StatusOK, ProjectListResponse{Projects: out})
 }
 
@@ -238,44 +282,50 @@ func (h *Handler) create(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		apierr.BadRequest(c, "name is required")
-		return
-	}
-	p := &db.Project{Name: name, Description: strings.TrimSpace(req.Description), Instructions: req.Instructions}
-	if err := h.store.CreateProject(p); err != nil {
-		apierr.Store(c, err, "project")
+	p, err := h.svc.Create(c.Request.Context(), rt.NewProjectSpec{Name: req.Name, Goal: req.Goal, Repos: req.Repos})
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusCreated, p)
 }
 
+func (h *Handler) inspectRepo(c *gin.Context) {
+	var req InspectRepoRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	repos, err := rt.ResolveRepos(c.Request.Context(), []string{req.Path})
+	if err != nil {
+		c.JSON(http.StatusOK, InspectRepoResponse{Error: err.Error()})
+		return
+	}
+	info, err := rt.InspectRepo(c.Request.Context(), repos[0].Path)
+	if err != nil {
+		c.JSON(http.StatusOK, InspectRepoResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, InspectRepoResponse{OK: true, Root: info.Root, Branch: info.Branch, Dirty: info.Dirty})
+}
+
 func (h *Handler) get(c *gin.Context) {
-	p, err := h.store.GetProject(c.Param("id"))
-	if err != nil {
-		apierr.Store(c, err, "project")
+	p, ok := h.project(c)
+	if !ok {
 		return
 	}
-	files, err := h.store.ListKnowledge(p.ID)
+	threads, err := h.svc.Store.ListThreads(p.ID)
 	if err != nil {
-		apierr.Store(c, err, "knowledge")
+		apierr.Store(c, err, "threads")
 		return
 	}
-	resp := ProjectDetailResponse{
-		Project:   *p,
-		Knowledge: make([]KnowledgeFileSummary, 0, len(files)),
-		Capacity: Capacity{
-			InlineBudget: knowledge.InlineBudget,
-			MaxTokens:    knowledge.MaxKnowledgeTokens,
-		},
+	m := map[string]int{}
+	for _, t := range threads {
+		m[t.Status]++
 	}
-	for _, f := range files {
-		resp.Knowledge = append(resp.Knowledge, summarize(f))
-		resp.Capacity.KnowledgeTokens += f.Tokens
+	if threads == nil {
+		threads = []db.Thread{}
 	}
-	resp.Capacity.Mode = knowledge.ModeFor(resp.Capacity.KnowledgeTokens)
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, ProjectDetailResponse{Project: *p, Threads: threads, Counts: counts(m), CoordinatorBusy: h.svc.Coordinator.Busy(p.ID)})
 }
 
 func (h *Handler) update(c *gin.Context) {
@@ -283,9 +333,8 @@ func (h *Handler) update(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	p, err := h.store.GetProject(c.Param("id"))
-	if err != nil {
-		apierr.Store(c, err, "project")
+	p, ok := h.project(c)
+	if !ok {
 		return
 	}
 	if req.Name != nil {
@@ -296,253 +345,297 @@ func (h *Handler) update(c *gin.Context) {
 		}
 		p.Name = name
 	}
-	if req.Description != nil {
-		p.Description = strings.TrimSpace(*req.Description)
+	if req.Goal != nil {
+		p.Goal = strings.TrimSpace(*req.Goal)
 	}
 	if req.Instructions != nil {
 		p.Instructions = *req.Instructions
 	}
-	if req.Memory != nil {
-		p.Memory = strings.TrimSpace(*req.Memory)
-		now := time.Now()
-		p.MemoryUpdatedAt = &now
+	if req.Repos != nil {
+		repos, err := rt.ResolveRepos(c.Request.Context(), *req.Repos)
+		if err != nil {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
+		p.Repos = repos
+	}
+	if req.CoordinatorModel != nil {
+		p.CoordinatorModel = strings.TrimSpace(*req.CoordinatorModel)
+	}
+	if req.ThreadModel != nil {
+		p.ThreadModel = strings.TrimSpace(*req.ThreadModel)
+	}
+	if req.ThreadPermissionMode != nil {
+		switch *req.ThreadPermissionMode {
+		case "default", "acceptEdits", "auto", "bypassPermissions":
+			p.ThreadPermissionMode = *req.ThreadPermissionMode
+		default:
+			apierr.BadRequest(c, "unknown permission mode")
+			return
+		}
 	}
 	if req.Starred != nil {
 		p.Starred = *req.Starred
 	}
-	if req.Archived != nil {
-		if *req.Archived && p.ArchivedAt == nil {
-			now := time.Now()
-			p.ArchivedAt = &now
-		} else if !*req.Archived {
-			p.ArchivedAt = nil
-		}
+	var err error
+	switch {
+	case req.Archived != nil && (*req.Archived != (p.ArchivedAt != nil)):
+		err = h.svc.SetArchived(p, *req.Archived)
+	case req.Paused != nil && *req.Paused != p.Paused:
+		err = h.svc.SetPaused(p, *req.Paused)
+	default:
+		err = h.svc.Save(p)
 	}
-	if err := h.store.SaveProject(p); err != nil {
-		apierr.Store(c, err, "project")
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, p)
 }
 
 func (h *Handler) delete(c *gin.Context) {
-	p, err := h.store.GetProject(c.Param("id"))
-	if err != nil {
-		apierr.Store(c, err, "project")
+	p, ok := h.project(c)
+	if !ok {
 		return
 	}
-	if p.ArchivedAt != nil {
-		apierr.Message(c, http.StatusConflict, "unarchive the project before deleting it")
-		return
-	}
-	if err := h.store.DeleteProject(p.ID); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), p); err != nil {
 		apierr.Store(c, err, "project")
 		return
 	}
 	c.JSON(http.StatusOK, OKResponse{OK: true})
 }
 
-func (h *Handler) context(c *gin.Context) {
-	p, err := h.store.GetProject(c.Param("id"))
+func (h *Handler) messages(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
+	msgs, err := h.svc.Store.ListProjectMessages(c.Param("id"), limit)
 	if err != nil {
-		apierr.Store(c, err, "project")
+		apierr.Store(c, err, "messages")
 		return
 	}
-	files, err := h.store.ListKnowledgeWithContent(p.ID)
-	if err != nil {
-		apierr.Store(c, err, "knowledge")
-		return
+	if msgs == nil {
+		msgs = []db.ProjectMessage{}
 	}
-	prompt := knowledge.Build(knowledge.PromptInput{Project: p, Files: files, Query: c.Query("q"), Memory: true})
-	c.JSON(http.StatusOK, ContextResponse{
-		SystemPrompt:    prompt.System,
-		Tokens:          knowledge.EstimateTokens(prompt.System),
-		Mode:            prompt.Mode,
-		KnowledgeTokens: prompt.KnowledgeTokens,
-		Excerpts:        prompt.Excerpts,
-	})
+	c.JSON(http.StatusOK, MessagesResponse{Messages: msgs})
 }
 
-func (h *Handler) refreshMemory(c *gin.Context) {
-	p, err := h.memory.Refresh(c.Request.Context(), c.Param("id"))
+func (h *Handler) post(c *gin.Context) {
+	var req PostMessageRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		apierr.BadRequest(c, "message is empty")
+		return
+	}
+	m, err := h.svc.Coordinator.Post(c.Param("id"), req.Content)
 	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
-			apierr.Store(c, err, "project")
+		storeErr(c, err, "project")
+		return
+	}
+	c.JSON(http.StatusCreated, m)
+}
+
+func (h *Handler) startSuggestions(c *gin.Context) {
+	var req StartSuggestionsRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	m, err := h.svc.Coordinator.StartSuggestions(c.Request.Context(), c.Param("id"), c.Param("mid"), req.Indexes)
+	if err != nil {
+		storeErr(c, err, "message")
+		return
+	}
+	c.JSON(http.StatusOK, m)
+}
+
+func (h *Handler) events(c *gin.Context) {
+	p, ok := h.project(c)
+	if !ok {
+		return
+	}
+	ch, cancel := h.svc.Hub.Subscribe(p.ID)
+	defer cancel()
+	w := c.Writer
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, ": connected\n\n")
+	w.Flush()
+	ping := time.NewTicker(20 * time.Second)
+	defer ping.Stop()
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case b := <-ch:
+			fmt.Fprintf(w, "data: %s\n\n", b)
+			w.Flush()
+		case <-ping.C:
+			fmt.Fprint(w, ": ping\n\n")
+			w.Flush()
+		}
+	}
+}
+
+func (h *Handler) listMemory(c *gin.Context) {
+	p, ok := h.project(c)
+	if !ok {
+		return
+	}
+	files, err := h.svc.Layout.ListMemory(p.ID)
+	if err != nil {
+		apierr.Message(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, MemoryResponse{Dir: h.svc.Layout.MemoryDir(p.ID), Files: files})
+}
+
+func (h *Handler) readMemory(c *gin.Context) {
+	content, err := h.svc.Layout.ReadMemory(c.Param("id"), c.Param("name"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			apierr.Message(c, http.StatusNotFound, "memory file not found")
 			return
 		}
-		apierr.Message(c, http.StatusBadGateway, err.Error())
+		apierr.BadRequest(c, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, p)
+	c.JSON(http.StatusOK, MemoryFileResponse{Name: c.Param("name"), Content: content})
 }
 
-// knowledgeTokens is the project's current knowledge size.
-func (h *Handler) knowledgeTokens(projectID string) (int, error) {
-	files, err := h.store.ListKnowledge(projectID)
-	if err != nil {
-		return 0, err
+func (h *Handler) writeMemory(c *gin.Context) {
+	var req WriteMemoryRequest
+	if !apierr.Bind(c, &req) {
+		return
 	}
-	total := 0
-	for _, f := range files {
-		total += f.Tokens
+	p, ok := h.project(c)
+	if !ok {
+		return
 	}
-	return total, nil
+	if err := h.svc.Layout.WriteMemory(p.ID, c.Param("name"), req.Content); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, MemoryFileResponse{Name: c.Param("name"), Content: req.Content})
 }
 
-func overCapacity() string {
-	return fmt.Sprintf("project knowledge would exceed %dk tokens", knowledge.MaxKnowledgeTokens/1000)
+func (h *Handler) deleteMemory(c *gin.Context) {
+	if err := h.svc.Layout.DeleteMemory(c.Param("id"), c.Param("name")); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, OKResponse{OK: true})
 }
 
-func (h *Handler) upload(c *gin.Context) {
-	p, err := h.store.GetProject(c.Param("id"))
+func (h *Handler) listLibrary(c *gin.Context) {
+	p, ok := h.project(c)
+	if !ok {
+		return
+	}
+	files, err := h.svc.Layout.ListLibrary(p.ID)
 	if err != nil {
-		apierr.Store(c, err, "project")
+		apierr.Message(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, LibraryResponse{Dir: h.svc.Layout.LibraryDir(p.ID), Files: files})
+}
+
+// maxUpload caps one uploaded library file.
+const maxUpload = 200 << 20
+
+func (h *Handler) uploadLibrary(c *gin.Context) {
+	p, ok := h.project(c)
+	if !ok {
 		return
 	}
 	form, err := c.MultipartForm()
 	if err != nil {
-		apierr.BadRequest(c, "expected multipart form with field \"files\"")
+		apierr.BadRequest(c, `expected multipart form with field "files"`)
 		return
 	}
-	total, err := h.knowledgeTokens(p.ID)
-	if err != nil {
-		apierr.Store(c, err, "knowledge")
-		return
-	}
-	resp := UploadResponse{Files: []KnowledgeFileSummary{}, Rejected: []RejectedFile{}}
 	for _, fh := range form.File["files"] {
-		reject := func(reason string) {
-			resp.Rejected = append(resp.Rejected, RejectedFile{Name: fh.Filename, Reason: reason})
-		}
-		if fh.Size > knowledge.MaxFileBytes {
-			reject("file is larger than 10 MB")
-			continue
-		}
-		f, err := fh.Open()
-		if err != nil {
-			reject(err.Error())
-			continue
-		}
-		data, err := io.ReadAll(io.LimitReader(f, knowledge.MaxFileBytes+1))
-		_ = f.Close()
-		if err != nil {
-			reject(err.Error())
-			continue
-		}
-		content, mimeType, err := knowledge.Decode(fh.Filename, data)
-		if err != nil {
-			reject(err.Error())
-			continue
-		}
-		tokens := knowledge.EstimateTokens(content)
-		if total+tokens > knowledge.MaxKnowledgeTokens {
-			reject(overCapacity())
-			continue
-		}
-		kf := &db.KnowledgeFile{
-			ProjectID: p.ID,
-			Name:      fh.Filename,
-			MimeType:  mimeType,
-			Content:   content,
-			Size:      int64(len(data)),
-			Tokens:    tokens,
-		}
-		if err := h.store.CreateKnowledge(kf); err != nil {
-			reject(err.Error())
-			continue
-		}
-		total += tokens
-		resp.Files = append(resp.Files, summarize(*kf))
-	}
-	if len(resp.Files) > 0 {
-		_ = h.store.TouchProject(p.ID)
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
-func (h *Handler) addText(c *gin.Context) {
-	var req AddTextRequest
-	if !apierr.Bind(c, &req) {
-		return
-	}
-	p, err := h.store.GetProject(c.Param("id"))
-	if err != nil {
-		apierr.Store(c, err, "project")
-		return
-	}
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		apierr.BadRequest(c, "name is required")
-		return
-	}
-	total, err := h.knowledgeTokens(p.ID)
-	if err != nil {
-		apierr.Store(c, err, "knowledge")
-		return
-	}
-	if tokens := knowledge.EstimateTokens(req.Content); total+tokens > knowledge.MaxKnowledgeTokens {
-		apierr.BadRequest(c, overCapacity())
-		return
-	}
-	kf := &db.KnowledgeFile{
-		ProjectID: p.ID,
-		Name:      name,
-		MimeType:  "text/plain",
-		Content:   req.Content,
-		Size:      int64(len(req.Content)),
-		Tokens:    knowledge.EstimateTokens(req.Content),
-	}
-	if err := h.store.CreateKnowledge(kf); err != nil {
-		apierr.Store(c, err, "knowledge")
-		return
-	}
-	_ = h.store.TouchProject(p.ID)
-	c.JSON(http.StatusCreated, summarize(*kf))
-}
-
-func (h *Handler) getKnowledge(c *gin.Context) {
-	f, err := h.store.GetKnowledge(c.Param("id"))
-	if err != nil {
-		apierr.Store(c, err, "knowledge file")
-		return
-	}
-	c.JSON(http.StatusOK, f)
-}
-
-func (h *Handler) updateKnowledge(c *gin.Context) {
-	var req UpdateKnowledgeRequest
-	if !apierr.Bind(c, &req) {
-		return
-	}
-	f, err := h.store.GetKnowledge(c.Param("id"))
-	if err != nil {
-		apierr.Store(c, err, "knowledge file")
-		return
-	}
-	if req.Name != nil {
-		name := strings.TrimSpace(*req.Name)
-		if name == "" {
-			apierr.BadRequest(c, "name cannot be empty")
+		if fh.Size > maxUpload {
+			apierr.BadRequest(c, fmt.Sprintf("%s is larger than 200 MB", fh.Filename))
 			return
 		}
-		f.Name = name
+		dst, err := h.svc.Layout.LibraryPath(p.ID, filepath.Base(fh.Filename))
+		if err != nil {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
+		if err := saveUpload(func() (multipartFile, error) { return fh.Open() }, dst); err != nil {
+			apierr.Message(c, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
-	if req.Content != nil {
-		f.Content = *req.Content
-		f.Size = int64(len(f.Content))
-		f.Tokens = knowledge.EstimateTokens(f.Content)
-	}
-	if err := h.store.SaveKnowledge(f); err != nil {
-		apierr.Store(c, err, "knowledge file")
-		return
-	}
-	c.JSON(http.StatusOK, summarize(*f))
+	h.listLibrary(c)
 }
 
-func (h *Handler) deleteKnowledge(c *gin.Context) {
-	if err := h.store.DeleteKnowledge(c.Param("id")); err != nil {
-		apierr.Store(c, err, "knowledge file")
+func saveUpload(open func() (multipartFile, error), dst string) error {
+	src, err := open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, src)
+	return err
+}
+
+func (h *Handler) downloadLibrary(c *gin.Context) {
+	path, err := h.svc.Layout.LibraryPath(c.Param("id"), c.Query("path"))
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	if st, err := os.Stat(path); err != nil || st.IsDir() {
+		apierr.Message(c, http.StatusNotFound, "file not found")
+		return
+	}
+	c.FileAttachment(path, filepath.Base(path))
+}
+
+func (h *Handler) deleteLibrary(c *gin.Context) {
+	path, err := h.svc.Layout.LibraryPath(c.Param("id"), c.Query("path"))
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	if err := os.Remove(path); err != nil {
+		apierr.Message(c, http.StatusNotFound, "file not found")
 		return
 	}
 	c.JSON(http.StatusOK, OKResponse{OK: true})
 }
+
+func (h *Handler) usage(c *gin.Context) {
+	p, ok := h.project(c)
+	if !ok {
+		return
+	}
+	byModel, err := h.svc.Store.ProjectUsage(p.ID)
+	if err != nil {
+		apierr.Store(c, err, "usage")
+		return
+	}
+	threads, _ := h.svc.Store.ListThreads(p.ID)
+	resp := UsageResponse{ByModel: byModel, ByThread: []ThreadUsage{}}
+	if resp.ByModel == nil {
+		resp.ByModel = []db.ModelUsage{}
+	}
+	for _, t := range threads {
+		resp.ByThread = append(resp.ByThread, ThreadUsage{ThreadID: t.ID, Title: t.Title, Model: t.Model, Turns: t.Turns, InputTokens: t.InputTokens, OutputTokens: t.OutputTokens})
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// multipartFile is what a multipart file header opens.
+type multipartFile = io.ReadCloser
