@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, Chip, IconButton, InputAdornment, Skeleton, TextField, Typography } from '@mui/material';
+import { Box, Button, IconButton, InputAdornment, Skeleton, TextField, Typography } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type ConversationSummary } from '@/client';
+import { api, unwrap, type Conversation } from '@/client';
 import { ChatActionsMenu } from '@/components/ChatActionsMenu';
-import { Add, Folder, MoreHoriz, Search, Star } from '@/components/icons';
+import { Add, MoreHoriz, Search, Star } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
 import { timeAgo } from '@/utils/format';
 
-function Row({ chat, onChanged }: { chat: ConversationSummary; onChanged: () => void }) {
+function Row({ chat, onChanged }: { chat: Conversation; onChanged: () => void }) {
     const { t, i18n } = useTranslation();
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     return (
@@ -22,11 +22,8 @@ function Row({ chat, onChanged }: { chat: ConversationSummary; onChanged: () => 
                     {chat.title || t('chat.untitled')}
                     {chat.starred && <Star sx={{ fontSize: 14, ml: 0.75, verticalAlign: '-2px' }} color="primary" />}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">{t('project.lastMessage', { time: timeAgo(chat.updated_at, i18n.language) })}</Typography>
+                <Typography variant="caption" color="text.secondary">{t('chats.lastMessage', { time: timeAgo(chat.updated_at, i18n.language) })}</Typography>
             </Box>
-            {chat.project_name && (
-                <Chip size="small" variant="outlined" icon={<Folder sx={{ fontSize: 14 }} />} label={chat.project_name} sx={{ maxWidth: 200 }} />
-            )}
             <IconButton
                 className="row-menu"
                 size="small"
@@ -49,7 +46,7 @@ export default function ChatsPage() {
     const navigate = useNavigate();
     const notify = useNotify();
     const [q, setQ] = useState('');
-    const [chats, setChats] = useState<ConversationSummary[] | null>(null);
+    const [chats, setChats] = useState<Conversation[] | null>(null);
     const [tick, setTick] = useState(0);
 
     useEffect(() => {
@@ -70,7 +67,7 @@ export default function ChatsPage() {
             <Box sx={{ maxWidth: 860, mx: 'auto', px: { xs: 2, md: 4 }, pt: { xs: 7, md: 5 }, pb: 6 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h1" sx={{ flex: 1, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400 }}>{t('chats.title')}</Typography>
-                    <Button variant="contained" startIcon={<Add />} onClick={() => navigate('/')}>{t('nav.newChat')}</Button>
+                    <Button variant="contained" startIcon={<Add />} onClick={() => navigate('/chat')}>{t('nav.newChat')}</Button>
                 </Box>
                 <TextField
                     fullWidth

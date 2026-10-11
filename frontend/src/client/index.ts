@@ -9,30 +9,34 @@ type S = components['schemas'];
 export type Project = S['Project'];
 export type ProjectSummary = S['ProjectSummary'];
 export type ProjectDetail = S['ProjectDetailResponse'];
-export type Capacity = S['Capacity'];
-export type KnowledgeFileSummary = S['KnowledgeFileSummary'];
-export type KnowledgeFile = S['KnowledgeFile'];
-export type ContextResponse = S['ContextResponse'];
+export type ThreadCounts = S['ThreadCounts'];
+export type ProjectMessage = S['ProjectMessage'];
+export type Thread = S['Thread'];
+export type ThreadEvent = S['ThreadEvent'];
+export type ThreadDetail = S['ThreadDetailResponse'];
+export type Diff = S['Diff'];
+export type MemoryFile = S['MemoryFile'];
+export type LibraryFile = S['LibraryFile'];
+export type Usage = S['UsageResponse'];
 export type Conversation = S['Conversation'];
-export type ConversationSummary = S['ConversationSummary'];
 export type ConversationDetail = S['ConversationDetailResponse'];
 export type Message = S['Message'];
 export type StreamEvent = S['StreamEvent'];
-export type TurnContext = S['TurnContext'];
 export type Settings = S['SettingsResponse'];
 export type ConnectionDraft = S['ConnectionDraft'];
 export type Model = S['Model'];
 export type TestResponse = S['TestResponse'];
-export type UploadResponse = S['UploadResponse'];
 
 export const api = createClient<paths>({ baseUrl: '' });
 
 /** Error carrying the server's `{"error": "..."}` message. */
 export class ApiError extends Error {
     status: number;
-    constructor(message: string, status: number) {
+    body: unknown;
+    constructor(message: string, status: number, body?: unknown) {
         super(message);
         this.status = status;
+        this.body = body;
     }
 }
 
@@ -44,7 +48,7 @@ export async function unwrap<T>(p: Promise<{ data?: T; error?: unknown; response
     const { data, error, response } = await p;
     if (!response.ok || data === undefined) {
         const msg = (error as { error?: string } | undefined)?.error ?? `${response.status} ${response.statusText}`;
-        throw new ApiError(msg, response.status);
+        throw new ApiError(msg, response.status, error);
     }
     return data;
 }

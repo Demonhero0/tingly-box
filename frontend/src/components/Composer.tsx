@@ -12,8 +12,9 @@ interface Props {
     disabled?: boolean;
     placeholder?: string;
     autoFocus?: boolean;
-    model: string;
-    onModelChange: (m: string) => void;
+    /** Shows the model picker when onModelChange is set. */
+    model?: string;
+    onModelChange?: (m: string) => void;
     /** Controls shown at the bottom-left (project / memory chips). */
     leftSlot?: ReactNode;
     minRows?: number;
@@ -82,7 +83,7 @@ export function Composer({ onSend, onStop, streaming, disabled, placeholder, aut
             />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>{leftSlot}</Box>
-                <ModelPicker value={model} onChange={onModelChange} />
+                {onModelChange && <ModelPicker value={model ?? ''} onChange={onModelChange} />}
                 {streaming ? (
                     <Tooltip title={t('composer.stop')}>
                         <IconButton onClick={onStop} sx={{ bgcolor: 'text.primary', color: 'background.paper', '&:hover': { bgcolor: 'text.secondary' } }} size="small" aria-label={t('composer.stop')}>

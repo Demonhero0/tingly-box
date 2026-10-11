@@ -19,11 +19,9 @@ export function useStartChat() {
     const navigate = useNavigate();
     const notify = useNotify();
     return useCallback(
-        async (opts: { text: string; model: string; projectId?: string; memoryDisabled?: boolean }) => {
+        async (opts: { text: string; model: string }) => {
             try {
-                const conv = await unwrap(api.POST('/api/v1/conversations', {
-                    body: { project_id: opts.projectId, model: opts.model || undefined, memory_disabled: opts.memoryDisabled || undefined },
-                }));
+                const conv = await unwrap(api.POST('/api/v1/conversations', { body: { model: opts.model || undefined } }));
                 const state: PendingFirstMessage = { pending: { text: opts.text, model: opts.model } };
                 navigate(`/chat/${conv.id}`, { state });
                 return true;

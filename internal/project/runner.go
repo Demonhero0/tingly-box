@@ -3,6 +3,8 @@ package project
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os"
 	"strings"
 
 	"github.com/tingly-dev/tingly-box/agentboot"
@@ -87,17 +89,32 @@ func (r *ClaudeRunner) RunTurn(ctx context.Context, spec TurnSpec, prompter agen
 	if out.Text == "" && res != nil {
 		out.Text = strings.TrimSpace(res.TextOutput())
 	}
+	if err != nil && conv.succeeded && closedPipe(err) {
+		// agentboot's process handle runs cmd.Wait as soon as the CLI starts,
+		// and Wait closes stdout; when the CLI exits right after its result,
+		// the decoder's final read races that close. The turn already
+		// finished successfully, so this is not a failure.
+		err = nil
+	}
 	return out, err
+}
+
+// closedPipe reports the "file already closed" read error from a stdout
+// pipe that cmd.Wait closed.
+func closedPipe(err error) bool {
+	return errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "file already closed")
 }
 
 // maxToolOutput caps a tool result kept in the transcript.
 const maxToolOutput = 4 << 10
 
 type converter struct {
-	seen     map[string]bool
-	lastText string
-	in, out  int64
-	model    string
+	seen map[string]bool
+	// succeeded is set once the CLI reported a successful result.
+	succeeded bool
+	lastText  string
+	in, out   int64
+	model     string
 }
 
 func (c *converter) convert(raw any) []RunnerEvent {
@@ -161,6 +178,7 @@ func (c *converter) convert(raw any) []RunnerEvent {
 		}
 		return []RunnerEvent{{Kind: "tool_result", Content: out, Payload: map[string]any{"is_error": m.IsError}}}
 	case *claude.ResultMessage:
+		c.succeeded = !m.IsError
 		c.in += int64(m.Usage.InputTokens + m.Usage.CacheReadInputTokens + m.Usage.CacheCreationInputTokens)
 		c.out += int64(m.Usage.OutputTokens)
 		if m.IsError && m.Result != "" {

@@ -46,6 +46,22 @@ import {
     IconSparkles,
     IconPencil,
     IconHistoryToggle,
+    IconGitBranch,
+    IconGitMerge,
+    IconPlayerPause,
+    IconPlayerPlay,
+    IconArrowLeft,
+    IconLayoutSidebarRight,
+    IconTerminal2,
+    IconTool,
+    IconMessageCircleQuestion,
+    IconFileDiff,
+    IconDownload,
+    IconLoader2,
+    IconCircleCheck,
+    IconHandStop,
+    IconFolderPlus,
+    IconCircleDashed,
 } from '@tabler/icons-react';
 import { tablerMui } from './tablerMui';
 
@@ -92,3 +108,19 @@ export const Cable = tablerMui(IconPlugConnected);
 export const AutoAwesome = tablerMui(IconSparkles);
 export const Pencil = tablerMui(IconPencil);
 export const MemoryOff = tablerMui(IconHistoryToggle);
+export const Branch = tablerMui(IconGitBranch);
+export const Merge = tablerMui(IconGitMerge);
+export const Pause = tablerMui(IconPlayerPause);
+export const PlayArrow = tablerMui(IconPlayerPlay);
+export const ArrowBack = tablerMui(IconArrowLeft);
+export const OverviewPane = tablerMui(IconLayoutSidebarRight);
+export const Terminal = tablerMui(IconTerminal2);
+export const Build = tablerMui(IconTool);
+export const Question = tablerMui(IconMessageCircleQuestion);
+export const DiffIcon = tablerMui(IconFileDiff);
+export const Download = tablerMui(IconDownload);
+export const Spinner = tablerMui(IconLoader2);
+export const CheckCircle = tablerMui(IconCircleCheck);
+export const HandStop = tablerMui(IconHandStop);
+export const NewFolder = tablerMui(IconFolderPlus);
+export const CircleDashed = tablerMui(IconCircleDashed);

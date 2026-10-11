@@ -126,6 +126,7 @@ func (c *Coordinator) schedule(projectID string, add func(*queue)) {
 // work drains a project's queue. Reports that arrive while a turn runs are
 // coalesced into the next turn.
 func (c *Coordinator) work(projectID string, q *queue) {
+	c.hub.Publish(Event{Type: EventCoordinator, ProjectID: projectID, Data: map[string]bool{"busy": true}})
 	for {
 		c.mu.Lock()
 		user, reports := q.user, q.reports
@@ -133,6 +134,7 @@ func (c *Coordinator) work(projectID string, q *queue) {
 		if !user && len(reports) == 0 {
 			q.running = false
 			c.mu.Unlock()
+			c.hub.Publish(Event{Type: EventCoordinator, ProjectID: projectID, Data: map[string]bool{"busy": false}})
 			return
 		}
 		c.mu.Unlock()

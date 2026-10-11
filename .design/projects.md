@@ -143,3 +143,12 @@ threads/<thread-id>.settings.json  线程的 Claude Code 设置（additionalDire
 - 后端：fake LLM（脚本化工具调用）+ agentboot fixture（脚本化 Claude CLI 输出）+ 临时 git 仓库，覆盖：路由开线程、线程提交 → ready、审批 → waiting → 允许 → 继续、NEEDS_INPUT、汇报回到协调者、合并、暂停。
 - 前端：typecheck / lint / vitest；无头浏览器走一遍主流程截图。
 - 真机：本机 `claude` CLI 指向 fake Anthropic 服务跑通一个真实线程（P1 末）。
+
+## 8. 状态（2026-10-11）
+
+MVP 已实现（§2 中标 ✅ 的部分）。验证：
+- 后端单测与 HTTP 端到端测试（含真实 Anthropic SDK 的 tool_use 流），`go test -race` 通过。
+- **真机**：本机 `claude` CLI（2.1.296）作为线程，指向一个模拟 Anthropic 服务：协调者 `start_thread` → Claude Code 建 worktree 分支、请求 `Bash` → 线程进入 Waiting on you → 在 UI 允许 → 提交 → Ready for review → diff → Merge 落到真实仓库。
+
+已知问题：
+- **agentboot 进程句柄的竞态**（上游 tingly-box）：`process/osexec.go` 启动后立即在 goroutine 里 `cmd.Wait()`，而 `Wait` 会关闭 stdout 管道；CLI 在写完 result 后立即退出时，解码器最后一次读会报 `read |0: file already closed`。`os/exec` 文档明确要求读完管道再调用 `Wait`。tingly-project 在 `internal/project/runner.go` 中只对"已收到成功 result + 该错误"这一种情况容错；根治应在 agentboot 修复。

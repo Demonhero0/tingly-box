@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, Breadcrumbs, Button, Chip, IconButton, Link, Skeleton, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Breadcrumbs, Button, IconButton, Skeleton, Tooltip, Typography } from '@mui/material';
 import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, unwrap, type ConversationDetail, type Message, type StreamEvent, type TurnContext } from '@/client';
+import { api, ApiError, unwrap, type ConversationDetail, type Message, type StreamEvent } from '@/client';
 import { regenerate, sendMessage } from '@/client/stream';
 import { ChatActionsMenu } from '@/components/ChatActionsMenu';
 import { Composer } from '@/components/Composer';
 import { Markdown } from '@/components/Markdown';
-import { Check, ContentCopy, ExpandMore, Folder, MemoryOff, Refresh } from '@/components/icons';
+import { Check, ContentCopy, ExpandMore, Refresh } from '@/components/icons';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { useNotify } from '@/hooks/useNotify';
 import type { PendingFirstMessage } from '@/hooks/useStartChat';
@@ -79,7 +79,6 @@ export default function ChatPage() {
     // retryable: the failure happened mid-turn (saved), so regenerate re-runs it.
     // A refused turn saved nothing and its text is back in the composer.
     const [turnError, setTurnError] = useState<{ message: string; retryable: boolean } | null>(null);
-    const [turnContext, setTurnContext] = useState<TurnContext | null>(null);
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const [seed, setSeed] = useState('');
 
@@ -130,7 +129,6 @@ export default function ChatPage() {
                     const m = ev.message;
                     setDetail((d) => (d ? { ...d, conversation: { ...d.conversation, model: m.model ?? d.conversation.model }, messages: [...d.messages, m] } : d));
                 }
-                setTurnContext(ev.context ?? null);
                 break;
             case 'title':
                 setDetail((d) => (d ? { ...d, conversation: { ...d.conversation, title: ev.title ?? '' } } : d));
@@ -148,7 +146,6 @@ export default function ChatPage() {
         stickRef.current = true;
         setStreaming(true);
         setTurnError(null);
-        setTurnContext(null);
         setDraftReply('');
         if (kind === 'send') setDraftUser(text ?? '');
         const m = modelOverride ?? model;
@@ -187,7 +184,6 @@ export default function ChatPage() {
     useEffect(() => {
         setDetail(null);
         setTurnError(null);
-        setTurnContext(null);
         void load().then((d) => {
             const pending = (location.state as PendingFirstMessage | null)?.pending;
             if (!d || !pending || firstSentRef.current === id || d.messages.length > 0) return;
@@ -203,7 +199,7 @@ export default function ChatPage() {
     if (loadError) {
         return (
             <Box sx={{ ...COLUMN, pt: 8 }}>
-                <Alert severity="error" action={<Button color="inherit" component={RouterLink} to="/">{t('nav.newChat')}</Button>}>{loadError}</Alert>
+                <Alert severity="error" action={<Button color="inherit" component={RouterLink} to="/chat">{t('nav.newChat')}</Button>}>{loadError}</Alert>
             </Box>
         );
     }
@@ -218,12 +214,6 @@ export default function ChatPage() {
             {/* Header: project breadcrumb + title menu */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: { xs: 6, md: 3 }, py: 1.25, minHeight: 52, borderBottom: 1, borderColor: 'divider' }}>
                 <Breadcrumbs separator="/" sx={{ minWidth: 0, '& ol': { flexWrap: 'nowrap' } }}>
-                    {detail?.project && (
-                        <Link component={RouterLink} to={`/project/${detail.project.id}`} underline="hover" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: 14, whiteSpace: 'nowrap' }}>
-                            <Folder sx={{ fontSize: 16 }} />
-                            {detail.project.name}
-                        </Link>
-                    )}
                     {conv ? (
                         <Button
                             color="inherit"
@@ -241,11 +231,6 @@ export default function ChatPage() {
                     )}
                 </Breadcrumbs>
                 <Box sx={{ flex: 1 }} />
-                {conv?.project_id && conv.memory_disabled && (
-                    <Tooltip title={t('memory.offInChatHint')}>
-                        <Chip size="small" variant="outlined" icon={<MemoryOff sx={{ fontSize: 16 }} />} label={t('memory.offInChat')} />
-                    </Tooltip>
-                )}
             </Box>
             {conv && (
                 <ChatActionsMenu
@@ -253,7 +238,7 @@ export default function ChatPage() {
                     anchorEl={menuAnchor}
                     onClose={() => setMenuAnchor(null)}
                     onChanged={(c) => setDetail((d) => (d ? { ...d, conversation: c } : d))}
-                    onDeleted={() => navigate(detail?.project ? `/project/${detail.project.id}` : '/')}
+                    onDeleted={() => navigate('/chats')}
                 />
             )}
 
@@ -287,11 +272,6 @@ export default function ChatPage() {
                                 </Box>
                             )}
                         </Box>
-                    )}
-                    {turnContext?.mode === 'retrieval' && !streaming && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            {t('knowledge.retrievalUsed', { count: turnContext.excerpts, total: formatTokens(turnContext.knowledge_tokens) })}
-                        </Typography>
                     )}
                     {turnError && (
                         <Alert

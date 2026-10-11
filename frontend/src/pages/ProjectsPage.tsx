@@ -1,49 +1,44 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Box, Button, Card, CardActionArea, IconButton, InputAdornment, MenuItem, Select, Skeleton, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Box, Button, Card, CardActionArea, Chip, InputAdornment, Skeleton, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api, unwrap, type ProjectSummary } from '@/client';
-import { Add, Folder, MoreHoriz, Search, Star } from '@/components/icons';
-import { ProjectActionsMenu } from '@/components/ProjectActionsMenu';
-import { ProjectFormDialog } from '@/components/ProjectFormDialog';
+import { Add, Branch, Folder, Pause, Search, Star } from '@/components/icons';
+import { NewProjectDialog } from '@/components/project/NewProjectDialog';
 import { useNotify } from '@/hooks/useNotify';
 import { useAppData } from '@/contexts/AppDataContext';
-import { formatTokens, timeAgo } from '@/utils/format';
-import { readLocal, writeLocal } from '@/utils/storage';
+import { timeAgo } from '@/utils/format';
 
-type Sort = 'activity' | 'name' | 'created';
-
-function ProjectCard({ p, onChanged }: { p: ProjectSummary; onChanged: () => void }) {
+function ProjectCard({ p }: { p: ProjectSummary }) {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
-    const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+    const c = p.threads;
+    const counts: { key: string; n: number; color: 'warning' | 'success' | 'info' | 'default' }[] = [
+        { key: 'waiting', n: c.waiting, color: 'warning' },
+        { key: 'ready', n: c.ready, color: 'success' },
+        { key: 'working', n: c.working, color: 'info' },
+    ];
     return (
-        <Card variant="outlined" sx={{ position: 'relative', borderRadius: 3, '&:hover': { borderColor: 'text.disabled' }, '& .card-menu': { opacity: anchor ? 1 : 0 }, '&:hover .card-menu': { opacity: 1 } }}>
+        <Card variant="outlined" sx={{ borderRadius: 3, '&:hover': { borderColor: 'text.disabled' } }}>
             <CardActionArea onClick={() => navigate(`/project/${p.id}`)} sx={{ p: 2.25, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 4 }}>
-                    <Typography variant="h5" noWrap sx={{ color: 'text.primary' }}>{p.name}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="h5" noWrap sx={{ flex: 1 }}>{p.name}</Typography>
+                    {p.paused && <Pause sx={{ fontSize: 16 }} color="warning" />}
                     {p.starred && <Star sx={{ fontSize: 16 }} color="primary" />}
                 </Box>
-                <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 0.75, minHeight: 40, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-                >
-                    {p.description || ' '}
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, minHeight: 40, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {p.goal || t('projects.noGoal')}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5 }}>
-                    {t('projects.cardMeta', {
-                        time: timeAgo(p.last_activity_at, i18n.language),
-                        chats: p.conversation_count,
-                        files: p.knowledge_count,
-                        tokens: formatTokens(p.knowledge_tokens),
-                    })}
-                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1.5, minHeight: 24 }}>
+                    {counts.filter((x) => x.n > 0).map((x) => (
+                        <Chip key={x.key} size="small" color={x.color} label={`${t(`overview.group.${x.key}`)} · ${x.n}`} sx={{ height: 22, fontSize: 12 }} />
+                    ))}
+                    {p.repos.slice(0, 2).map((r) => (
+                        <Chip key={r.path} size="small" variant="outlined" icon={<Branch sx={{ fontSize: 13 }} />} label={r.path.split('/').pop()} sx={{ height: 22, fontSize: 12 }} />
+                    ))}
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>{t('projects.updated', { time: timeAgo(p.updated_at, i18n.language) })}</Typography>
             </CardActionArea>
-            <IconButton className="card-menu" size="small" onClick={(e) => setAnchor(e.currentTarget)} sx={{ position: 'absolute', top: 12, right: 12 }} aria-label={t('common.more')}>
-                <MoreHoriz fontSize="small" />
-            </IconButton>
-            <ProjectActionsMenu project={p} anchorEl={anchor} onClose={() => setAnchor(null)} onChanged={onChanged} onDeleted={onChanged} />
         </Card>
     );
 }
@@ -55,10 +50,17 @@ export default function ProjectsPage() {
     const { refresh } = useAppData();
     const [tab, setTab] = useState<'active' | 'archived'>('active');
     const [q, setQ] = useState('');
-    const [sort, setSort] = useState<Sort>(() => (readLocal('projectSort') as Sort) || 'activity');
     const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
+    const [params, setParams] = useSearchParams();
     const [creating, setCreating] = useState(false);
-    const [tick, setTick] = useState(0);
+
+    // The sidebar's "New project" lands here with ?new=1.
+    useEffect(() => {
+        if (params.get('new')) {
+            setCreating(true);
+            setParams({}, { replace: true });
+        }
+    }, [params, setParams]);
 
     useEffect(() => {
         let alive = true;
@@ -71,62 +73,30 @@ export default function ProjectsPage() {
             alive = false;
             window.clearTimeout(timer);
         };
-    }, [q, tab, tick, notify]);
-
-    const sorted = useMemo(() => {
-        if (!projects) return null;
-        const list = [...projects];
-        if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
-        else if (sort === 'created') list.sort((a, b) => b.created_at.localeCompare(a.created_at));
-        // 'activity' keeps the server order: starred first, then recent activity.
-        return list;
-    }, [projects, sort]);
+    }, [q, tab, notify]);
 
     return (
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
             <Box sx={{ maxWidth: 1040, mx: 'auto', px: { xs: 2, md: 4 }, pt: { xs: 7, md: 5 }, pb: 6 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                     <Typography variant="h1" sx={{ flex: 1, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400 }}>{t('projects.title')}</Typography>
                     <Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)}>{t('projects.new')}</Button>
                 </Box>
+                <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 680 }}>{t('projects.intro')}</Typography>
 
-                <TextField
-                    fullWidth
-                    placeholder={t('projects.search')}
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
+                <TextField fullWidth placeholder={t('projects.search')} value={q} onChange={(e) => setQ(e.target.value)}
                     slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> } }}
-                    sx={{ mb: 2, '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' } }}
-                />
+                    sx={{ mb: 2, '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' } }} />
+                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, minHeight: 40, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minHeight: 40 } }}>
+                    <Tab value="active" label={t('projects.tabActive')} />
+                    <Tab value="archived" label={t('projects.tabArchived')} />
+                </Tabs>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-                    <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flex: 1, minHeight: 40, '& .MuiTab-root': { minHeight: 40 } }}>
-                        <Tab value="active" label={t('projects.tabActive')} />
-                        <Tab value="archived" label={t('projects.tabArchived')} />
-                    </Tabs>
-                    <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>{t('projects.sortBy')}</Typography>
-                    <Select
-                        size="small"
-                        variant="standard"
-                        disableUnderline
-                        value={sort}
-                        onChange={(e) => {
-                            setSort(e.target.value as Sort);
-                            writeLocal('projectSort', e.target.value);
-                        }}
-                        sx={{ fontSize: 14 }}
-                    >
-                        <MenuItem value="activity">{t('projects.sortActivity')}</MenuItem>
-                        <MenuItem value="name">{t('projects.sortName')}</MenuItem>
-                        <MenuItem value="created">{t('projects.sortCreated')}</MenuItem>
-                    </Select>
-                </Box>
-
-                {sorted === null ? (
+                {projects === null ? (
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 2 }}>
-                        {[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={140} />)}
+                        {[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={150} />)}
                     </Box>
-                ) : sorted.length === 0 ? (
+                ) : projects.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
                         <Folder sx={{ fontSize: 40, color: 'text.disabled' }} />
                         <Typography variant="h4" sx={{ mt: 1.5, color: 'text.primary' }}>
@@ -134,25 +104,21 @@ export default function ProjectsPage() {
                         </Typography>
                         {!q && tab === 'active' && (
                             <>
-                                <Typography variant="body1" sx={{ mt: 1, maxWidth: 520, mx: 'auto' }}>{t('projects.emptyBody')}</Typography>
+                                <Typography sx={{ mt: 1, maxWidth: 560, mx: 'auto' }}>{t('projects.emptyBody')}</Typography>
                                 <Button variant="contained" startIcon={<Add />} sx={{ mt: 3 }} onClick={() => setCreating(true)}>{t('projects.new')}</Button>
                             </>
                         )}
                     </Box>
                 ) : (
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 2 }}>
-                        {sorted.map((p) => (
-                            <ProjectCard key={p.id} p={p} onChanged={() => setTick((x) => x + 1)} />
-                        ))}
+                        {projects.map((p) => <ProjectCard key={p.id} p={p} />)}
                     </Box>
                 )}
             </Box>
-
-            <ProjectFormDialog
+            <NewProjectDialog
                 open={creating}
-                mode="create"
                 onClose={() => setCreating(false)}
-                onSubmit={async (v) => {
+                onCreate={async (v) => {
                     try {
                         const p = await unwrap(api.POST('/api/v1/projects', { body: v }));
                         refresh();

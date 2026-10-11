@@ -2,6 +2,9 @@ package project
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,4 +49,10 @@ func TestClaudeRunnerWithScriptedCLI(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"Running the tests.", "All tests pass. Committed on the branch."}, texts)
+}
+
+func TestClosedPipeAfterResultIsNotAFailure(t *testing.T) {
+	assert.True(t, closedPipe(errors.New("agentboot: claude protocol error: decode: read |0: file already closed")))
+	assert.True(t, closedPipe(fmt.Errorf("wrapped: %w", os.ErrClosed)))
+	assert.False(t, closedPipe(errors.New("rate limited")))
 }

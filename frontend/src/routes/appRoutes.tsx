@@ -14,10 +14,11 @@ export const appRoutes: RouteObject[] = [
     {
         element: <Layout />,
         children: [
-            { path: '/', element: <HomePage /> },
+            { path: '/', element: <ProjectsPage /> },
+            { path: '/projects', element: <Navigate to="/" replace /> },
+            { path: '/chat', element: <HomePage /> },
             { path: '/chat/:id', element: <ChatPage /> },
             { path: '/chats', element: <ChatsPage /> },
-            { path: '/projects', element: <ProjectsPage /> },
             { path: '/project/:id', element: <ProjectPage /> },
             { path: '/settings', element: <SettingsPage /> },
             { path: '*', element: <Navigate to="/" replace /> },

@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, ListItemIcon, ListItemText, Menu, MenuItem, TextField } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { api, unwrap, type Conversation } from '@/client';
-import { Delete, DriveFileMove, Edit, FolderOff, Star, StarBorder } from '@/components/icons';
+import { Delete, Edit, Star, StarBorder } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
 import { useAppData } from '@/contexts/AppDataContext';
 import { ConfirmDialog } from './ConfirmDialog';
-import { MoveChatDialog } from './MoveChatDialog';
 
-type ChatLike = Pick<Conversation, 'id' | 'title' | 'starred' | 'project_id'>;
+type ChatLike = Pick<Conversation, 'id' | 'title' | 'starred'>;
 
 interface Props {
     chat: ChatLike;
@@ -18,19 +17,18 @@ interface Props {
     onDeleted?: () => void;
 }
 
-/** Star / rename / add to or move between projects / remove from project / delete. */
+/** Star / rename / delete a chat. */
 export function ChatActionsMenu({ chat, anchorEl, onClose, onChanged, onDeleted }: Props) {
     const { t } = useTranslation();
     const notify = useNotify();
     const { refresh } = useAppData();
     const [renaming, setRenaming] = useState(false);
-    const [moving, setMoving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [title, setTitle] = useState(chat.title);
 
     useEffect(() => setTitle(chat.title), [chat.title]);
 
-    const patch = async (body: { title?: string; starred?: boolean; project_id?: string }) => {
+    const patch = async (body: { title?: string; starred?: boolean }) => {
         try {
             const c = await unwrap(api.PATCH('/api/v1/conversations/{id}', { params: { path: { id: chat.id } }, body }));
             onChanged?.(c);
@@ -58,16 +56,6 @@ export function ChatActionsMenu({ chat, anchorEl, onClose, onChanged, onDeleted 
                     <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
                     <ListItemText>{t('common.rename')}</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={act(() => setMoving(true))}>
-                    <ListItemIcon><DriveFileMove fontSize="small" /></ListItemIcon>
-                    <ListItemText>{chat.project_id ? t('chat.moveToProject') : t('chat.addToProject')}</ListItemText>
-                </MenuItem>
-                {chat.project_id && (
-                    <MenuItem onClick={act(() => void patch({ project_id: '' }).then(() => notify(t('chat.removedFromProject'), 'success')))}>
-                        <ListItemIcon><FolderOff fontSize="small" /></ListItemIcon>
-                        <ListItemText>{t('chat.removeFromProject')}</ListItemText>
-                    </MenuItem>
-                )}
                 <Divider />
                 <MenuItem onClick={act(() => setDeleting(true))} sx={{ color: 'error.main' }}>
                     <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
@@ -94,16 +82,6 @@ export function ChatActionsMenu({ chat, anchorEl, onClose, onChanged, onDeleted 
                     <Button variant="contained" onClick={() => void patch({ title }).then(() => setRenaming(false))}>{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
-
-            <MoveChatDialog
-                open={moving}
-                currentProjectId={chat.project_id || undefined}
-                onClose={() => setMoving(false)}
-                onPick={async (pid) => {
-                    await patch({ project_id: pid });
-                    notify(t('chat.moved'), 'success');
-                }}
-            />
 
             <ConfirmDialog
                 open={deleting}

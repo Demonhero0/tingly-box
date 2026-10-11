@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { Box, Button, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Tooltip, Typography, useTheme } from '@mui/material';
+import { Badge, Box, Button, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Tooltip, Typography, useTheme } from '@mui/material';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Add, ChatBubble, DarkMode, Folder, Forum, LightMode, MoreHoriz, Settings, SidebarCollapse, SystemMode } from '@/components/icons';
+import { Add, DarkMode, Folder, Forum, LightMode, MoreHoriz, Settings, SidebarCollapse, SystemMode } from '@/components/icons';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useThemeMode, type ThemeMode } from '@/contexts/ThemeModeContext';
 import { ChatActionsMenu } from '@/components/ChatActionsMenu';
-import type { ConversationSummary } from '@/client';
+import type { Conversation } from '@/client';
 import { sidebarBg } from '@/theme';
 
 export const SIDEBAR_WIDTH = 272;
@@ -20,7 +20,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     );
 }
 
-function ChatRow({ chat, selected }: { chat: ConversationSummary; selected: boolean }) {
+function ChatRow({ chat, selected }: { chat: Conversation; selected: boolean }) {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -54,7 +54,7 @@ function ChatRow({ chat, selected }: { chat: ConversationSummary; selected: bool
                 anchorEl={anchor}
                 onClose={() => setAnchor(null)}
                 onDeleted={() => {
-                    if (selected) navigate('/');
+                    if (selected) navigate('/chats');
                 }}
             />
         </>
@@ -68,14 +68,17 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
-    const { recents, starredChats, starredProjects } = useAppData();
+    const { recents, starredChats, projects } = useAppData();
     const { mode, setMode, resolved } = useThemeMode();
     const starredIds = new Set(starredChats.map((c) => c.id));
 
     const nav = [
+        { to: '/', label: t('nav.projects'), icon: <Folder fontSize="small" /> },
         { to: '/chats', label: t('nav.chats'), icon: <Forum fontSize="small" /> },
-        { to: '/projects', label: t('nav.projects'), icon: <Folder fontSize="small" /> },
     ];
+    // Starred first, then the most recently active; waiting counts make the
+    // projects that need the user stand out.
+    const sideProjects = projects.slice(0, 12);
     const ModeIcon = mode === 'system' ? SystemMode : mode === 'light' ? LightMode : DarkMode;
 
     return (
@@ -104,12 +107,12 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
                     fullWidth
                     startIcon={<Add />}
                     onClick={() => {
-                        navigate('/');
+                        navigate('/?new=1');
                         onNavigate?.();
                     }}
                     sx={{ justifyContent: 'flex-start', color: 'primary.main', fontWeight: 600, px: 1.25 }}
                 >
-                    {t('nav.newChat')}
+                    {t('projects.new')}
                 </Button>
             </Box>
             <List dense disablePadding sx={{ mt: 0.5 }}>
@@ -122,30 +125,27 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
             </List>
 
             <Box sx={{ flex: 1, overflowY: 'auto', pb: 2 }}>
-                {(starredProjects.length > 0 || starredChats.length > 0) && (
-                    <Section title={t('nav.starred')}>
-                        {starredProjects.map((p) => (
+                {sideProjects.length > 0 && (
+                    <Section title={t('nav.projects')}>
+                        {sideProjects.map((p) => (
                             <ListItemButton key={p.id} component={NavLink} to={`/project/${p.id}`} selected={location.pathname === `/project/${p.id}`} sx={{ mx: 1, borderRadius: 1.5, py: 0.5 }}>
-                                <ListItemIcon sx={{ minWidth: 28 }}><Folder sx={{ fontSize: 16 }} /></ListItemIcon>
+                                <ListItemIcon sx={{ minWidth: 28 }}>
+                                    <Badge color="warning" variant="dot" invisible={p.threads.waiting === 0}><Folder sx={{ fontSize: 16 }} /></Badge>
+                                </ListItemIcon>
                                 <ListItemText primary={p.name} slotProps={{ primary: { noWrap: true, sx: { fontSize: 13.5, color: 'text.primary' } } }} />
+                                {p.threads.waiting > 0 && <Typography variant="caption" color="warning.main" sx={{ fontWeight: 600 }}>{p.threads.waiting}</Typography>}
                             </ListItemButton>
                         ))}
-                        {starredChats.map((c) => (
+                    </Section>
+                )}
+                {(starredChats.length > 0 || recents.length > 0) && (
+                    <Section title={t('nav.recentChats')}>
+                        {starredChats.map((c) => <ChatRow key={c.id} chat={c} selected={location.pathname === `/chat/${c.id}`} />)}
+                        {recents.filter((c) => !starredIds.has(c.id)).slice(0, 8).map((c) => (
                             <ChatRow key={c.id} chat={c} selected={location.pathname === `/chat/${c.id}`} />
                         ))}
                     </Section>
                 )}
-                <Section title={t('nav.recents')}>
-                    {recents.filter((c) => !starredIds.has(c.id)).map((c) => (
-                        <ChatRow key={c.id} chat={c} selected={location.pathname === `/chat/${c.id}`} />
-                    ))}
-                    {recents.length === 0 && (
-                        <Box sx={{ px: 2, py: 1, display: 'flex', gap: 1, alignItems: 'center', color: 'text.secondary' }}>
-                            <ChatBubble sx={{ fontSize: 16 }} />
-                            <Typography variant="body2">{t('nav.noChats')}</Typography>
-                        </Box>
-                    )}
-                </Section>
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 1, borderTop: 1, borderColor: 'divider', gap: 0.5 }}>

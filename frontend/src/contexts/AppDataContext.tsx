@@ -1,15 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, unwrap, type ConversationSummary, type ProjectSummary, type Settings } from '@/client';
+import { api, unwrap, type Conversation, type ProjectSummary, type Settings } from '@/client';
 
 /**
- * Data the shell (sidebar) shows on every page: recent and starred chats,
- * starred projects and the connection settings. Pages call `refresh()` after
+ * Data the shell (sidebar) shows on every page: projects (with their
+ * waiting-on-you counts), recent and starred chats, and the connection
+ * settings. Pages call `refresh()` after
  * a change the sidebar should reflect.
  */
 interface AppData {
-    recents: ConversationSummary[];
-    starredChats: ConversationSummary[];
-    starredProjects: ProjectSummary[];
+    recents: Conversation[];
+    starredChats: Conversation[];
+    projects: ProjectSummary[];
     settings: Settings | null;
     refresh: () => void;
     refreshSettings: () => void;
@@ -18,9 +19,9 @@ interface AppData {
 const Ctx = createContext<AppData | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-    const [recents, setRecents] = useState<ConversationSummary[]>([]);
-    const [starredChats, setStarredChats] = useState<ConversationSummary[]>([]);
-    const [starredProjects, setStarredProjects] = useState<ProjectSummary[]>([]);
+    const [recents, setRecents] = useState<Conversation[]>([]);
+    const [starredChats, setStarredChats] = useState<Conversation[]>([]);
+    const [projects, setProjects] = useState<ProjectSummary[]>([]);
     const [settings, setSettings] = useState<Settings | null>(null);
     const [tick, setTick] = useState(0);
     const [settingsTick, setSettingsTick] = useState(0);
@@ -28,14 +29,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         let alive = true;
         Promise.all([
-            unwrap(api.GET('/api/v1/conversations', { params: { query: { limit: 30 } } })),
+            unwrap(api.GET('/api/v1/conversations', { params: { query: { limit: 20 } } })),
             unwrap(api.GET('/api/v1/conversations', { params: { query: { starred: true } } })),
             unwrap(api.GET('/api/v1/projects')),
         ]).then(([r, s, p]) => {
             if (!alive) return;
             setRecents(r.conversations);
             setStarredChats(s.conversations);
-            setStarredProjects(p.projects.filter((x) => x.starred));
+            setProjects(p.projects);
         }).catch(() => {
             // The sidebar stays as it was; pages surface their own errors.
         });
@@ -51,8 +52,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const refresh = useCallback(() => setTick((t) => t + 1), []);
     const refreshSettings = useCallback(() => setSettingsTick((t) => t + 1), []);
     const value = useMemo(
-        () => ({ recents, starredChats, starredProjects, settings, refresh, refreshSettings }),
-        [recents, starredChats, starredProjects, settings, refresh, refreshSettings],
+        () => ({ recents, starredChats, projects, settings, refresh, refreshSettings }),
+        [recents, starredChats, projects, settings, refresh, refreshSettings],
     );
     return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

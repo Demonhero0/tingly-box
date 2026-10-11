@@ -1,240 +1,272 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, IconButton, Link, Skeleton, Tooltip, Typography } from '@mui/material';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Badge, Box, Button, Drawer, IconButton, Skeleton, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type ConversationSummary, type ProjectDetail } from '@/client';
-import { ChatActionsMenu } from '@/components/ChatActionsMenu';
-import { Composer } from '@/components/Composer';
-import { ConnectionHint } from '@/components/ConnectionHint';
-import { ContextPreviewDialog } from '@/components/ContextPreviewDialog';
-import { ChatBubble, ChevronRight, MemoryOff, MoreHoriz, Psychology, Star, StarBorder } from '@/components/icons';
-import { KnowledgePanel } from '@/components/KnowledgePanel';
-import { ProjectActionsMenu } from '@/components/ProjectActionsMenu';
+import { api, unwrap, type Project, type ProjectMessage, type Thread, type ThreadEvent } from '@/client';
+import { ConversationPane } from '@/components/project/ConversationPane';
+import { OverviewPane } from '@/components/project/OverviewPane';
+import { ProjectSettingsDialog, type SettingsTab } from '@/components/project/ProjectSettingsDialog';
+import { ThreadPanel } from '@/components/project/ThreadPanel';
+import { OverviewPane as OverviewIcon, Pause, Settings, Star, StarBorder } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
-import { useChosenModel, useStartChat } from '@/hooks/useStartChat';
+import { useProjectEvents, type ProjectEvent } from '@/hooks/useProjectEvents';
 import { useAppData } from '@/contexts/AppDataContext';
-import { timeAgo } from '@/utils/format';
+import { readLocal, writeLocal } from '@/utils/storage';
 
-function ChatRow({ chat, onChanged }: { chat: ConversationSummary; onChanged: () => void }) {
-    const { t, i18n } = useTranslation();
-    const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-    return (
-        <Box
-            component={RouterLink}
-            to={`/chat/${chat.id}`}
-            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, textDecoration: 'none', color: 'inherit', borderTop: 1, borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' }, '& .row-menu': { opacity: anchor ? 1 : 0 }, '&:hover .row-menu': { opacity: 1 } }}
-        >
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography noWrap sx={{ color: 'text.primary', fontWeight: 500, fontSize: 14.5 }}>
-                    {chat.title || t('chat.untitled')}
-                    {chat.starred && <Star sx={{ fontSize: 14, ml: 0.75, verticalAlign: '-2px' }} color="primary" />}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                    {t('project.lastMessage', { time: timeAgo(chat.updated_at, i18n.language) })}
-                    {chat.memory_disabled && ` · ${t('memory.offInChat')}`}
-                </Typography>
-            </Box>
-            <IconButton
-                className="row-menu"
-                size="small"
-                aria-label={t('common.more')}
-                onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setAnchor(e.currentTarget);
-                }}
-            >
-                <MoreHoriz fontSize="small" />
-            </IconButton>
-            <ChatActionsMenu chat={chat} anchorEl={anchor} onClose={() => setAnchor(null)} onChanged={onChanged} onDeleted={onChanged} />
-        </Box>
-    );
+const PANE_WIDTH = 440;
+
+function upsert<T extends { id: string }>(list: T[], item: T): T[] {
+    const i = list.findIndex((x) => x.id === item.id);
+    if (i < 0) return [...list, item];
+    const next = list.slice();
+    next[i] = item;
+    return next;
 }
 
 export default function ProjectPage() {
     const { id = '' } = useParams();
     const { t } = useTranslation();
+    const theme = useTheme();
+    const narrow = useMediaQuery(theme.breakpoints.down('lg'));
     const navigate = useNavigate();
     const notify = useNotify();
     const { refresh } = useAppData();
-    const start = useStartChat();
-    const { model, setModel } = useChosenModel();
-    const [detail, setDetail] = useState<ProjectDetail | null>(null);
-    const [chats, setChats] = useState<ConversationSummary[] | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
-    const [memoryOff, setMemoryOff] = useState(false);
-    const [contextOpen, setContextOpen] = useState(false);
+    const [params, setParams] = useSearchParams();
+    const threadId = params.get('thread') ?? '';
 
-    const load = useCallback(() => {
-        unwrap(api.GET('/api/v1/projects/{id}', { params: { path: { id } } }))
-            .then((d) => {
-                setDetail(d);
-                setError(null);
-            })
-            .catch((e: Error) => setError(e.message));
-        unwrap(api.GET('/api/v1/conversations', { params: { query: { project_id: id } } }))
-            .then((r) => setChats(r.conversations))
-            .catch(() => setChats([]));
+    const [project, setProject] = useState<Project | null>(null);
+    const [threads, setThreads] = useState<Thread[]>([]);
+    const [messages, setMessages] = useState<ProjectMessage[] | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [threadEvents, setThreadEvents] = useState<ThreadEvent[] | null>(null);
+    const [paneOpen, setPaneOpen] = useState(() => readLocal('overviewOpen') !== '0');
+    // On narrow screens the pane is a drawer, closed until asked for.
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+    const [memoryKey, setMemoryKey] = useState(0);
+    const [libraryKey, setLibraryKey] = useState(0);
+
+    const load = useCallback(async () => {
+        try {
+            const [d, m] = await Promise.all([
+                unwrap(api.GET('/api/v1/projects/{id}', { params: { path: { id } } })),
+                unwrap(api.GET('/api/v1/projects/{id}/messages', { params: { path: { id }, query: { limit: 200 } } })),
+            ]);
+            setProject(d.project);
+            setThreads(d.threads);
+            setBusy(d.coordinator_busy);
+            setMessages(m.messages);
+            setError(null);
+        } catch (e) {
+            setError((e as Error).message);
+        }
     }, [id]);
 
+    const loadThread = useCallback(async (tid: string) => {
+        try {
+            const d = await unwrap(api.GET('/api/v1/threads/{id}', { params: { path: { id: tid } } }));
+            setThreadEvents(d.events);
+            setThreads((list) => upsert(list, d.thread));
+        } catch (e) {
+            notify((e as Error).message, 'error');
+        }
+    }, [notify]);
+
     useEffect(() => {
-        setDetail(null);
-        setChats(null);
-        load();
+        setProject(null);
+        setMessages(null);
+        void load();
     }, [load]);
+
+    useEffect(() => {
+        setThreadEvents(null);
+        if (threadId) void loadThread(threadId);
+    }, [threadId, loadThread]);
+
+    const onEvent = useCallback((ev: ProjectEvent) => {
+        switch (ev.type) {
+            case 'message':
+                setMessages((list) => (list ? upsert(list, ev.data as ProjectMessage) : list));
+                break;
+            case 'message_delta': {
+                const d = ev.data as { id: string; text: string };
+                setMessages((list) => list?.map((m) => (m.id === d.id ? { ...m, content: m.content + d.text } : m)) ?? list);
+                break;
+            }
+            case 'thread': {
+                const th = ev.data as Thread;
+                setThreads((list) => upsert(list, th));
+                if (th.status !== 'working' && th.status !== 'waiting') setLibraryKey((k) => k + 1);
+                refresh();
+                break;
+            }
+            case 'thread_event': {
+                const e = ev.data as ThreadEvent;
+                if (e.thread_id === threadId) setThreadEvents((list) => (list ? upsert(list, e) : list));
+                break;
+            }
+            case 'coordinator':
+                setBusy((ev.data as { busy: boolean }).busy);
+                break;
+            case 'project': {
+                const d = ev.data as Project & { memory?: string };
+                if (d.memory !== undefined) setMemoryKey((k) => k + 1);
+                else if (d.id) setProject(d);
+                break;
+            }
+        }
+    }, [threadId, refresh]);
+
+    useProjectEvents(id, onEvent, () => {
+        void load();
+        if (threadId) void loadThread(threadId);
+    });
+
+    const selected = threads.find((th) => th.id === threadId);
+    // A turn is in flight while the thread works or waits on a request it
+    // raised (approvals only exist inside a running turn).
+    const threadRunning = selected?.status === 'working'
+        || (selected?.status === 'waiting' && !!threadEvents?.some((e) => (e.kind === 'approval' || e.kind === 'ask') && e.payload?.includes('"state":"pending"')));
+
+    const threadMap = useMemo(() => new Map(threads.map((th) => [th.id, th])), [threads]);
+    const waiting = threads.filter((th) => th.status === 'waiting').length;
+
+    const openThread = (tid: string) => {
+        setParams((p) => {
+            p.set('thread', tid);
+            return p;
+        });
+        if (narrow) setDrawerOpen(true);
+        else if (!paneOpen) setPaneOpen(true);
+    };
+    const closeThread = () => setParams((p) => {
+        p.delete('thread');
+        return p;
+    });
+    const togglePane = () => {
+        if (narrow) {
+            setDrawerOpen((v) => !v);
+            return;
+        }
+        setPaneOpen((v) => {
+            writeLocal('overviewOpen', v ? '0' : '1');
+            return !v;
+        });
+    };
+
+    const patch = async (body: { starred?: boolean; paused?: boolean; archived?: boolean }) => {
+        try {
+            setProject(await unwrap(api.PATCH('/api/v1/projects/{id}', { params: { path: { id } }, body })));
+            refresh();
+        } catch (e) {
+            notify((e as Error).message, 'error');
+        }
+    };
 
     if (error) {
         return (
             <Box sx={{ maxWidth: 720, mx: 'auto', pt: 8, px: 2 }}>
-                <Alert severity="error" action={<Button color="inherit" component={RouterLink} to="/projects">{t('projects.all')}</Button>}>{error}</Alert>
+                <Alert severity="error" action={<Button color="inherit" component={RouterLink} to="/">{t('projects.all')}</Button>}>{error}</Alert>
             </Box>
         );
     }
 
-    const p = detail?.project;
-    const archived = !!p?.archived_at;
-    const toggleStar = () => {
-        if (!p) return;
-        unwrap(api.PATCH('/api/v1/projects/{id}', { params: { path: { id: p.id } }, body: { starred: !p.starred } }))
-            .then(() => {
-                load();
-                refresh();
-            })
-            .catch((e: Error) => notify(e.message, 'error'));
-    };
+    const blocked = !!project && (project.paused || !!project.archived_at);
+    const banner = project?.archived_at ? (
+        <Alert severity="info" sx={{ mb: 1 }} action={<Button color="inherit" size="small" onClick={() => void patch({ archived: false })}>{t('projectSettings.unarchive')}</Button>}>{t('project.archivedBanner')}</Alert>
+    ) : project?.paused ? (
+        <Alert severity="warning" icon={<Pause />} sx={{ mb: 1 }} action={<Button color="inherit" size="small" onClick={() => void patch({ paused: false })}>{t('projectSettings.resume')}</Button>}>{t('project.pausedBanner')}</Alert>
+    ) : null;
+
+    const pane = threadId ? (
+        <ThreadPanel threadId={threadId} thread={selected} events={threadEvents} running={threadRunning} disabled={blocked} onBack={closeThread} />
+    ) : (
+        <OverviewPane projectId={id} threads={threads} onOpen={openThread} libraryKey={libraryKey} />
+    );
 
     return (
-        <Box sx={{ flex: 1, overflowY: 'auto' }}>
-            <Box
-                sx={{
-                    maxWidth: 1180,
-                    mx: 'auto',
-                    px: { xs: 2, md: 4 },
-                    pt: { xs: 7, md: 4 },
-                    pb: 6,
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 360px' },
-                    gap: { xs: 3, lg: 5 },
-                    alignItems: 'start',
-                }}
-            >
-                {/* Main column */}
-                <Box sx={{ minWidth: 0 }}>
-                    <Link component={RouterLink} to="/projects" underline="hover" color="text.secondary" sx={{ fontSize: 13.5, display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
-                        {t('projects.all')}
-                        <ChevronRight sx={{ fontSize: 15 }} />
-                    </Link>
-                    {p ? (
-                        <>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                                <Typography variant="h1" sx={{ flex: 1, minWidth: 0, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400, wordBreak: 'break-word' }}>{p.name}</Typography>
-                                <Tooltip title={p.starred ? t('common.unstar') : t('common.star')}>
-                                    <IconButton onClick={toggleStar} aria-label={p.starred ? t('common.unstar') : t('common.star')}>
-                                        {p.starred ? <Star color="primary" /> : <StarBorder />}
-                                    </IconButton>
-                                </Tooltip>
-                                <IconButton onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label={t('common.more')}><MoreHoriz /></IconButton>
-                            </Box>
-                            {p.description && <Typography color="text.secondary" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>{p.description}</Typography>}
-                            <ProjectActionsMenu
-                                project={p}
-                                anchorEl={menuAnchor}
-                                onClose={() => setMenuAnchor(null)}
-                                onChanged={() => load()}
-                                onDeleted={() => navigate('/projects')}
-                            />
-                        </>
-                    ) : (
-                        <Skeleton variant="text" width="50%" height={48} />
-                    )}
-
-                    {archived && (
-                        <Alert
-                            severity="info"
-                            sx={{ mt: 2 }}
-                            action={
-                                <Button
-                                    color="inherit"
-                                    size="small"
-                                    onClick={() =>
-                                        unwrap(api.PATCH('/api/v1/projects/{id}', { params: { path: { id } }, body: { archived: false } }))
-                                            .then(() => {
-                                                load();
-                                                refresh();
-                                            })
-                                            .catch((e: Error) => notify(e.message, 'error'))
-                                    }
-                                >
-                                    {t('project.unarchive')}
-                                </Button>
-                            }
-                        >
-                            {t('project.archivedBanner')}
-                        </Alert>
-                    )}
-
-                    <Box sx={{ mt: 3 }}>
-                        <ConnectionHint />
-                        <Composer
-                            disabled={!p || archived}
-                            model={model}
-                            onModelChange={setModel}
-                            placeholder={t('project.composerPlaceholder')}
-                            onSend={(text) => start({ text, model, projectId: id, memoryDisabled: memoryOff })}
-                            leftSlot={
-                                <Tooltip title={memoryOff ? t('memory.offHint') : t('memory.onHint')}>
-                                    <Chip
-                                        size="small"
-                                        variant={memoryOff ? 'filled' : 'outlined'}
-                                        icon={memoryOff ? <MemoryOff sx={{ fontSize: 16 }} /> : <Psychology sx={{ fontSize: 16 }} />}
-                                        label={memoryOff ? t('memory.chipOff') : t('memory.chipOn')}
-                                        onClick={() => setMemoryOff((v) => !v)}
-                                    />
-                                </Tooltip>
-                            }
-                        />
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: { xs: 6, md: 3 }, py: 1, minHeight: 52, borderBottom: 1, borderColor: 'divider' }}>
+                {project ? (
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="h5" noWrap>{project.name}</Typography>
+                        {project.goal && <Typography variant="caption" color="text.secondary" noWrap component="div">{project.goal}</Typography>}
                     </Box>
-
-                    <Box sx={{ mt: 4 }}>
-                        <Typography variant="h5" sx={{ mb: 1 }}>{t('project.chatsTitle')}</Typography>
-                        {chats === null ? (
-                            [0, 1, 2].map((i) => <Skeleton key={i} height={56} />)
-                        ) : chats.length === 0 ? (
-                            <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 3, p: 3, textAlign: 'center', color: 'text.secondary' }}>
-                                <ChatBubble sx={{ fontSize: 28, color: 'text.disabled' }} />
-                                <Typography variant="body2" sx={{ mt: 1 }}>{t('project.noChats')}</Typography>
-                            </Box>
-                        ) : (
-                            <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 3, overflow: 'hidden', '& > a:first-of-type': { borderTop: 0 } }}>
-                                {chats.map((c) => (
-                                    <ChatRow key={c.id} chat={c} onChanged={load} />
-                                ))}
-                            </Box>
-                        )}
-                    </Box>
-                </Box>
-
-                {/* Project knowledge panel */}
-                <Box sx={{ position: { lg: 'sticky' }, top: { lg: 24 } }}>
-                    {detail ? (
-                        <KnowledgePanel
-                            projectId={id}
-                            instructions={detail.project.instructions}
-                            memory={detail.project.memory}
-                            memoryUpdatedAt={detail.project.memory_updated_at}
-                            files={detail.knowledge}
-                            capacity={detail.capacity}
-                            readOnly={archived}
-                            onChanged={load}
-                            onViewContext={() => setContextOpen(true)}
-                        />
-                    ) : (
-                        <Skeleton variant="rounded" height={420} />
-                    )}
-                </Box>
+                ) : <Skeleton width={200} sx={{ flex: 1 }} />}
+                {project && (
+                    <>
+                        <Tooltip title={project.starred ? t('common.unstar') : t('common.star')}>
+                            <IconButton size="small" onClick={() => void patch({ starred: !project.starred })}>{project.starred ? <Star fontSize="small" color="primary" /> : <StarBorder fontSize="small" />}</IconButton>
+                        </Tooltip>
+                        <Tooltip title={t('project.overview')}>
+                            <IconButton size="small" onClick={togglePane} aria-label={t('project.overview')}>
+                                <Badge color="warning" variant="dot" invisible={waiting === 0}><OverviewIcon fontSize="small" /></Badge>
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title={t('projectSettings.title')}>
+                            <IconButton size="small" onClick={() => setSettingsTab('general')} aria-label={t('projectSettings.title')}><Settings fontSize="small" /></IconButton>
+                        </Tooltip>
+                    </>
+                )}
             </Box>
-            <ContextPreviewDialog projectId={id} open={contextOpen} onClose={() => setContextOpen(false)} />
+
+            <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
+                {messages === null ? (
+                    <Box sx={{ flex: 1, p: 3 }}><Skeleton variant="rounded" height={80} /></Box>
+                ) : (
+                    <ConversationPane
+                        messages={messages}
+                        threads={threadMap}
+                        busy={busy}
+                        disabled={blocked || !project}
+                        disabledReason={banner}
+                        onOpenThread={openThread}
+                        onSend={async (text) => {
+                            try {
+                                const m = await unwrap(api.POST('/api/v1/projects/{id}/messages', { params: { path: { id } }, body: { content: text } }));
+                                setMessages((list) => (list ? upsert(list, m) : list));
+                                setBusy(true);
+                                return true;
+                            } catch (e) {
+                                notify((e as Error).message, 'error');
+                                return false;
+                            }
+                        }}
+                        onStartSuggestions={async (mid, indexes) => {
+                            try {
+                                const m = await unwrap(api.POST('/api/v1/projects/{id}/messages/{mid}/start', { params: { path: { id, mid } }, body: { indexes } }));
+                                setMessages((list) => (list ? upsert(list, m) : list));
+                            } catch (e) {
+                                notify((e as Error).message, 'error');
+                            }
+                        }}
+                    />
+                )}
+                {narrow ? (
+                    <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
+                        slotProps={{ paper: { sx: { width: { xs: '100%', sm: PANE_WIDTH } } } }}>
+                        {pane}
+                    </Drawer>
+                ) : paneOpen && (
+                    <Box sx={{ width: PANE_WIDTH, flexShrink: 0, borderLeft: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: 0 }}>{pane}</Box>
+                )}
+            </Box>
+
+            {project && settingsTab && (
+                <ProjectSettingsDialog
+                    project={project}
+                    open
+                    tab={settingsTab}
+                    onTab={setSettingsTab}
+                    onClose={() => setSettingsTab(null)}
+                    onChanged={(p) => {
+                        setProject(p);
+                        if (!p.archived_at && project.archived_at) navigate(`/project/${p.id}`);
+                    }}
+                    memoryKey={memoryKey}
+                />
+            )}
         </Box>
     );
 }

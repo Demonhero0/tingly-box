@@ -12,6 +12,7 @@ const (
 	EventThread       = "thread"        // a thread changed
 	EventThreadEvent  = "thread_event"  // a thread transcript entry was added or changed
 	EventProject      = "project"       // project settings or state changed
+	EventCoordinator  = "coordinator"   // the coordinator started or finished working ({"busy": bool})
 )
 
 // Event is one SSE payload.
