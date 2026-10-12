@@ -1,23 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import AgentStatusRow, { formatErrorRate, formatRelativeTime } from './AgentStatusRow';
+import AgentStatusRow, { AgentLooksIn, formatErrorRate, formatRelativeTime } from './AgentStatusRow';
 
 // No i18n instance in tests: t() returns the key, which is what we match on.
 const base = {
     connected: true,
     configStatus: null,
-    onApplyConfig: vi.fn(),
-    onOpenRequests: vi.fn(),
-    onOpenUsage: vi.fn(),
-    onOpenLog: vi.fn(),
 };
 
 describe('AgentStatusRow', () => {
     it('claims nothing until the first answer', () => {
         render(<AgentStatusRow {...base} observation={null} />);
         expect(screen.queryByTestId('agent-status-summary')).toBeNull();
-        // the looks-in are always there
-        expect(screen.getByRole('button', { name: 'agentStatus.requests' })).toBeInTheDocument();
+        // text only: buttons live in the page header
+        expect(screen.queryAllByRole('button')).toHaveLength(0);
     });
 
     it('says connected with the last request, today and error rate', () => {
@@ -34,23 +30,23 @@ describe('AgentStatusRow', () => {
         expect(screen.getByTestId('agent-status-summary').textContent).toBe('agentStatus.noRequestsFinishSetup');
     });
 
-    it('offers Reapply as the primary action when the config is out of date', () => {
-        const onApplyConfig = vi.fn();
+    it('notes an out-of-date config without a button of its own', () => {
         render(
             <AgentStatusRow
                 {...base}
-                onApplyConfig={onApplyConfig}
                 observation={{ lastRequestAt: null, requestsToday: 0, errorsToday: 0 }}
                 configStatus={{ state: 'outdated', differences: [{ key: 'a', applied: '1', expected: '2' }] } as never}
             />,
         );
-        fireEvent.click(screen.getByRole('button', { name: 'clientConfigStatus.reapply' }));
-        expect(onApplyConfig).toHaveBeenCalledOnce();
+        expect(screen.getByText('agentStatus.stale')).toBeInTheDocument();
+        expect(screen.queryAllByRole('button')).toHaveLength(0);
     });
+});
 
+describe('AgentLooksIn', () => {
     it('opens the log', () => {
         const onOpenLog = vi.fn();
-        render(<AgentStatusRow {...base} onOpenLog={onOpenLog} observation={null} />);
+        render(<AgentLooksIn onOpenRequests={vi.fn()} onOpenUsage={vi.fn()} onOpenLog={onOpenLog} />);
         fireEvent.click(screen.getByRole('button', { name: 'agentStatus.log' }));
         expect(onOpenLog).toHaveBeenCalledOnce();
     });
@@ -58,7 +54,7 @@ describe('AgentStatusRow', () => {
     it('opens requests and usage', () => {
         const onOpenRequests = vi.fn();
         const onOpenUsage = vi.fn();
-        render(<AgentStatusRow {...base} onOpenRequests={onOpenRequests} onOpenUsage={onOpenUsage} observation={null} />);
+        render(<AgentLooksIn onOpenRequests={onOpenRequests} onOpenUsage={onOpenUsage} onOpenLog={vi.fn()} />);
         fireEvent.click(screen.getByRole('button', { name: 'agentStatus.requests' }));
         fireEvent.click(screen.getByRole('button', { name: 'agentStatus.usage' }));
         expect(onOpenRequests).toHaveBeenCalledOnce();

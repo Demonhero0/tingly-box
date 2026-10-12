@@ -23,7 +23,7 @@ import { type SlotMode, useSlotRouting } from '@/pages/scenario/hooks/useSlotRou
 import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
 import AgentAccessSection, { useAccessExpanded } from './components/AgentAccessSection';
 import AgentActivityDialog from './components/AgentActivityDialog';
-import AgentStatusRow from './components/AgentStatusRow';
+import AgentStatusRow, { AgentLooksIn } from './components/AgentStatusRow';
 import AgentSetupCard, {
     type AgentApplyResult,
     type AgentInstallAction,
@@ -273,6 +273,12 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     </Button>
                 </Tooltip>
             ))}
+            <AgentLooksIn
+                onOpenRequests={() => setRequestsOpen(true)}
+                onOpenLog={() => setLogOpen(true)}
+                // The Dashboard already opens filtered to one agent (?scenario=).
+                onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
+            />
             {configButton}
         </>
     );
@@ -302,11 +308,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     observation={observation.data}
                     connected={connected}
                     configStatus={clientConfigStatus}
-                    onApplyConfig={openDialog}
-                    onOpenRequests={() => setRequestsOpen(true)}
-                    onOpenLog={() => setLogOpen(true)}
-                    // The Dashboard already opens filtered to one agent (?scenario=).
-                    onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
                 />
                 {/* Connection: always here, between the status row and the rules; open
                     until the agent is connected (or while its config is out of date),

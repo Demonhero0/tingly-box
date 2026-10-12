@@ -1,8 +1,8 @@
 // The Agent page's status line (under the title): "is it connected, and is it
-// being used" at a glance, plus the two looks-in (Requests, Usage) and — when
-// the client's config file has drifted from this page — the one primary
-// action, Reapply. See .design/agent-page-redesign.md §3.2 for the config
-// state and the Agent page v4 sketch for the layout.
+// being used" at a glance, plus a quiet note when the client's config file has
+// drifted from this page. Text only — every button lives in the page header
+// (one row), including the looks-in (AgentLooksIn). See
+// .design/agent-page-redesign.md §3.2 for the config state.
 import { Box, Button, Tooltip, Typography } from '@mui/material';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,11 +36,6 @@ export interface AgentStatusRowProps {
     connected: boolean;
     /** The client's config readback, for agents that have one. */
     configStatus: ClientConfigStatus | null;
-    /** Opens the page's Auto Config (reapply / first apply). */
-    onApplyConfig: () => void;
-    onOpenRequests: () => void;
-    onOpenUsage: () => void;
-    onOpenLog: () => void;
 }
 
 const Dot: React.FC<{ color: string }> = ({ color }) => (
@@ -51,10 +46,6 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
     observation,
     connected,
     configStatus,
-    onApplyConfig,
-    onOpenRequests,
-    onOpenUsage,
-    onOpenLog,
 }) => {
     const { t, i18n } = useTranslation();
     const hasRequests = !!observation?.lastRequestAt;
@@ -82,8 +73,8 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
     const dotColor = !observation ? 'transparent' : hasRequests && connected ? 'success.main' : 'warning.main';
 
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 1, minHeight: 32 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: '1 1 320px' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, minHeight: 24 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                 {summary && (
                     <>
                         <Dot color={dotColor} />
@@ -94,58 +85,59 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
                 )}
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
-                {outdated && (
-                    <>
-                        <Tooltip
-                            arrow
-                            title={(
-                                <Box>
-                                    <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>{t('clientConfigStatus.outdatedTooltip', { path })}</Typography>
-                                    {diffs.map((d: { key?: string; applied?: string; expected?: string }) => (
-                                        <Box key={d.key} sx={{ fontFamily: fontMono, fontSize: 11, lineHeight: 1.5 }}>
-                                            {d.key}: {d.applied || '—'} → {d.expected || '—'}
-                                        </Box>
-                                    ))}
+            {outdated && (
+                <Tooltip
+                    arrow
+                    title={(
+                        <Box>
+                            <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>{t('clientConfigStatus.outdatedTooltip', { path })}</Typography>
+                            {diffs.map((d: { key?: string; applied?: string; expected?: string }) => (
+                                <Box key={d.key} sx={{ fontFamily: fontMono, fontSize: 11, lineHeight: 1.5 }}>
+                                    {d.key}: {d.applied || '—'} → {d.expected || '—'}
                                 </Box>
-                            )}
-                        >
-                            <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 500, fontSize: fontSizes.md }}>
-                                {t('agentStatus.stale', { count: diffs.length })}
-                            </Typography>
-                        </Tooltip>
-                        <Button variant="contained" size="small" onClick={onApplyConfig}>
-                            {t('clientConfigStatus.reapply')}
-                        </Button>
-                    </>
-                )}
-                {notApplied && (
-                    <>
-                        <Tooltip arrow title={t('clientConfigStatus.notAppliedTooltip', { path })}>
-                            <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: fontSizes.md }}>
-                                {t('clientConfigStatus.notApplied')}
-                            </Typography>
-                        </Tooltip>
-                        <Button variant="contained" size="small" onClick={onApplyConfig}>
-                            {t('clientConfigStatus.apply')}
-                        </Button>
-                    </>
-                )}
-                <Button variant="outlined" size="small" onClick={onOpenRequests}>
-                    {t('agentStatus.requests')}
-                </Button>
-                <Tooltip title={t('agentStatus.usageTooltip')} describeChild>
-                    <Button variant="outlined" size="small" onClick={onOpenUsage}>
-                        {t('agentStatus.usage')}
-                    </Button>
+                            ))}
+                        </Box>
+                    )}
+                >
+                    <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 500, fontSize: fontSizes.md }}>
+                        {t('agentStatus.stale', { count: diffs.length })}
+                    </Typography>
                 </Tooltip>
-                <Tooltip title={t('agentStatus.logTooltip')} describeChild>
-                    <Button variant="outlined" size="small" onClick={onOpenLog}>
-                        {t('agentStatus.log')}
-                    </Button>
+            )}
+            {notApplied && (
+                <Tooltip arrow title={t('clientConfigStatus.notAppliedTooltip', { path })}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: fontSizes.md }}>
+                        {t('clientConfigStatus.notApplied')}
+                    </Typography>
                 </Tooltip>
-            </Box>
+            )}
         </Box>
+    );
+};
+
+/** The three looks-in, as header buttons next to the page's other actions. */
+export const AgentLooksIn: React.FC<{
+    onOpenRequests: () => void;
+    onOpenUsage: () => void;
+    onOpenLog: () => void;
+}> = ({ onOpenRequests, onOpenUsage, onOpenLog }) => {
+    const { t } = useTranslation();
+    return (
+        <>
+            <Button variant="outlined" size="small" onClick={onOpenRequests}>
+                {t('agentStatus.requests')}
+            </Button>
+            <Tooltip title={t('agentStatus.usageTooltip')} describeChild>
+                <Button variant="outlined" size="small" onClick={onOpenUsage}>
+                    {t('agentStatus.usage')}
+                </Button>
+            </Tooltip>
+            <Tooltip title={t('agentStatus.logTooltip')} describeChild>
+                <Button variant="outlined" size="small" onClick={onOpenLog}>
+                    {t('agentStatus.log')}
+                </Button>
+            </Tooltip>
+        </>
     );
 };
 
