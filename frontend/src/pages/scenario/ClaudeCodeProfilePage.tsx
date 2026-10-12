@@ -1,5 +1,9 @@
 import CardGrid from "@/components/CardGrid.tsx";
 import PageLayout from '@/components/PageLayout';
+import PageHeader from '@/components/PageHeader';
+import ScenarioLogDialog from '@/components/RuleLogDialog';
+import AgentActivityDialog from './components/AgentActivityDialog';
+import { AgentLooksIn } from './components/AgentStatusRow';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
 import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './components/ScenarioCardHeader';
 import ProviderConfigCard from "@/components/ProviderConfigCard.tsx";
@@ -82,6 +86,8 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
     // Profile state
     const { getProfiles, refresh: refreshProfiles } = useProfileContext();
     const currentProfile = getProfiles(BASE_SCENARIO).find(p => p.id === profileId);
+    const [requestsOpen, setRequestsOpen] = useState(false);
+    const [logOpen, setLogOpen] = useState(false);
     const [renameProfileOpen, setRenameProfileOpen] = useState(false);
     const [deleteProfileOpen, setDeleteProfileOpen] = useState(false);
     const [renameName, setRenameName] = useState('');
@@ -187,47 +193,55 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
 
     return (
         <PageLayout loading={isLoading} loadingContent={<ScenarioPageSkeleton />} notification={notification}>
+            <Stack spacing={2}>
+            <PageHeader
+                title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box component="span" sx={{ minWidth: 0 }}>Claude Code</Box>
+                        <Tooltip title={`Base URL: ${baseUrl}/tingly/${scenario}`}>
+                            <IconButton size="small" aria-label="Base URL">
+                                <InfoIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                }
+                // Same shape as the Agent pages: title left, one row of buttons right.
+                actions={(
+                    <>
+                        <AgentLooksIn
+                            onOpenRequests={() => setRequestsOpen(true)}
+                            onOpenLog={() => setLogOpen(true)}
+                            onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
+                        />
+                        <Tooltip title={t('claudeCode.profile.renameProfile')}>
+                            <IconButton size="small" aria-label={t('claudeCode.profile.renameProfile')} onClick={() => { setRenameName(currentProfile?.name || ''); setRenameProfileOpen(true); }}>
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title={t('claudeCode.profile.deleteProfile')}>
+                            <IconButton size="small" color="error" aria-label={t('claudeCode.profile.deleteProfile')} onClick={() => setDeleteProfileOpen(true)}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </>
+                )}
+                sx={{
+                    pb: 0,
+                    borderBottom: 0,
+                    flexDirection: { xs: 'column', md: 'row' },
+                    alignItems: { xs: 'flex-start', md: 'center' },
+                    '& h1': { whiteSpace: 'nowrap' },
+                }}
+            />
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                {currentProfile ? `${profileId} - ${currentProfile.name}` : profileId}
+                {' · '}
+                {unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}
+            </Typography>
             <CardGrid>
                 <UnifiedCard
                     size="full"
                     contentMaxWidth={SCENARIO_HEADER_CONTENT_MAX_WIDTH}
-                    title={
-                        <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Box component="span" sx={{ lineHeight: 1.2, minWidth: 0 }}>
-                                    Claude Code
-                                </Box>
-                                <Tooltip title={`Base URL: ${baseUrl}/tingly/${scenario}`}>
-                                    <IconButton size="small">
-                                        <InfoIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={t('claudeCode.profile.renameProfile')}>
-                                    <IconButton size="small" onClick={() => { setRenameName(currentProfile?.name || ''); setRenameProfileOpen(true); }}>
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={t('claudeCode.profile.deleteProfile')}>
-                                    <IconButton size="small" color="error" onClick={() => setDeleteProfileOpen(true)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                            </Box>
-                            <Typography
-                                component="span"
-                                variant="caption"
-                                sx={{
-                                    color: 'text.secondary',
-                                    fontWeight: 400,
-                                    lineHeight: 1.2,
-                                }}
-                            >
-                                {currentProfile ? `${profileId} - ${currentProfile.name}` : profileId}
-                                {' · '}
-                                {unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}
-                            </Typography>
-                        </Stack>
-                    }
                 >
                     <Box sx={{ px: 2, pb: 0.5 }}>
                         <ConfigRow
@@ -368,7 +382,11 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                     collapsible={true}
                     allowToggleRule={false}
                     allowAddRule={false}
+                    hideTroubleshoot
                 />
+
+                <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
+                <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
 
                 {/* Rename profile dialog */}
                 <Dialog
@@ -425,6 +443,7 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                     }
                 />
             </CardGrid>
+            </Stack>
         </PageLayout>
     );
 };
