@@ -292,6 +292,13 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                             tooltipKey={agent.tooltipKey}
                         />
                     }
+                    meta={(
+                        <AgentStatusRow
+                            observation={observation.data}
+                            connected={connected}
+                            configStatus={clientConfigStatus}
+                        />
+                    )}
                     actions={headerActions}
                     // Title, status and actions share a row only where they fit; below that
                     // the actions drop under the title instead of wrapping it.
@@ -302,11 +309,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         alignItems: { xs: 'flex-start', md: 'center' },
                         '& h1': { whiteSpace: 'nowrap' },
                     }}
-                />
-                <AgentStatusRow
-                    observation={observation.data}
-                    connected={connected}
-                    configStatus={clientConfigStatus}
                 />
                 {/* Connection: always here, between the status row and the rules; open
                     until the agent is connected (or while its config is out of date),

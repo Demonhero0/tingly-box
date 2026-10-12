@@ -38,6 +38,8 @@ export interface AgentStatusRowProps {
     configStatus: ClientConfigStatus | null;
     /** What to say when nothing has arrived and it is not connected, if "below" does not point at anything. */
     unconnectedText?: string;
+    /** Identity text that leads the line (a profile's id and mode). */
+    leading?: string;
 }
 
 const Dot: React.FC<{ color: string }> = ({ color }) => (
@@ -49,13 +51,14 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
     connected,
     configStatus,
     unconnectedText,
+    leading,
 }) => {
     const { t, i18n } = useTranslation();
     const hasRequests = !!observation?.lastRequestAt;
 
     const summary = useMemo(() => {
         if (!observation) return null;
-        const parts: string[] = [];
+        const parts: string[] = leading ? [leading] : [];
         if (connected) parts.push(t('agentStatus.connected'));
         if (observation.lastRequestAt) {
             parts.push(t('agentStatus.lastRequest', { ago: formatRelativeTime(observation.lastRequestAt, i18n.language) }));
@@ -66,7 +69,7 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
             parts.push(connected ? t('agentStatus.noRequestsYet') : (unconnectedText ?? t('agentStatus.noRequestsFinishSetup')));
         }
         return parts.join(' · ');
-    }, [observation, connected, unconnectedText, t, i18n.language]);
+    }, [observation, connected, unconnectedText, leading, t, i18n.language]);
 
     const outdated = configStatus?.state === 'outdated';
     const notApplied = !!configStatus && configStatus.state !== 'applied' && !outdated;
@@ -76,7 +79,7 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
     const dotColor = !observation ? 'transparent' : hasRequests && connected ? 'success.main' : 'warning.main';
 
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, minHeight: 24 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                 {summary && (
                     <>

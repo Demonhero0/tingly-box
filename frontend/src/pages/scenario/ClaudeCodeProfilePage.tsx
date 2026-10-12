@@ -216,6 +216,15 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                         </Tooltip>
                     </Box>
                 }
+                meta={(
+                    <AgentStatusRow
+                        observation={observation.data}
+                        connected={launched === true}
+                        configStatus={null}
+                        unconnectedText={t('agentStatus.noRequestsYet')}
+                        leading={`${currentProfile ? `${profileId} - ${currentProfile.name}` : profileId} · ${unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}`}
+                    />
+                )}
                 // Same shape as the Agent pages: title left, one row of buttons right.
                 actions={(
                     <>
@@ -247,14 +256,6 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                     '& h1': { whiteSpace: 'nowrap' },
                 }}
             />
-            <Stack spacing={0.5}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {currentProfile ? `${profileId} - ${currentProfile.name}` : profileId}
-                {' · '}
-                {unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}
-            </Typography>
-            <AgentStatusRow observation={observation.data} connected={launched === true} configStatus={null} unconnectedText={t('agentStatus.noRequestsYet')} />
-            </Stack>
                 <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
                   <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
                     <Box sx={{ px: 2, pb: 0.5 }}>

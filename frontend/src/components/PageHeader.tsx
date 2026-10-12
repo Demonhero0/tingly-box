@@ -7,10 +7,12 @@ interface PageHeaderProps {
   subtitle?: ReactNode;
   icon?: ReactNode;
   actions?: ReactNode;
+  /** Quiet status text on the title's own line (wraps under it when narrow). */
+  meta?: ReactNode;
   sx?: SxProps<Theme>;
 }
 
-export default function PageHeader({ title, subtitle, icon, actions, sx }: PageHeaderProps) {
+export default function PageHeader({ title, subtitle, icon, actions, meta, sx }: PageHeaderProps) {
   return (
     <Box
       sx={{
@@ -26,7 +28,7 @@ export default function PageHeader({ title, subtitle, icon, actions, sx }: PageH
       }}
     >
       <Box sx={{ minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', columnGap: 1.25, rowGap: 0.25, flexWrap: 'wrap' }}>
           {icon && (
             <Box
               aria-hidden="true"
@@ -43,6 +45,7 @@ export default function PageHeader({ title, subtitle, icon, actions, sx }: PageH
           <Typography component="h1" variant="h3" sx={{ color: 'text.primary' }}>
             {title}
           </Typography>
+          {meta && <Box sx={{ minWidth: 0, ml: { sm: 1 } }}>{meta}</Box>}
         </Box>
         {subtitle && (
           <Typography
