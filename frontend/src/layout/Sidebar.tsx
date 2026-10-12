@@ -1,4 +1,4 @@
-import { Info as IconInfoCircle, Visibility as IconVisibility, VisibilityOff as IconVisibilityOff } from '@/components/icons';
+import { Info as IconInfoCircle, Pin as IconPin, PinFilled as IconPinFilled, Visibility as IconVisibility, VisibilityOff as IconVisibilityOff } from '@/components/icons';
 import {
     Box,
     Button,
@@ -50,9 +50,11 @@ interface SidebarProps {
     /** Edit mode: hidden rows are listed (dimmed) and every hideable row gets a visibility toggle. */
     editing?: boolean;
     onToggleHidden?: (id: string) => void;
+    /** Hover a pinnable row to pin it to the top of the list (outside edit mode). */
+    onTogglePinned?: (id: string) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ sidebarItems, activeActivityLabel, onClose, headerAction, editing = false, onToggleHidden }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ sidebarItems, activeActivityLabel, onClose, headerAction, editing = false, onToggleHidden, onTogglePinned }) => {
     const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
@@ -154,11 +156,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ sidebarItems, activeActivityLa
                     const active = !isAddAction && (item.match ? item.match(location.pathname) : isActive(item.path));
 
                     const toggleable = editing && item.hideId && onToggleHidden;
+                    const pinnable = !editing && !!item.pinId && !!onTogglePinned;
                     const button = (
                         <ListItem
                             disablePadding
-                            sx={{ opacity: editing && item.hidden ? 0.5 : 1 }}
-                            secondaryAction={toggleable ? (
+                            sx={{
+                                opacity: editing && item.hidden ? 0.5 : 1,
+                                // The pin shows on hover / keyboard focus, and stays visible once set.
+                                '& .pin-btn': { opacity: item.pinned ? 0.9 : 0, transition: 'opacity 0.12s' },
+                                '&:hover .pin-btn, & .pin-btn:focus-visible': { opacity: 1 },
+                                // Room for the pin only while it is showing, so names keep their width.
+                                ...(pinnable && !item.pinned && {
+                                    '&& > .MuiListItemButton-root': { pr: 1.5 },
+                                    '&&:hover > .MuiListItemButton-root, &&:focus-within > .MuiListItemButton-root': { pr: 5 },
+                                }),
+                            }}
+                            secondaryAction={pinnable ? (
+                                <Tooltip title={item.pinned ? t('layout.sidebar.unpin') : t('layout.sidebar.pinToTop')} placement="right" arrow>
+                                    <IconButton
+                                        className="pin-btn"
+                                        size="small"
+                                        edge="end"
+                                        onClick={() => onTogglePinned!(item.pinId!)}
+                                        aria-label={item.pinned ? t('layout.sidebar.unpin') : t('layout.sidebar.pinToTop')}
+                                        aria-pressed={!!item.pinned}
+                                        sx={{ color: active ? 'primary.contrastText' : 'text.secondary', mr: 0.5 }}
+                                    >
+                                        {item.pinned ? <IconPinFilled sx={{ fontSize: 16 }} /> : <IconPin sx={{ fontSize: 16 }} />}
+                                    </IconButton>
+                                </Tooltip>
+                            ) : toggleable ? (
                                 <Tooltip title={item.hidden ? t('scenarioOverview.showInSidebar') : t('scenarioOverview.hideFromSidebar')} placement="right" arrow>
                                     <IconButton
                                         size="small"

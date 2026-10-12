@@ -14,7 +14,7 @@ import { SidebarCollapsedProvider, useSidebarCollapsed } from './useSidebarColla
 import type { ActivityItem, LayoutProps } from './types';
 import { FloatingStatusIndicators } from '../components/FloatingStatusIndicators';
 import { syncUiPrefs } from '../services/uiPrefs';
-import { useHiddenScenarios } from '@/pages/scenario/scenarioRegistry';
+import { useHiddenScenarios, usePinnedScenarios } from '@/pages/scenario/scenarioRegistry';
 import { rememberAgentPath } from '@/pages/scenario/lastAgent';
 import { CoachMark } from '@/components/CoachMark';
 import { useOneTimeTip } from '@/hooks/useOneTimeTip';
@@ -103,6 +103,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
     // each with its visibility toggle. It replaced the /agent card page.
     const [editingAgents, setEditingAgents] = useState(false);
     const { toggleHidden } = useHiddenScenarios();
+    const { togglePinned } = usePinnedScenarios();
     const { dismissed: tipDismissed, dismiss: dismissTip } = useOneTimeTip(AGENT_VISIBILITY_TIP_KEY);
     // The header renders in both the desktop nav and the (kept-mounted)
     // mobile drawer; anchor the callout to whichever eye is on screen.
@@ -232,6 +233,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
                     headerAction={sidebarHeaderAction}
                     editing={editingAgents}
                     onToggleHidden={toggleHidden}
+                    onTogglePinned={togglePinned}
                 />
             )}
             {hasSidebar && sidebarCollapsed && flyoutOpen && (
@@ -250,6 +252,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
                             headerAction={sidebarHeaderAction}
                             editing={editingAgents}
                             onToggleHidden={toggleHidden}
+                    onTogglePinned={togglePinned}
                         />
                     </Box>
                 </ClickAwayListener>

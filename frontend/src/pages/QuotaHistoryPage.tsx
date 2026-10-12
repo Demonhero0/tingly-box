@@ -6,6 +6,7 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
+    Paper,
     Select,
     ToggleButton,
     ToggleButtonGroup,
@@ -13,7 +14,7 @@ import {
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Refresh } from '@/components/icons';
-import PageHeader from '@/components/PageHeader';
+import { visuallyHidden } from '@/components/dashboard/visuallyHidden';
 import { QuotaHistoryView } from '@/components/dashboard';
 import api from '@/services/api';
 import { toLocalISOString } from '@/utils/datetime';
@@ -73,13 +74,10 @@ export default function QuotaHistoryPage() {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <PageHeader
-                title={t('dashboard.quotaHistory.title', { defaultValue: 'Quota history' })}
-                subtitle={t('dashboard.quotaHistory.pageSubtitle', {
-                    defaultValue: 'Short ranges show samples; longer ranges show daily highs and lows.',
-                })}
-                actions={
-                    <>
+            <Box component="h1" sx={visuallyHidden}>
+                {t('dashboard.quotaHistory.title', { defaultValue: 'Quota history' })}
+            </Box>
+            <Paper variant="outlined" sx={{ px: 1.5, py: 1, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
                         <FormControl size="small" sx={{ minWidth: 180 }}>
                             <InputLabel>{t('dashboard.overview.provider', { defaultValue: 'Provider' })}</InputLabel>
                             <Select
@@ -112,9 +110,7 @@ export default function QuotaHistoryPage() {
                                 </IconButton>
                             </span>
                         </Tooltip>
-                    </>
-                }
-            />
+            </Paper>
 
             <QuotaHistoryView
                 startTime={timeRange.startTime}

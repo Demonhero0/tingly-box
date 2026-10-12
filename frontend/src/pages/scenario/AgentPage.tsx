@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { Box, Button, Card, Stack, Tooltip } from '@mui/material';
-import { Rule as QuickStartIcon } from '@/components/icons';
 import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +22,7 @@ import { type SlotMode, useSlotRouting } from '@/pages/scenario/hooks/useSlotRou
 import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
 import AgentAccessSection, { useAccessExpanded } from './components/AgentAccessSection';
 import AgentActivityDialog from './components/AgentActivityDialog';
-import AgentStatusRow from './components/AgentStatusRow';
+import AgentStatusRow, { AgentLooksIn } from './components/AgentStatusRow';
 import AgentSetupCard, {
     type AgentApplyResult,
     type AgentInstallAction,
@@ -261,7 +260,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
             {quickStart && quickStartHidden && (
                 // A finished Quick Start leaves the page; this brings it back (reset).
                 <Tooltip title={t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' })}>
-                    <Button onClick={restartQuickStart} variant="text" size="small" startIcon={<QuickStartIcon />} sx={{ textTransform: 'none' }}>
+                    <Button onClick={restartQuickStart} variant="outlined" size="small">
                         {t('agentSetup.quickStart')}
                     </Button>
                 </Tooltip>
@@ -273,6 +272,12 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     </Button>
                 </Tooltip>
             ))}
+            <AgentLooksIn
+                onOpenRequests={() => setRequestsOpen(true)}
+                onOpenLog={() => setLogOpen(true)}
+                // The Dashboard already opens filtered to one agent (?scenario=).
+                onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
+            />
             {configButton}
         </>
     );
@@ -287,6 +292,13 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                             tooltipKey={agent.tooltipKey}
                         />
                     }
+                    meta={(
+                        <AgentStatusRow
+                            observation={observation.data}
+                            connected={connected}
+                            configStatus={clientConfigStatus}
+                        />
+                    )}
                     actions={headerActions}
                     // Title, status and actions share a row only where they fit; below that
                     // the actions drop under the title instead of wrapping it.
@@ -297,16 +309,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         alignItems: { xs: 'flex-start', md: 'center' },
                         '& h1': { whiteSpace: 'nowrap' },
                     }}
-                />
-                <AgentStatusRow
-                    observation={observation.data}
-                    connected={connected}
-                    configStatus={clientConfigStatus}
-                    onApplyConfig={openDialog}
-                    onOpenRequests={() => setRequestsOpen(true)}
-                    onOpenLog={() => setLogOpen(true)}
-                    // The Dashboard already opens filtered to one agent (?scenario=).
-                    onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
                 />
                 {/* Connection: always here, between the status row and the rules; open
                     until the agent is connected (or while its config is out of date),

@@ -32,6 +32,9 @@ export interface NavItemBase {
      */
     hideId?: string;
     hidden?: boolean;
+    /** Set on rows that can be pinned to the top of the list (hover shows a pin). */
+    pinId?: string;
+    pinned?: boolean;
     /**
      * Optional override for "is this item active": receives the current
      * pathname, returns whether this item should highlight. Defaults to an

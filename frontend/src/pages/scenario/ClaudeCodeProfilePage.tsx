@@ -1,9 +1,16 @@
 import CardGrid from "@/components/CardGrid.tsx";
 import PageLayout from '@/components/PageLayout';
+import PageHeader from '@/components/PageHeader';
+import ScenarioLogDialog from '@/components/RuleLogDialog';
+import AgentActivityDialog from './components/AgentActivityDialog';
+import AgentStatusRow, { AgentLooksIn } from './components/AgentStatusRow';
+import AgentAccessSection, { useAccessExpanded } from './components/AgentAccessSection';
+import ProfileSetupDialog from './components/ProfileSetupDialog';
+import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
+import { isCredentialProvider } from '@/utils/providers';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
 import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './components/ScenarioCardHeader';
 import ProviderConfigCard from "@/components/ProviderConfigCard.tsx";
-import UnifiedCard from "@/components/UnifiedCard.tsx";
 import ConfigRow from "@/components/ConfigRow.tsx";
 import { ChoiceToggle } from "@/components/ChoiceToggle";
 import { useProfileContext } from '@/contexts/ProfileContext';
@@ -82,6 +89,9 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
     // Profile state
     const { getProfiles, refresh: refreshProfiles } = useProfileContext();
     const currentProfile = getProfiles(BASE_SCENARIO).find(p => p.id === profileId);
+    const [requestsOpen, setRequestsOpen] = useState(false);
+    const [setupOpen, setSetupOpen] = useState(false);
+    const [logOpen, setLogOpen] = useState(false);
     const [renameProfileOpen, setRenameProfileOpen] = useState(false);
     const [deleteProfileOpen, setDeleteProfileOpen] = useState(false);
     const [renameName, setRenameName] = useState('');
@@ -185,50 +195,69 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
         return `tingly-box profile ${profileId}`;
     }, [commandMode, appVersion, profileId]);
 
+    // Facts, not clicks: a provider exists, a request has come through this profile.
+    const observation = useAgentObservation(scenario);
+    const launched = observation.data ? !!observation.data.lastRequestAt : null;
+    const providerConnected = isLoading ? null : providers.some((p: any) => p.enabled && isCredentialProvider(p));
+    const access = useAccessExpanded(scenario, launched !== true);
+    const accessUrl = `${baseUrl}/tingly/${scenario}`;
+
     return (
         <PageLayout loading={isLoading} loadingContent={<ScenarioPageSkeleton />} notification={notification}>
-            <CardGrid>
-                <UnifiedCard
-                    size="full"
-                    contentMaxWidth={SCENARIO_HEADER_CONTENT_MAX_WIDTH}
-                    title={
-                        <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Box component="span" sx={{ lineHeight: 1.2, minWidth: 0 }}>
-                                    Claude Code
-                                </Box>
-                                <Tooltip title={`Base URL: ${baseUrl}/tingly/${scenario}`}>
-                                    <IconButton size="small">
-                                        <InfoIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={t('claudeCode.profile.renameProfile')}>
-                                    <IconButton size="small" onClick={() => { setRenameName(currentProfile?.name || ''); setRenameProfileOpen(true); }}>
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={t('claudeCode.profile.deleteProfile')}>
-                                    <IconButton size="small" color="error" onClick={() => setDeleteProfileOpen(true)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                            </Box>
-                            <Typography
-                                component="span"
-                                variant="caption"
-                                sx={{
-                                    color: 'text.secondary',
-                                    fontWeight: 400,
-                                    lineHeight: 1.2,
-                                }}
-                            >
-                                {currentProfile ? `${profileId} - ${currentProfile.name}` : profileId}
-                                {' · '}
-                                {unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}
-                            </Typography>
-                        </Stack>
-                    }
-                >
+            <Stack spacing={2}>
+            <PageHeader
+                title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box component="span" sx={{ minWidth: 0 }}>Claude Code</Box>
+                        <Tooltip title={`Base URL: ${baseUrl}/tingly/${scenario}`}>
+                            <IconButton size="small" aria-label="Base URL">
+                                <InfoIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                }
+                meta={(
+                    <AgentStatusRow
+                        observation={observation.data}
+                        connected={launched === true}
+                        configStatus={null}
+                        unconnectedText={t('agentStatus.noRequestsYet')}
+                        leading={`${currentProfile ? `${profileId} - ${currentProfile.name}` : profileId} · ${unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}`}
+                    />
+                )}
+                // Same shape as the Agent pages: title left, one row of buttons right.
+                actions={(
+                    <>
+                        <Button onClick={() => setSetupOpen(true)} variant="outlined" size="small">
+                            {t('scenarioPage.setupGuide')}
+                        </Button>
+                        <AgentLooksIn
+                            onOpenRequests={() => setRequestsOpen(true)}
+                            onOpenLog={() => setLogOpen(true)}
+                            onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
+                        />
+                        <Tooltip title={t('claudeCode.profile.renameProfile')}>
+                            <IconButton size="small" aria-label={t('claudeCode.profile.renameProfile')} onClick={() => { setRenameName(currentProfile?.name || ''); setRenameProfileOpen(true); }}>
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title={t('claudeCode.profile.deleteProfile')}>
+                            <IconButton size="small" color="error" aria-label={t('claudeCode.profile.deleteProfile')} onClick={() => setDeleteProfileOpen(true)}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </>
+                )}
+                sx={{
+                    pb: 0,
+                    borderBottom: 0,
+                    flexDirection: { xs: 'column', md: 'row' },
+                    alignItems: { xs: 'flex-start', md: 'center' },
+                    '& h1': { whiteSpace: 'nowrap' },
+                }}
+            />
+                <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
+                  <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
                     <Box sx={{ px: 2, pb: 0.5 }}>
                         <ConfigRow
                             tabs={[
@@ -355,7 +384,9 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                         showBaseUrlRow={true}
                         compact={true}
                     />
-                </UnifiedCard>
+                  </Box>
+                </AgentAccessSection>
+            <CardGrid>
 
                 <ClaudeCodeProfileOverrides
                     profileId={profileId || ''}
@@ -368,6 +399,19 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                     collapsible={true}
                     allowToggleRule={false}
                     allowAddRule={false}
+                    hideTroubleshoot
+                />
+
+                <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
+                <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
+
+                <ProfileSetupDialog
+                    open={setupOpen}
+                    onClose={() => setSetupOpen(false)}
+                    command={ccCommand}
+                    providerConnected={providerConnected}
+                    launched={launched}
+                    onConnectProvider={() => navigate('/help')}
                 />
 
                 {/* Rename profile dialog */}
@@ -425,6 +469,7 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                     }
                 />
             </CardGrid>
+            </Stack>
         </PageLayout>
     );
 };

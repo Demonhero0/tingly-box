@@ -291,3 +291,45 @@ export const useHiddenScenarios = () => {
 
     return { hidden, isHidden, toggleHidden };
 };
+
+// ── Pinned agents ────────────────────────────────────────────────────────────
+// The user's own order, one rule: pinned agents sit at the top of the Agent
+// sidebar (above Claude Code and its profiles), in the order they were pinned.
+// Synced like the hidden list so every surface agrees.
+const PINNED_KEY = 'scenario.pinnedScenarios';
+const PINNED_EVENT = 'scenario-pinned-change';
+
+const readPinned = (): string[] => {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(PINNED_KEY) ?? '[]');
+        return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+export const getPinnedScenarios = (): string[] => readPinned();
+
+export const usePinnedScenarios = () => {
+    const [pinned, setPinned] = useState<string[]>(() => readPinned());
+
+    useEffect(() => {
+        const sync = () => setPinned(readPinned());
+        window.addEventListener(PINNED_EVENT, sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener(PINNED_EVENT, sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+
+    const togglePinned = useCallback((id: string) => {
+        const current = readPinned();
+        const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+        setSyncedItem(PINNED_KEY, JSON.stringify(next));
+        window.dispatchEvent(new Event(PINNED_EVENT));
+        setPinned(next);
+    }, []);
+
+    return { pinned, togglePinned };
+};

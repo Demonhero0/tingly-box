@@ -12,6 +12,7 @@ import UnifiedCard from '@/components/UnifiedCard';
 import { EntryGuideDialog } from '@/components/tier/EntryGuideDialog';
 import type {TemplatePageProps} from './TemplatePage.types';
 import {TemplatePageActions} from './TemplatePageActions';
+import {TitleIconButtons} from './TitleIconButtons';
 import {useTemplatePageRules} from '@/pages/scenario/hooks/useTemplatePageRules';
 import {useRuleSort} from '@/pages/scenario/hooks/useRuleSort';
 import {useScrollToNewRule} from '@/components/hooks/useScrollToNewRule';
@@ -324,8 +325,6 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
             onViewLogs={scenario && !hideTroubleshoot ? () => setLogDialogOpen(true) : undefined}
             onProbeAll={rules.length > 0 ? handleProbeAll : undefined}
             onShowGuide={() => setShowGuide(true)}
-            sortMode={rules.length > 1 ? sortMode : undefined}
-            onToggleSort={rules.length > 1 ? toggleSortMode : undefined}
             scenario={scenario}
         />
     );
@@ -358,6 +357,17 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
                 id="models-and-forwarding-rules"
                 size="full"
                 title={title}
+                leftAction={
+                    <TitleIconButtons
+                        collapsible={collapsible}
+                        allExpanded={allExpanded}
+                        onToggleExpandAll={handleToggleExpandAll}
+                        showExpandCollapseButton={showExpandCollapseButton}
+                        onShowGuide={() => setShowGuide(true)}
+                        sortMode={rules.length > 1 ? sortMode : undefined}
+                        onToggleSort={rules.length > 1 ? toggleSortMode : undefined}
+                    />
+                }
                 rightAction={rightAction}
                 sx={{ scrollMarginTop: 16 }}
             >

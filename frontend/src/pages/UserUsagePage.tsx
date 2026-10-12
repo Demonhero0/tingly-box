@@ -5,23 +5,15 @@ import {
     Box,
     CircularProgress,
     Grid,
+    Paper,
     IconButton,
     Skeleton,
     ToggleButton,
     ToggleButtonGroup,
     Tooltip,
 } from '@mui/material';
-import {
-    Autorenew as CachedIcon,
-    BarChart,
-    Cloud,
-    ErrorOutline,
-    Refresh,
-    Server,
-    Token,
-    Users,
-} from '@/components/icons';
-import PageHeader from '@/components/PageHeader';
+import { Refresh } from '@/components/icons';
+import { visuallyHidden } from '@/components/dashboard/visuallyHidden';
 import {
     formatNumber,
     StatCard,
@@ -217,8 +209,7 @@ export default function UserUsagePage() {
                 count: activeAccounts,
                 defaultValue: `${activeAccounts} active in this period`,
             }),
-            icon: <Users />,
-            color: 'primary' as const,
+            color: 'secondary' as const,
         }
         : viewMode === 'model'
         ? {
@@ -228,8 +219,7 @@ export default function UserUsagePage() {
                 count: providerCount,
                 defaultValue: `Across ${providerCount} provider${providerCount === 1 ? '' : 's'}`,
             }),
-            icon: <Server />,
-            color: 'primary' as const,
+            color: 'secondary' as const,
         }
         : {
             label: t('dashboard.userUsage.providersUsed', { defaultValue: 'Providers used' }),
@@ -238,8 +228,7 @@ export default function UserUsagePage() {
                 count: modelRoster.length,
                 defaultValue: `Across ${modelRoster.length} model${modelRoster.length === 1 ? '' : 's'}`,
             }),
-            icon: <Cloud />,
-            color: 'primary' as const,
+            color: 'secondary' as const,
         };
     const summaryItems = [
         primarySummaryItem,
@@ -252,7 +241,6 @@ export default function UserUsagePage() {
                 output: formatNumber(totalOutputTokens),
                 defaultValue: `Cache: ${formatNumber(totalCacheTokens)} · Input: ${formatNumber(totalInputTokens)} · Output: ${formatNumber(totalOutputTokens)}`,
             }),
-            icon: <Token />,
             color: 'secondary' as const,
         },
         {
@@ -261,7 +249,7 @@ export default function UserUsagePage() {
             // Already a fully composed string; wrapping it in t() would be an
             // identity call against a key that does not exist.
             hint: formatCacheBreakdown(totalCacheTokens, totalCacheWriteTokens, formatNumber),
-            icon: <CachedIcon />,
+            statusDot: true,
             color: getCacheHitRateColor(cacheHitRate),
         },
         {
@@ -271,14 +259,13 @@ export default function UserUsagePage() {
                 value: activeAccounts ? formatNumber(Math.round(totalRequests / activeAccounts)) : '0',
                 defaultValue: `${activeAccounts ? formatNumber(Math.round(totalRequests / activeAccounts)) : '0'} per active user`,
             }),
-            icon: <BarChart />,
             color: 'secondary' as const,
         },
         {
             label: t('dashboard.userUsage.errors', { defaultValue: 'Errors' }),
             value: formatNumber(totalErrors),
             hint: `${errorRate.toFixed(1)}%`,
-            icon: <ErrorOutline />,
+            statusDot: true,
             color: getErrorRateColor(errorRate),
         },
     ];
@@ -329,13 +316,12 @@ export default function UserUsagePage() {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <PageHeader
-                title={t('dashboard.userUsage.title', { defaultValue: 'Team usage' })}
-                subtitle={t('dashboard.userUsage.subtitle', {
-                    defaultValue: 'See how every registered user is consuming shared AI access.',
-                })}
-                actions={
-                    <>
+            {/* Same shape as the Usage page: no second title (the sidebar says where
+                you are), one bordered toolbar with the range and refresh. */}
+            <Box component="h1" sx={visuallyHidden}>
+                {t('dashboard.userUsage.title', { defaultValue: 'Team usage' })}
+            </Box>
+            <Paper variant="outlined" sx={{ px: 1.5, py: 1, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1.5 }}>
                         <ToggleButtonGroup
                             size="small"
                             exclusive
@@ -359,9 +345,7 @@ export default function UserUsagePage() {
                                 </IconButton>
                             </span>
                         </Tooltip>
-                    </>
-                }
-            />
+            </Paper>
 
             {error && <Alert severity="error">{error}</Alert>}
 
@@ -372,7 +356,7 @@ export default function UserUsagePage() {
                             title={item.label}
                             value={item.value}
                             subtitle={item.hint}
-                            icon={item.icon}
+                            statusDot={'statusDot' in item && item.statusDot}
                             color={item.color}
                         />
                     </Grid>

@@ -80,6 +80,8 @@ export default {
       "prompt": "Prompt"
     },
     "sidebar": {
+      "pinToTop": "Pin to top",
+      "unpin": "Unpin",
       "newProfile": "New Profile",
       "newTeam": "New Team",
       "profileName": "Profile name",
@@ -2229,6 +2231,18 @@ export default {
     "loadFailed": "Couldn't load this agent's requests."
   },
   "agentSetup": {
+    "profile": {
+      "title": "Get started with this profile",
+      "step1": "Connect an AI provider",
+      "step1Done": "Connected",
+      "connect": "Connect AI",
+      "step2": "Start Claude Code with this profile",
+      "step2Hint": "Run this in a terminal. It launches Claude Code on this profile's settings.",
+      "step2Done": "First request received",
+      "copy": "Copy command",
+      "inherit": "The profile inherits the main configuration and model routing; change only what you need under Profile Overrides.",
+      "close": "Done"
+    },
     "hide": "Hide",
     "restartTooltip": "Run Quick Start again",
     "autoSkipped": "Skipped — a model is already set",

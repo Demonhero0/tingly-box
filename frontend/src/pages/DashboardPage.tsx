@@ -16,7 +16,7 @@ import {
     getErrorRateColor,
     computeUsageSummary,
 } from '@/components/dashboard';
-import PageHeader from '@/components/PageHeader';
+import { visuallyHidden } from '@/components/dashboard/visuallyHidden';
 import { useTranslation } from 'react-i18next';
 import { useDashboardData, TIME_RANGE_CONFIG } from '@/hooks/useDashboardData';
 import type { TimeRange } from '@/hooks/useDashboardData';
@@ -24,10 +24,6 @@ import { fontSizes } from '@/theme/fonts';
 
 const DashboardSkeleton = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Box sx={{ pb: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <Skeleton variant="text" width={220} height={34} />
-            <Skeleton variant="text" width={140} height={24} />
-        </Box>
         <Grid container spacing={{ xs: 1.5, sm: 2 }}>
             {Array.from({ length: 5 }).map((_, index) => (
                 <Grid key={index} size={{ xs: 6, sm: 4, md: 2.4 }}>
@@ -174,9 +170,11 @@ export default function DashboardPage() {
                 minHeight: '100vh',
             }}
         >
-            <PageHeader
-                title={t('dashboard.overview.title', { defaultValue: 'Usage Dashboard' })}
-            />
+            {/* The sidebar already says where you are ("Usage"); keep the h1 for
+                screen readers only instead of a second, visible title. */}
+            <Box component="h1" sx={visuallyHidden}>
+                {t('dashboard.overview.title', { defaultValue: 'Usage Dashboard' })}
+            </Box>
             {toolbar}
             {/* Main Content */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
