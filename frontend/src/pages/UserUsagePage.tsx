@@ -12,16 +12,7 @@ import {
     ToggleButtonGroup,
     Tooltip,
 } from '@mui/material';
-import {
-    Autorenew as CachedIcon,
-    BarChart,
-    Cloud,
-    ErrorOutline,
-    Refresh,
-    Server,
-    Token,
-    Users,
-} from '@/components/icons';
+import { Refresh } from '@/components/icons';
 import { visuallyHidden } from '@/components/dashboard/visuallyHidden';
 import {
     formatNumber,
@@ -218,8 +209,7 @@ export default function UserUsagePage() {
                 count: activeAccounts,
                 defaultValue: `${activeAccounts} active in this period`,
             }),
-            icon: <Users />,
-            color: 'primary' as const,
+            color: 'secondary' as const,
         }
         : viewMode === 'model'
         ? {
@@ -229,8 +219,7 @@ export default function UserUsagePage() {
                 count: providerCount,
                 defaultValue: `Across ${providerCount} provider${providerCount === 1 ? '' : 's'}`,
             }),
-            icon: <Server />,
-            color: 'primary' as const,
+            color: 'secondary' as const,
         }
         : {
             label: t('dashboard.userUsage.providersUsed', { defaultValue: 'Providers used' }),
@@ -239,8 +228,7 @@ export default function UserUsagePage() {
                 count: modelRoster.length,
                 defaultValue: `Across ${modelRoster.length} model${modelRoster.length === 1 ? '' : 's'}`,
             }),
-            icon: <Cloud />,
-            color: 'primary' as const,
+            color: 'secondary' as const,
         };
     const summaryItems = [
         primarySummaryItem,
@@ -253,7 +241,6 @@ export default function UserUsagePage() {
                 output: formatNumber(totalOutputTokens),
                 defaultValue: `Cache: ${formatNumber(totalCacheTokens)} · Input: ${formatNumber(totalInputTokens)} · Output: ${formatNumber(totalOutputTokens)}`,
             }),
-            icon: <Token />,
             color: 'secondary' as const,
         },
         {
@@ -262,7 +249,7 @@ export default function UserUsagePage() {
             // Already a fully composed string; wrapping it in t() would be an
             // identity call against a key that does not exist.
             hint: formatCacheBreakdown(totalCacheTokens, totalCacheWriteTokens, formatNumber),
-            icon: <CachedIcon />,
+            statusDot: true,
             color: getCacheHitRateColor(cacheHitRate),
         },
         {
@@ -272,14 +259,13 @@ export default function UserUsagePage() {
                 value: activeAccounts ? formatNumber(Math.round(totalRequests / activeAccounts)) : '0',
                 defaultValue: `${activeAccounts ? formatNumber(Math.round(totalRequests / activeAccounts)) : '0'} per active user`,
             }),
-            icon: <BarChart />,
             color: 'secondary' as const,
         },
         {
             label: t('dashboard.userUsage.errors', { defaultValue: 'Errors' }),
             value: formatNumber(totalErrors),
             hint: `${errorRate.toFixed(1)}%`,
-            icon: <ErrorOutline />,
+            statusDot: true,
             color: getErrorRateColor(errorRate),
         },
     ];
@@ -370,7 +356,7 @@ export default function UserUsagePage() {
                             title={item.label}
                             value={item.value}
                             subtitle={item.hint}
-                            icon={item.icon}
+                            statusDot={'statusDot' in item && item.statusDot}
                             color={item.color}
                         />
                     </Grid>
