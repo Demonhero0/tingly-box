@@ -20,7 +20,7 @@ import {
     Settings as IconSettings,
     Send as IconSend,
     License as IconLicense,
-    History as IconHistory,
+    Speed as IconQuota,
     Key as IconKey,
     Shield as IconShield,
     Lock as IconLock,
@@ -229,7 +229,7 @@ export function useActivityItems(): ActivityItem[] {
                     // on that page (every /dashboard/<range> URL still works).
                     { path: '/dashboard/today', label: t('layout.usage', { defaultValue: 'Usage' }), icon: <IconChartBar sx={{ fontSize: 20 }} />, match: (p) => DASHBOARD_RANGE_PATH.test(p) },
                     { path: '/dashboard/users', label: t('layout.userUsage', { defaultValue: 'Team usage' }), icon: <IconUsers sx={{ fontSize: 20 }} /> },
-                    { path: '/dashboard/quota-history', label: t('layout.quotaHistory', { defaultValue: 'Quota history' }), icon: <IconHistory sx={{ fontSize: 20 }} /> },
+                    { path: '/dashboard/quota-history', label: t('layout.quotaHistory', { defaultValue: 'Quota history' }), icon: <IconQuota sx={{ fontSize: 20 }} /> },
                 ],
             },
             // ── Use: agent ⇄ model, team, image ──
@@ -329,7 +329,7 @@ export function useActivityItems(): ActivityItem[] {
                     { path: '/guardrails/groups', label: t('layout.policyGroups'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
                     { path: '/guardrails/rules', label: t('layout.policies'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
                     { path: '/guardrails/credentials', label: t('layout.protectedCredentials', { defaultValue: 'Secrets' }), icon: <IconKey sx={{ fontSize: 20 }} /> },
-                    { path: '/guardrails/history', label: t('layout.guardrailsHistory'), icon: <IconHistory sx={{ fontSize: 20 }} /> },
+                    { path: '/guardrails/history', label: t('layout.guardrailsHistory'), icon: <IconQuota sx={{ fontSize: 20 }} /> },
                 ] as NavItem[],
             }] as ActivityItem[] : []),
             // Bench — the customizable end-to-end test workbench
