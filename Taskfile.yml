@@ -1,0 +1,49 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  frontend:
+    desc: Build the web UI into frontend/dist (embedded by go build)
+    dir: frontend
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm build
+
+  build:
+    desc: Build the single binary with the embedded web UI
+    deps: [frontend]
+    cmds:
+      - go build -o bin/tingly-project ./cmd/tingly-project
+
+  swagger:
+    aliases: [openapi]
+    desc: Regenerate openapi.json from the registered routes
+    cmds:
+      - go run ./cmd/tingly-project swagger
+
+  codegen:
+    desc: Regenerate openapi.json and the typed frontend client
+    cmds:
+      - task: swagger
+      - cd frontend && pnpm gen:api
+
+  dev:backend:
+    desc: Run the API server on :12590
+    cmds:
+      - go run ./cmd/tingly-project
+
+  dev:frontend:
+    desc: Run the Vite dev server (proxies /api to :12590)
+    dir: frontend
+    cmds:
+      - pnpm dev
+
+  test:
+    desc: Backend and frontend tests, typecheck and lint
+    cmds:
+      - go vet ./...
+      - go test ./...
+      - cd frontend && pnpm typecheck && pnpm lint && pnpm test

@@ -1,0 +1,66 @@
+package project
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/tingly-dev/tingly-project/internal/db"
+)
+
+// MaxInstructions is the instructions length limit, as in the official
+// Projects.
+const MaxInstructions = 16000
+
+func (l Layout) memoryIndexText(projectID string) string {
+	idx, err := l.ReadMemory(projectID, MemoryIndex)
+	if err != nil {
+		return ""
+	}
+	idx = strings.TrimSpace(idx)
+	if idx == strings.TrimSpace(memoryIndexHeader) {
+		return ""
+	}
+	return idx
+}
+
+// threadSystemPrompt is appended to Claude Code's own system prompt for
+// every turn of a thread.
+func threadSystemPrompt(l Layout, p *db.Project, t *db.Thread) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "You are a thread in the project %q, run by a coordinator that hands you one task and reads your final report.\n", p.Name)
+	if g := strings.TrimSpace(p.Goal); g != "" {
+		fmt.Fprintf(&b, "Project goal: %s\n", g)
+	}
+	fmt.Fprintf(&b, "Your task: %s\n\n", t.Title)
+
+	b.WriteString("<rules>\n")
+	b.WriteString("- Do only the task you were given. If you notice other work worth doing, mention it in your report instead of doing it.\n")
+	if t.Branch != "" {
+		fmt.Fprintf(&b, "- You are on branch %s (from %s) in your own worktree. Commit your work to this branch when it is done and verified. Do not push, merge, or touch other branches.\n", t.Branch, t.BaseBranch)
+	} else {
+		fmt.Fprintf(&b, "- This thread has no repository. Write deliverables (documents, data, scripts) under %s so they appear in the project Library.\n", l.OutputDir(p.ID, slugify(t.Title)))
+	}
+	b.WriteString("- Verify your work before calling it done (run the relevant tests, builds or checks) and say how you verified it.\n")
+	b.WriteString("- If something you need is missing (access, a file, a secret, a decision), say exactly what is missing and stop. Do not substitute, mock or guess.\n")
+	b.WriteString("- If you need the user's decision or input to continue, make the last line of your final message: NEEDS_INPUT: <your question>\n")
+	b.WriteString("- End every turn with a short report: what you did, what is on the branch (or which files you produced), how you verified it, and anything the user should know.\n")
+	fmt.Fprintf(&b, "- Project memory lives in %s. Read MEMORY.md there when relevant. To remember a project-level fact, decision or pitfall for future threads, write a short .md file there and add a one-line link to it in MEMORY.md.\n", l.MemoryDir(p.ID))
+	fmt.Fprintf(&b, "- Files the user added to the project are in %s.\n", l.LibraryDir(p.ID))
+	b.WriteString("</rules>\n")
+
+	if len(p.Repos) > 1 {
+		b.WriteString("\nOther repositories in this project (readable):\n")
+		for _, r := range p.Repos {
+			if r.Path != t.RepoPath {
+				fmt.Fprintf(&b, "- %s\n", r.Path)
+			}
+		}
+	}
+	if ins := strings.TrimSpace(p.Instructions); ins != "" {
+		fmt.Fprintf(&b, "\n<project_instructions>\n%s\n</project_instructions>\n", ins)
+	}
+	if mem := l.memoryIndexText(p.ID); mem != "" {
+		fmt.Fprintf(&b, "\n<project_memory_index>\n%s\n</project_memory_index>\n", mem)
+	}
+	return b.String()
+}
