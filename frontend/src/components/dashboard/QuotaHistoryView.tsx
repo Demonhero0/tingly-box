@@ -133,7 +133,7 @@ export default function QuotaHistoryView({ startTime, endTime, provider, daily, 
             {providers.map((item) => (
                 <Paper key={item.uuid} variant="outlined" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 2 }}>
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 1, mb: 2 }}>
-                        <ProviderLabel uuid={item.uuid} size={22}>
+                        <ProviderLabel uuid={item.uuid} size={18}>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{item.name}</Typography>
                         </ProviderLabel>
                         <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
