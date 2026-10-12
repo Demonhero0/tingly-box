@@ -5,6 +5,7 @@ import {
     Box,
     CircularProgress,
     Grid,
+    Paper,
     IconButton,
     Skeleton,
     ToggleButton,
@@ -21,7 +22,7 @@ import {
     Token,
     Users,
 } from '@/components/icons';
-import PageHeader from '@/components/PageHeader';
+import { visuallyHidden } from '@/components/dashboard/visuallyHidden';
 import {
     formatNumber,
     StatCard,
@@ -329,13 +330,12 @@ export default function UserUsagePage() {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <PageHeader
-                title={t('dashboard.userUsage.title', { defaultValue: 'Team usage' })}
-                subtitle={t('dashboard.userUsage.subtitle', {
-                    defaultValue: 'See how every registered user is consuming shared AI access.',
-                })}
-                actions={
-                    <>
+            {/* Same shape as the Usage page: no second title (the sidebar says where
+                you are), one bordered toolbar with the range and refresh. */}
+            <Box component="h1" sx={visuallyHidden}>
+                {t('dashboard.userUsage.title', { defaultValue: 'Team usage' })}
+            </Box>
+            <Paper variant="outlined" sx={{ px: 1.5, py: 1, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1.5 }}>
                         <ToggleButtonGroup
                             size="small"
                             exclusive
@@ -359,9 +359,7 @@ export default function UserUsagePage() {
                                 </IconButton>
                             </span>
                         </Tooltip>
-                    </>
-                }
-            />
+            </Paper>
 
             {error && <Alert severity="error">{error}</Alert>}
 
