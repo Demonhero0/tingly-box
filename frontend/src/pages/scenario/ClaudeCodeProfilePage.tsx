@@ -255,7 +255,6 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
             </Typography>
             <AgentStatusRow observation={observation.data} connected={launched === true} configStatus={null} unconnectedText={t('agentStatus.noRequestsYet')} />
             </Stack>
-            <CardGrid>
                 <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
                   <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
                     <Box sx={{ px: 2, pb: 0.5 }}>
@@ -386,6 +385,7 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                     />
                   </Box>
                 </AgentAccessSection>
+            <CardGrid>
 
                 <ClaudeCodeProfileOverrides
                     profileId={profileId || ''}
