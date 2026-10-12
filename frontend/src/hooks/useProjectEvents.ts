@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { apiFetch } from '@/client';
 
 export interface ProjectEvent {
     type: 'message' | 'message_delta' | 'thread' | 'thread_event' | 'project' | 'coordinator';
@@ -6,9 +7,37 @@ export interface ProjectEvent {
     data: unknown;
 }
 
+const RETRY_MS = 2000;
+
 /**
- * Subscribes to a project's live event stream. onOpen runs on every
- * (re)connect so the page can re-fetch anything it missed while offline.
+ * Reads a server-sent event stream and hands each `data:` payload to
+ * onData. Resolves when the stream ends; rejects when it cannot be opened.
+ */
+export async function readEventStream(res: Response, onData: (data: string) => void): Promise<void> {
+    if (!res.ok || !res.body) throw new Error(`${res.status} ${res.statusText}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        buf += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf('\n\n')) >= 0) {
+            const frame = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            for (const line of frame.split('\n')) {
+                if (line.startsWith('data: ')) onData(line.slice(6));
+            }
+        }
+    }
+}
+
+/**
+ * Subscribes to a project's live event stream, reconnecting when it drops.
+ * onOpen runs on every reconnect so the page can re-fetch anything it missed
+ * while offline. The stream is read with fetch rather than EventSource so it
+ * goes through the host's authentication like every other request.
  */
 export function useProjectEvents(projectId: string, onEvent: (ev: ProjectEvent) => void, onOpen?: () => void) {
     const handler = useRef(onEvent);
@@ -18,19 +47,32 @@ export function useProjectEvents(projectId: string, onEvent: (ev: ProjectEvent) 
 
     useEffect(() => {
         if (!projectId) return;
-        let first = true;
-        const es = new EventSource(`/api/v1/projects/${projectId}/events`);
-        es.onopen = () => {
-            if (!first) opened.current?.();
-            first = false;
-        };
-        es.onmessage = (m) => {
-            try {
-                handler.current(JSON.parse(m.data) as ProjectEvent);
-            } catch {
-                // ignore malformed frames
+        const abort = new AbortController();
+        const { signal } = abort;
+        void (async () => {
+            let first = true;
+            while (!signal.aborted) {
+                try {
+                    const res = await apiFetch(`/api/v1/projects/${projectId}/events`, {
+                        headers: { Accept: 'text/event-stream' },
+                        signal,
+                    });
+                    if (res.ok && !first) opened.current?.();
+                    first = false;
+                    await readEventStream(res, (data) => {
+                        try {
+                            handler.current(JSON.parse(data) as ProjectEvent);
+                        } catch {
+                            // ignore malformed frames
+                        }
+                    });
+                } catch {
+                    // offline or refused: retry below
+                }
+                if (signal.aborted) return;
+                await new Promise((r) => setTimeout(r, RETRY_MS));
             }
-        };
-        return () => es.close();
+        })();
+        return () => abort.abort();
     }, [projectId]);
 }

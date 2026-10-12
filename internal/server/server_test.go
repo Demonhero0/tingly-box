@@ -252,10 +252,10 @@ func TestProjectEndToEnd(t *testing.T) {
 
 	repo := gitRepo(t)
 	var insp map[string]any
-	c.do("POST", "/repos/inspect", map[string]any{"path": repo}, &insp)
+	c.do("POST", "/projects/repos/inspect", map[string]any{"path": repo}, &insp)
 	assert.Equal(t, true, insp["ok"])
 	assert.Equal(t, "main", insp["branch"])
-	c.do("POST", "/repos/inspect", map[string]any{"path": t.TempDir()}, &insp)
+	c.do("POST", "/projects/repos/inspect", map[string]any{"path": t.TempDir()}, &insp)
 	assert.Contains(t, insp["error"], "not a git repository")
 
 	var p db.Project
@@ -318,12 +318,15 @@ func TestProjectEndToEnd(t *testing.T) {
 		}
 	}
 
+	// A thread is only reachable under its own project.
+	require.Equal(t, 404, c.do("GET", "/projects/not-this-one/threads/"+th.ID, nil, nil))
+
 	var diff map[string]any
-	require.Equal(t, 200, c.do("GET", "/threads/"+th.ID+"/diff", nil, &diff))
+	require.Equal(t, 200, c.do("GET", "/projects/"+p.ID+"/threads/"+th.ID+"/diff", nil, &diff))
 	assert.Contains(t, diff["patch"], "fix.txt")
 
 	var merged db.Thread
-	require.Equal(t, 200, c.do("POST", "/threads/"+th.ID+"/merge", nil, &merged))
+	require.Equal(t, 200, c.do("POST", "/projects/"+p.ID+"/threads/"+th.ID+"/merge", nil, &merged))
 	assert.Equal(t, db.ThreadResolved, merged.Status)
 	assert.FileExists(t, filepath.Join(repo, "fix.txt"))
 

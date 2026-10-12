@@ -6,14 +6,12 @@ package settings
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/llm"
+	"github.com/tingly-dev/tingly-project/llm"
 )
 
 const settingsKey = "connection"
@@ -89,8 +87,8 @@ func (s *Service) Client() (llm.Client, Connection, error) {
 
 const modelsTTL = time.Minute
 
-// Models lists models for conn, cached for a minute per connection.
-func (s *Service) Models(ctx context.Context, conn Connection) ([]llm.Model, error) {
+// ModelsFor lists models for conn, cached for a minute per connection.
+func (s *Service) ModelsFor(ctx context.Context, conn Connection) ([]llm.Model, error) {
 	id := conn.APIStyle + "|" + conn.BaseURL + "|" + conn.APIKey
 	s.mu.Lock()
 	if s.modelsForID == id && time.Since(s.modelsAt) < modelsTTL {
@@ -114,6 +112,16 @@ func (s *Service) Models(ctx context.Context, conn Connection) ([]llm.Model, err
 	return models, err
 }
 
+// Models lists models for the saved connection. With ClientFor and
+// ThreadEnv it makes the settings service the standalone app's project.Host.
+func (s *Service) Models(ctx context.Context) ([]llm.Model, error) {
+	conn, err := s.Connection()
+	if err != nil {
+		return nil, err
+	}
+	return s.ModelsFor(ctx, conn)
+}
+
 // ResolveModel picks the model for a request: the explicit one, else the
 // configured default, else the first model the endpoint lists.
 func (s *Service) ResolveModel(ctx context.Context, conn Connection, explicit string) (string, error) {
@@ -123,7 +131,7 @@ func (s *Service) ResolveModel(ctx context.Context, conn Connection, explicit st
 	if conn.DefaultModel != "" {
 		return conn.DefaultModel, nil
 	}
-	models, err := s.Models(ctx, conn)
+	models, err := s.ModelsFor(ctx, conn)
 	if err != nil {
 		return "", fmt.Errorf("no default model is set and listing models failed: %w", err)
 	}
@@ -162,16 +170,4 @@ func (s *Service) ThreadEnv(ctx context.Context) ([]string, string) {
 	}
 	model, _ := s.ResolveModel(ctx, conn, "")
 	return env, model
-}
-
-// ClaudeCLIPath is the Claude Code CLI threads run, or "" if none is found.
-func ClaudeCLIPath() string {
-	if p := os.Getenv("CLAUDE_CLI_PATH"); p != "" {
-		return p
-	}
-	p, err := exec.LookPath("claude")
-	if err != nil {
-		return ""
-	}
-	return p
 }

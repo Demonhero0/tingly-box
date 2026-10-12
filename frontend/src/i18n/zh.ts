@@ -121,7 +121,7 @@ export const zh: Dict<typeof en> = {
         reposHelp: '新线程会在这些仓库里工作。已有线程保留原来的 worktree。',
         runtime: '线程运行环境', runtimeCli: '线程运行的 Claude Code：',
         runtimeMissing: '没有找到 Claude Code CLI，线程无法运行。请安装：',
-        runtimeVia: '线程使用设置里的模型连接：', runtimeOwnLogin: '模型连接不是 Anthropic 风格，因此线程使用 Claude Code 自己的登录。',
+        runtimeVia: '线程的模型请求发往', runtimeOwnLogin: '模型连接不是 Anthropic 风格，因此线程使用 Claude Code 自己的登录。',
         usageHelp: '线程上报的 token 用量。每个线程都是一个完整的 Claude Code 会话，并行越多消耗越快。',
         model: '模型', thread: '线程', turns: '轮次',
     },

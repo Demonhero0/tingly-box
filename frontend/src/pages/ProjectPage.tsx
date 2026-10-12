@@ -10,7 +10,7 @@ import { ThreadPanel } from '@/components/project/ThreadPanel';
 import { OverviewPane as OverviewIcon, Pause, Settings, Star, StarBorder } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
 import { useProjectEvents, type ProjectEvent } from '@/hooks/useProjectEvents';
-import { useAppData } from '@/contexts/AppDataContext';
+import { useProjectsHost } from '@/host/ProjectsHost';
 import { readLocal, writeLocal } from '@/utils/storage';
 
 const PANE_WIDTH = 440;
@@ -30,7 +30,7 @@ export default function ProjectPage() {
     const narrow = useMediaQuery(theme.breakpoints.down('lg'));
     const navigate = useNavigate();
     const notify = useNotify();
-    const { refresh } = useAppData();
+    const { onProjectsChanged: refresh, paths: routes } = useProjectsHost();
     const [params, setParams] = useSearchParams();
     const threadId = params.get('thread') ?? '';
 
@@ -65,13 +65,13 @@ export default function ProjectPage() {
 
     const loadThread = useCallback(async (tid: string) => {
         try {
-            const d = await unwrap(api.GET('/api/v1/threads/{id}', { params: { path: { id: tid } } }));
+            const d = await unwrap(api.GET('/api/v1/projects/{id}/threads/{tid}', { params: { path: { id, tid } } }));
             setThreadEvents(d.events);
             setThreads((list) => upsert(list, d.thread));
         } catch (e) {
             notify((e as Error).message, 'error');
         }
-    }, [notify]);
+    }, [id, notify]);
 
     useEffect(() => {
         setProject(null);
@@ -167,7 +167,7 @@ export default function ProjectPage() {
     if (error) {
         return (
             <Box sx={{ maxWidth: 720, mx: 'auto', pt: 8, px: 2 }}>
-                <Alert severity="error" action={<Button color="inherit" component={RouterLink} to="/">{t('projects.all')}</Button>}>{error}</Alert>
+                <Alert severity="error" action={<Button color="inherit" component={RouterLink} to={routes.list}>{t('projects.all')}</Button>}>{error}</Alert>
             </Box>
         );
     }
@@ -180,7 +180,7 @@ export default function ProjectPage() {
     ) : null;
 
     const pane = threadId ? (
-        <ThreadPanel threadId={threadId} thread={selected} events={threadEvents} running={threadRunning} disabled={blocked} onBack={closeThread} />
+        <ThreadPanel projectId={id} threadId={threadId} thread={selected} events={threadEvents} running={threadRunning} disabled={blocked} onBack={closeThread} />
     ) : (
         <OverviewPane projectId={id} threads={threads} onOpen={openThread} libraryKey={libraryKey} />
     );
@@ -262,7 +262,7 @@ export default function ProjectPage() {
                     onClose={() => setSettingsTab(null)}
                     onChanged={(p) => {
                         setProject(p);
-                        if (!p.archived_at && project.archived_at) navigate(`/project/${p.id}`);
+                        if (!p.archived_at && project.archived_at) navigate(routes.project(p.id));
                     }}
                     memoryKey={memoryKey}
                 />

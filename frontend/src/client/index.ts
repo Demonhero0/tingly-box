@@ -27,7 +27,24 @@ export type ConnectionDraft = S['ConnectionDraft'];
 export type Model = S['Model'];
 export type TestResponse = S['TestResponse'];
 
-export const api = createClient<paths>({ baseUrl: '' });
+export type ProjectRuntime = S['ProjectRuntimeResponse'];
+
+let hostFetch: typeof fetch = (input, init) => globalThis.fetch(input, init);
+
+/**
+ * Sets the fetch every API call goes through, so an embedding host can add
+ * its authentication. Undefined restores the browser's fetch.
+ */
+export function setApiFetch(f: typeof fetch | undefined) {
+    hostFetch = f ?? ((input, init) => globalThis.fetch(input, init));
+}
+
+/** fetch through the host's fetch, for calls the typed client cannot make (streams, downloads). */
+export function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    return hostFetch(input, init);
+}
+
+export const api = createClient<paths>({ baseUrl: '', fetch: (req) => hostFetch(req) });
 
 /** Error carrying the server's `{"error": "..."}` message. */
 export class ApiError extends Error {

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tingly-dev/tingly-box/agentboot"
 	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/llm"
+	"github.com/tingly-dev/tingly-project/llm"
 )
 
 // fakeLLM answers each request with a function of it.

@@ -20,6 +20,7 @@ import (
 	rt "github.com/tingly-dev/tingly-project/internal/project"
 	"github.com/tingly-dev/tingly-project/internal/server/module"
 	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
+	"github.com/tingly-dev/tingly-project/llm"
 )
 
 // ThreadCounts is how many threads a project has in each Overview group.
@@ -142,6 +143,23 @@ type InspectRepoResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+// ProjectModelsResponse lists the models the host offers. Error is set (and
+// Models may be empty) when the list could not be fetched; a model ID can
+// still be typed by hand.
+type ProjectModelsResponse struct {
+	Models []llm.Model `json:"models"`
+	Error  string      `json:"error,omitempty"`
+}
+
+// ProjectRuntimeResponse is what threads run on.
+type ProjectRuntimeResponse struct {
+	// CLIPath is the Claude Code CLI; empty when none is installed.
+	CLIPath string `json:"cli_path"`
+	// BaseURL is the gateway threads send model calls to; empty when
+	// Claude Code uses its own login.
+	BaseURL string `json:"base_url"`
+}
+
 // OKResponse acknowledges an action.
 type OKResponse struct {
 	OK bool `json:"ok"`
@@ -170,7 +188,13 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithDescription("Create a project"),
 		swagger.WithRequestModel(CreateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
-	api.POST("/repos/inspect", h.inspectRepo, tag,
+	api.GET("/projects/models", h.models, tag,
+		swagger.WithDescription("Models the coordinator and threads can use"),
+		swagger.WithResponseModel(ProjectModelsResponse{}))
+	api.GET("/projects/runtime", h.runtime, tag,
+		swagger.WithDescription("What threads run on: the Claude Code CLI and the gateway it is pointed at"),
+		swagger.WithResponseModel(ProjectRuntimeResponse{}))
+	api.POST("/projects/repos/inspect", h.inspectRepo, tag,
 		swagger.WithDescription("Check a local repository path and return its root and current branch"),
 		swagger.WithRequestModel(InspectRepoRequest{}),
 		swagger.WithResponseModel(InspectRepoResponse{}))
@@ -288,6 +312,29 @@ func (h *Handler) create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, p)
+}
+
+func (h *Handler) models(c *gin.Context) {
+	models, err := h.svc.Host.Models(c.Request.Context())
+	resp := ProjectModelsResponse{Models: models}
+	if resp.Models == nil {
+		resp.Models = []llm.Model{}
+	}
+	if err != nil {
+		resp.Error = err.Error()
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) runtime(c *gin.Context) {
+	env, _ := h.svc.Host.ThreadEnv(c.Request.Context())
+	resp := ProjectRuntimeResponse{CLIPath: rt.ClaudeCLIPath()}
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "ANTHROPIC_BASE_URL="); ok {
+			resp.BaseURL = v
+		}
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) inspectRepo(c *gin.Context) {

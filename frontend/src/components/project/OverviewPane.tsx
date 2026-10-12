@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Button, Chip, Collapse, IconButton, LinearProgress, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type LibraryFile, type Thread } from '@/client';
+import { api, apiFetch, unwrap, type LibraryFile, type Thread } from '@/client';
 import { Delete, Description, Download, ExpandMore, UploadFile } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
 import { formatBytes, timeAgo } from '@/utils/format';
@@ -90,7 +90,7 @@ function Library({ projectId, refreshKey }: { projectId: string; refreshKey: num
         Array.from(list).forEach((f) => form.append('files', f));
         setUploading(true);
         try {
-            const res = await fetch(`/api/v1/projects/${projectId}/library`, { method: 'POST', body: form });
+            const res = await apiFetch(`/api/v1/projects/${projectId}/library`, { method: 'POST', body: form });
             if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? res.statusText);
             setTick((x) => x + 1);
         } catch (e) {
@@ -98,6 +98,23 @@ function Library({ projectId, refreshKey }: { projectId: string; refreshKey: num
         } finally {
             setUploading(false);
             if (input.current) input.current.value = '';
+        }
+    };
+
+    // Through apiFetch rather than a plain link, so the host's
+    // authentication applies to downloads too.
+    const download = async (path: string) => {
+        try {
+            const res = await apiFetch(`/api/v1/projects/${projectId}/library/file?path=${encodeURIComponent(path)}`);
+            if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? res.statusText);
+            const url = URL.createObjectURL(await res.blob());
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = path.split('/').pop() || path;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+        } catch (e) {
+            notify((e as Error).message, 'error');
         }
     };
 
@@ -120,7 +137,7 @@ function Library({ projectId, refreshKey }: { projectId: string; refreshKey: num
                     </Box>
                     <Chip size="small" variant="outlined" label={t(`library.origin.${f.origin}`)} sx={{ height: 20, fontSize: 11 }} />
                     <Tooltip title={t('library.download')}>
-                        <IconButton className="act" size="small" component="a" href={`/api/v1/projects/${projectId}/library/file?path=${encodeURIComponent(f.path)}`}><Download fontSize="small" /></IconButton>
+                        <IconButton className="act" size="small" onClick={() => void download(f.path)}><Download fontSize="small" /></IconButton>
                     </Tooltip>
                     <Tooltip title={t('common.delete')}>
                         <IconButton className="act" size="small" onClick={() => {

@@ -5,13 +5,13 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type MemoryFile, type paths, type Project, type Usage } from '@/client';
+import { api, unwrap, type MemoryFile, type paths, type Project, type ProjectRuntime, type Usage } from '@/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { TextEditDialog } from '@/components/TextEditDialog';
 import { Add, Close, Delete, Description } from '@/components/icons';
 import { useModels } from '@/hooks/useModels';
 import { useNotify } from '@/hooks/useNotify';
-import { useAppData } from '@/contexts/AppDataContext';
+import { useProjectsHost } from '@/host/ProjectsHost';
 import { formatBytes, formatTokens, timeAgo } from '@/utils/format';
 import { RepoField, type RepoEntry } from './RepoField';
 
@@ -24,7 +24,7 @@ type Patch = NonNullable<paths['/api/v1/projects/{id}']['patch']['requestBody']>
 type Mode = NonNullable<Patch['thread_permission_mode']>;
 
 function ModelField({ label, value, onChange, help }: { label: string; value: string; onChange: (v: string) => void; help: string }) {
-    const { models } = useModels();
+    const { models } = useModels('projects');
     const { t } = useTranslation();
     return (
         <Autocomplete
@@ -44,7 +44,7 @@ function General({ project, patch }: { project: Project; patch: (p: Patch) => Pr
     const { t } = useTranslation();
     const navigate = useNavigate();
     const notify = useNotify();
-    const { refresh } = useAppData();
+    const { onProjectsChanged, paths: routes } = useProjectsHost();
     const [name, setName] = useState(project.name);
     const [goal, setGoal] = useState(project.goal);
     const [coord, setCoord] = useState(project.coordinator_model);
@@ -99,8 +99,8 @@ function General({ project, patch }: { project: Project; patch: (p: Patch) => Pr
                 onConfirm={() => {
                     unwrap(api.DELETE('/api/v1/projects/{id}', { params: { path: { id: project.id } } }))
                         .then(() => {
-                            refresh();
-                            navigate('/');
+                            onProjectsChanged();
+                            navigate(routes.list);
                         })
                         .catch((e: Error) => notify(e.message, 'error'));
                 }}
@@ -201,7 +201,10 @@ function Memory({ project, patch, refreshKey }: { project: Project; patch: (p: P
 
 function Environment({ project, patch }: { project: Project; patch: (p: Patch) => Promise<void> }) {
     const { t } = useTranslation();
-    const { settings } = useAppData();
+    const [runtime, setRuntime] = useState<ProjectRuntime | null>(null);
+    useEffect(() => {
+        unwrap(api.GET('/api/v1/projects/runtime')).then(setRuntime).catch(() => {});
+    }, []);
     const initial = project.repos.map((r) => ({ root: r.path, branch: r.base_branch }));
     const [repos, setRepos] = useState<RepoEntry[]>(initial);
     useEffect(() => setRepos(project.repos.map((r) => ({ root: r.path, branch: r.base_branch }))), [project.repos]);
@@ -219,17 +222,17 @@ function Environment({ project, patch }: { project: Project; patch: (p: Patch) =
             <Divider />
             <Box>
                 <Typography sx={{ fontWeight: 600, color: 'text.primary' }}>{t('projectSettings.runtime')}</Typography>
-                {settings?.threads.cli_path ? (
+                {!runtime ? null : runtime.cli_path ? (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        {t('projectSettings.runtimeCli')} <Box component="span" sx={{ ...mono, color: 'text.primary' }}>{settings.threads.cli_path}</Box>
+                        {t('projectSettings.runtimeCli')} <Box component="span" sx={{ ...mono, color: 'text.primary' }}>{runtime.cli_path}</Box>
                     </Typography>
                 ) : (
                     <Alert severity="warning" sx={{ mt: 1 }}>{t('projectSettings.runtimeMissing')} <Box component="code" sx={mono}>npm install -g @anthropic-ai/claude-code</Box></Alert>
                 )}
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {settings?.threads.via_connection
-                        ? <>{t('projectSettings.runtimeVia')} <Box component="span" sx={{ ...mono, color: 'text.primary' }}>{settings.base_url}</Box></>
-                        : t('projectSettings.runtimeOwnLogin')}
+                    {runtime?.base_url
+                        ? <>{t('projectSettings.runtimeVia')} <Box component="span" sx={{ ...mono, color: 'text.primary' }}>{runtime.base_url}</Box></>
+                        : runtime && t('projectSettings.runtimeOwnLogin')}
                 </Typography>
             </Box>
         </Stack>
@@ -279,12 +282,12 @@ interface Props {
 export function ProjectSettingsDialog({ project, open, tab, onTab, onClose, onChanged, memoryKey }: Props) {
     const { t } = useTranslation();
     const notify = useNotify();
-    const { refresh } = useAppData();
+    const { onProjectsChanged } = useProjectsHost();
     const patch = async (body: Patch) => {
         try {
             const p = await unwrap(api.PATCH('/api/v1/projects/{id}', { params: { path: { id: project.id } }, body }));
             onChanged(p);
-            refresh();
+            onProjectsChanged();
             notify(t('settings.saved'), 'success');
         } catch (e) {
             notify((e as Error).message, 'error');

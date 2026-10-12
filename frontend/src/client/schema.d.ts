@@ -160,6 +160,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Models the coordinator and threads can use
+         * @description Models the coordinator and threads can use
+         */
+        get: operations["apiV1ProjectsModelsGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/repos/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a local repository path and return its root and current branch
+         * @description Check a local repository path and return its root and current branch
+         */
+        post: operations["apiV1ProjectsReposInspectPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What threads run on: the Claude Code CLI and the gateway it is pointed at
+         * @description What threads run on: the Claude Code CLI and the gateway it is pointed at
+         */
+        get: operations["apiV1ProjectsRuntimeGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}": {
         parameters: {
             query?: never;
@@ -348,6 +408,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{id}/threads/{tid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A thread with its transcript
+         * @description A thread with its transcript
+         */
+        get: operations["apiV1ProjectsIdThreadsTidGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The thread's changes against its base branch
+         * @description The thread's changes against its base branch
+         */
+        get: operations["apiV1ProjectsIdThreadsTidDiffGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
+         * @description Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
+         */
+        post: operations["apiV1ProjectsIdThreadsTidMergePost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a message straight to the thread (runs after its current turn)
+         * @description Send a message straight to the thread (runs after its current turn)
+         */
+        post: operations["apiV1ProjectsIdThreadsTidMessagesPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a resolved thread
+         * @description Reopen a resolved thread
+         */
+        post: operations["apiV1ProjectsIdThreadsTidReopenPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark the thread resolved
+         * @description Mark the thread resolved
+         */
+        post: operations["apiV1ProjectsIdThreadsTidResolvePost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a permission request or question the thread is waiting on
+         * @description Answer a permission request or question the thread is waiting on
+         */
+        post: operations["apiV1ProjectsIdThreadsTidRespondPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interrupt the thread's running turn
+         * @description Interrupt the thread's running turn
+         */
+        post: operations["apiV1ProjectsIdThreadsTidStopPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}/usage": {
         parameters: {
             query?: never;
@@ -362,26 +582,6 @@ export interface paths {
         get: operations["apiV1ProjectsIdUsageGet"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repos/inspect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check a local repository path and return its root and current branch
-         * @description Check a local repository path and return its root and current branch
-         */
-        post: operations["apiV1ReposInspectPost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -446,166 +646,6 @@ export interface paths {
          * @description Send a real chat request through a draft connection
          */
         post: operations["apiV1SettingsTestPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * A thread with its transcript
-         * @description A thread with its transcript
-         */
-        get: operations["apiV1ThreadsIdGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/diff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The thread's changes against its base branch
-         * @description The thread's changes against its base branch
-         */
-        get: operations["apiV1ThreadsIdDiffGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
-         * @description Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
-         */
-        post: operations["apiV1ThreadsIdMergePost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send a message straight to the thread (runs after its current turn)
-         * @description Send a message straight to the thread (runs after its current turn)
-         */
-        post: operations["apiV1ThreadsIdMessagesPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reopen a resolved thread
-         * @description Reopen a resolved thread
-         */
-        post: operations["apiV1ThreadsIdReopenPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark the thread resolved
-         * @description Mark the thread resolved
-         */
-        post: operations["apiV1ThreadsIdResolvePost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/respond": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Answer a permission request or question the thread is waiting on
-         * @description Answer a permission request or question the thread is waiting on
-         */
-        post: operations["apiV1ThreadsIdRespondPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/threads/{id}/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Interrupt the thread's running turn
-         * @description Interrupt the thread's running turn
-         */
-        post: operations["apiV1ThreadsIdStopPost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -912,6 +952,18 @@ export interface components {
             project_id: string;
             /** @description Field role */
             role: string;
+        };
+        ProjectModelsResponse: {
+            /** @description Field error */
+            error?: string;
+            /** @description Field models */
+            models: components["schemas"]["Model"][];
+        };
+        ProjectRuntimeResponse: {
+            /** @description Field base_url */
+            base_url: string;
+            /** @description Field cli_path */
+            cli_path: string;
         };
         ProjectSummary: {
             /**
@@ -1546,6 +1598,71 @@ export interface operations {
             };
         };
     };
+    apiV1ProjectsModelsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectModelsResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsReposInspectPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectRepoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectRepoResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsRuntimeGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRuntimeResponse"];
+                };
+            };
+        };
+    };
     apiV1ProjectsIdGet: {
         parameters: {
             query?: never;
@@ -1928,6 +2045,225 @@ export interface operations {
             };
         };
     };
+    apiV1ProjectsIdThreadsTidGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetailResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidDiffGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Diff"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidMergePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+            /** @description merge blocked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeBlockedResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidMessagesPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidReopenPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidResolvePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidRespondPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespondRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidStopPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
     apiV1ProjectsIdUsageGet: {
         parameters: {
             query?: never;
@@ -1947,31 +2283,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageResponse"];
-                };
-            };
-        };
-    };
-    apiV1ReposInspectPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InspectRepoRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InspectRepoResponse"];
                 };
             };
         };
@@ -2067,209 +2378,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestResponse"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ThreadDetailResponse"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdDiffGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Diff"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdMergePost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-            /** @description merge blocked */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MergeBlockedResponse"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdMessagesPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdReopenPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdResolvePost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdRespondPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RespondRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ThreadsIdStopPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
                 };
             };
         };

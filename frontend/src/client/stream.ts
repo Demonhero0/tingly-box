@@ -1,7 +1,7 @@
 // Chat streaming. openapi-fetch cannot read a text/event-stream body, so the
 // two streaming endpoints are called with fetch directly; the event shape is
 // still the generated StreamEvent type.
-import { ApiError, type StreamEvent } from './index';
+import { ApiError, apiFetch, type StreamEvent } from './index';
 
 export interface StreamOptions {
     signal?: AbortSignal;
@@ -9,7 +9,7 @@ export interface StreamOptions {
 }
 
 async function stream(path: string, body: unknown, { signal, onEvent }: StreamOptions): Promise<void> {
-    const res = await fetch(path, {
+    const res = await apiFetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
         body: JSON.stringify(body),

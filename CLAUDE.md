@@ -30,7 +30,9 @@ Instructions, Goal.
 - Errors use one shape, `{"error": "..."}`, via `module/apierr`.
 - Metadata edits (rename, star, move) must not bump a conversation's
   `updated_at`; use the `*Meta` / `Set*` store helpers.
-- LLM access goes through `internal/llm` only.
+- LLM access goes through `llm` only (public: an embedding host passes its model client in through it).
+- `projects` is the embedding facade (`New` / `Register` / `Start` / `Host`); this module never imports Tingly Box's root module (`task boundary`).
+- Projects routes all live under `/api/v1/projects`. Settings, Chats and health sit outside it and are standalone-only (`build` in `server_modules.go`).
 
 ## Frontend
 

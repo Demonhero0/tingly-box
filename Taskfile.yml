@@ -41,9 +41,15 @@ tasks:
     cmds:
       - pnpm dev
 
+  boundary:
+    desc: Fail if this module imports Tingly Box's root module (Tingly Box imports us, never the other way)
+    cmds:
+      - "! go list -deps ./... | grep -E '^github.com/tingly-dev/tingly-box(/internal|/pkg|$)'"
+
   test:
     desc: Backend and frontend tests, typecheck and lint
     cmds:
+      - task: boundary
       - go vet ./...
       - go test ./...
       - cd frontend && pnpm typecheck && pnpm lint && pnpm test

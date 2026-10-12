@@ -1,14 +1,15 @@
 package settings
 
 import (
+	"github.com/tingly-dev/tingly-project/internal/project"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/internal/llm"
 	"github.com/tingly-dev/tingly-project/internal/server/module"
 	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
+	"github.com/tingly-dev/tingly-project/llm"
 )
 
 // SettingsResponse is the connection as shown to the UI. The API key itself
@@ -120,7 +121,7 @@ func toResponse(conn Connection) SettingsResponse {
 		APIKeyHint:     hint,
 		DefaultModel:   conn.DefaultModel,
 		DefaultBaseURL: DefaultBaseURL,
-		Threads:        ThreadRuntime{CLIPath: ClaudeCLIPath(), ViaConnection: conn.APIStyle == llm.StyleAnthropic},
+		Threads:        ThreadRuntime{CLIPath: project.ClaudeCLIPath(), ViaConnection: conn.APIStyle == llm.StyleAnthropic},
 	}
 }
 
@@ -174,7 +175,7 @@ func (h *Handler) models(c *gin.Context) {
 		apierr.Store(c, err, "settings")
 		return
 	}
-	models, err := h.svc.Models(c.Request.Context(), conn)
+	models, err := h.svc.ModelsFor(c.Request.Context(), conn)
 	resp := ModelsResponse{Models: models}
 	if resp.Models == nil {
 		resp.Models = []llm.Model{}
@@ -195,7 +196,7 @@ func (h *Handler) draftModels(c *gin.Context) {
 		apierr.Store(c, err, "settings")
 		return
 	}
-	models, err := h.svc.Models(c.Request.Context(), conn)
+	models, err := h.svc.ModelsFor(c.Request.Context(), conn)
 	resp := ModelsResponse{Models: models}
 	if resp.Models == nil {
 		resp.Models = []llm.Model{}

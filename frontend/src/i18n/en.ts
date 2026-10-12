@@ -117,7 +117,7 @@ export const en = {
         reposHelp: 'New threads work in these. Existing threads keep their worktree.',
         runtime: 'Thread runtime', runtimeCli: 'Threads run Claude Code at',
         runtimeMissing: 'Claude Code CLI was not found, so threads cannot run. Install it:',
-        runtimeVia: 'Threads use the model connection from Settings:', runtimeOwnLogin: 'The model connection is not Anthropic-style, so threads use Claude Code’s own login.',
+        runtimeVia: 'Threads send model calls to', runtimeOwnLogin: 'Threads use Claude Code’s own login, because the model connection is not Anthropic-style.',
         usageHelp: 'Token use reported by the threads. Each thread is a full Claude Code session; parallel threads use tokens faster.',
         model: 'Model', thread: 'Thread', turns: 'Turns',
     },

@@ -3,6 +3,8 @@ package project
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/tingly-dev/tingly-box/agentboot"
@@ -168,4 +170,17 @@ func (c *converter) convert(raw any) []RunnerEvent {
 		}
 	}
 	return nil
+}
+
+// ClaudeCLIPath is the Claude Code CLI threads run (CLAUDE_CLI_PATH, else
+// claude on PATH), or "" if none is found.
+func ClaudeCLIPath() string {
+	if p := os.Getenv("CLAUDE_CLI_PATH"); p != "" {
+		return p
+	}
+	p, err := exec.LookPath("claude")
+	if err != nil {
+		return ""
+	}
+	return p
 }

@@ -4,6 +4,9 @@
 //
 // The default connection points at a local Tingly Box gateway, which speaks
 // both styles and routes to whatever upstream the user configured there.
+//
+// It is public because a host embedding Projects (see package projects)
+// hands the coordinator its model client through these types.
 package llm
 
 import (

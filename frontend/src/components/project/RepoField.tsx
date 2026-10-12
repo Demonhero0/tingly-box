@@ -29,7 +29,7 @@ export function RepoField({ value, onChange }: { value: RepoEntry[]; onChange: (
         setBusy(true);
         setError(null);
         try {
-            const r = await unwrap(api.POST('/api/v1/repos/inspect', { body: { path: p } }));
+            const r = await unwrap(api.POST('/api/v1/projects/repos/inspect', { body: { path: p } }));
             if (!r.ok || !r.root) {
                 setError(r.error ?? t('repo.invalid'));
                 return;

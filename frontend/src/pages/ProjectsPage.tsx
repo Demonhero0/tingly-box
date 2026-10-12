@@ -6,12 +6,13 @@ import { api, unwrap, type ProjectSummary } from '@/client';
 import { Add, Branch, Folder, Pause, Search, Star } from '@/components/icons';
 import { NewProjectDialog } from '@/components/project/NewProjectDialog';
 import { useNotify } from '@/hooks/useNotify';
-import { useAppData } from '@/contexts/AppDataContext';
+import { useProjectsHost } from '@/host/ProjectsHost';
 import { timeAgo } from '@/utils/format';
 
 function ProjectCard({ p }: { p: ProjectSummary }) {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
+    const { paths: routes } = useProjectsHost();
     const c = p.threads;
     const counts: { key: string; n: number; color: 'warning' | 'success' | 'info' | 'default' }[] = [
         { key: 'waiting', n: c.waiting, color: 'warning' },
@@ -20,7 +21,7 @@ function ProjectCard({ p }: { p: ProjectSummary }) {
     ];
     return (
         <Card variant="outlined" sx={{ borderRadius: 3, '&:hover': { borderColor: 'text.disabled' } }}>
-            <CardActionArea onClick={() => navigate(`/project/${p.id}`)} sx={{ p: 2.25, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start' }}>
+            <CardActionArea onClick={() => navigate(routes.project(p.id))} sx={{ p: 2.25, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="h5" noWrap sx={{ flex: 1 }}>{p.name}</Typography>
                     {p.paused && <Pause sx={{ fontSize: 16 }} color="warning" />}
@@ -47,7 +48,7 @@ export default function ProjectsPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const notify = useNotify();
-    const { refresh } = useAppData();
+    const { onProjectsChanged: refresh, paths: routes } = useProjectsHost();
     const [tab, setTab] = useState<'active' | 'archived'>('active');
     const [q, setQ] = useState('');
     const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -122,7 +123,7 @@ export default function ProjectsPage() {
                     try {
                         const p = await unwrap(api.POST('/api/v1/projects', { body: v }));
                         refresh();
-                        navigate(`/project/${p.id}`);
+                        navigate(routes.project(p.id));
                     } catch (e) {
                         notify((e as Error).message, 'error');
                         throw e;

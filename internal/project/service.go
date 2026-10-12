@@ -13,7 +13,19 @@ import (
 	"time"
 
 	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-project/llm"
 )
+
+// Host is what the runtime needs from whoever runs it: a model client for
+// the coordinator, the models the project settings offer, and the
+// environment threads run Claude Code in. The standalone app implements it
+// with its own connection settings; an embedding host (Tingly Box) with its
+// gateway.
+type Host interface {
+	LLMSource
+	ThreadEnv
+	Models(ctx context.Context) ([]llm.Model, error)
+}
 
 // Service bundles the project runtime for the HTTP modules.
 type Service struct {
@@ -22,15 +34,17 @@ type Service struct {
 	Hub         *Hub
 	Threads     *Threads
 	Coordinator *Coordinator
+	Host        Host
 }
 
 // NewService wires the runtime. Call Start once the server is up.
-func NewService(store *db.Store, layout Layout, runner Runner, env ThreadEnv, src LLMSource) *Service {
+func NewService(store *db.Store, layout Layout, runner Runner, host Host) *Service {
 	hub := NewHub()
-	threads := NewThreads(store, layout, hub, runner, env)
+	threads := NewThreads(store, layout, hub, runner, host)
 	return &Service{
 		Store: store, Layout: layout, Hub: hub, Threads: threads,
-		Coordinator: NewCoordinator(store, layout, hub, threads, src),
+		Coordinator: NewCoordinator(store, layout, hub, threads, host),
+		Host:        host,
 	}
 }
 

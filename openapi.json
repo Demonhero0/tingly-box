@@ -399,6 +399,83 @@
         }
       }
     },
+    "/api/v1/projects/models": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Models the coordinator and threads can use",
+        "description": "Models the coordinator and threads can use",
+        "operationId": "apiV1ProjectsModelsGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectModelsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/repos/inspect": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Check a local repository path and return its root and current branch",
+        "description": "Check a local repository path and return its root and current branch",
+        "operationId": "apiV1ProjectsReposInspectPost",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectRepoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectRepoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/runtime": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "What threads run on: the Claude Code CLI and the gateway it is pointed at",
+        "description": "What threads run on: the Claude Code CLI and the gateway it is pointed at",
+        "operationId": "apiV1ProjectsRuntimeGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRuntimeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{id}": {
       "get": {
         "tags": [
@@ -987,6 +1064,374 @@
         }
       }
     },
+    "/api/v1/projects/{id}/threads/{tid}": {
+      "get": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A thread with its transcript",
+        "description": "A thread with its transcript",
+        "operationId": "apiV1ProjectsIdThreadsTidGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/diff": {
+      "get": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "The thread's changes against its base branch",
+        "description": "The thread's changes against its base branch",
+        "operationId": "apiV1ProjectsIdThreadsTidDiffGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Diff"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/merge": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.",
+        "description": "Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.",
+        "operationId": "apiV1ProjectsIdThreadsTidMergePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "merge blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeBlockedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/messages": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Send a message straight to the thread (runs after its current turn)",
+        "description": "Send a message straight to the thread (runs after its current turn)",
+        "operationId": "apiV1ProjectsIdThreadsTidMessagesPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/reopen": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Reopen a resolved thread",
+        "description": "Reopen a resolved thread",
+        "operationId": "apiV1ProjectsIdThreadsTidReopenPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/resolve": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Mark the thread resolved",
+        "description": "Mark the thread resolved",
+        "operationId": "apiV1ProjectsIdThreadsTidResolvePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/respond": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Answer a permission request or question the thread is waiting on",
+        "description": "Answer a permission request or question the thread is waiting on",
+        "operationId": "apiV1ProjectsIdThreadsTidRespondPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/stop": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Interrupt the thread's running turn",
+        "description": "Interrupt the thread's running turn",
+        "operationId": "apiV1ProjectsIdThreadsTidStopPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{id}/usage": {
       "get": {
         "tags": [
@@ -1013,39 +1458,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UsageResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/repos/inspect": {
-      "post": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "Check a local repository path and return its root and current branch",
-        "description": "Check a local repository path and return its root and current branch",
-        "operationId": "apiV1ReposInspectPost",
-        "requestBody": {
-          "description": "Request body",
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InspectRepoRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InspectRepoResponse"
                 }
               }
             }
@@ -1165,302 +1577,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TestResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}": {
-      "get": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "A thread with its transcript",
-        "description": "A thread with its transcript",
-        "operationId": "apiV1ThreadsIdGet",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ThreadDetailResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/diff": {
-      "get": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "The thread's changes against its base branch",
-        "description": "The thread's changes against its base branch",
-        "operationId": "apiV1ThreadsIdDiffGet",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Diff"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/merge": {
-      "post": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.",
-        "description": "Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.",
-        "operationId": "apiV1ThreadsIdMergePost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Thread"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "merge blocked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MergeBlockedResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/messages": {
-      "post": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "Send a message straight to the thread (runs after its current turn)",
-        "description": "Send a message straight to the thread (runs after its current turn)",
-        "operationId": "apiV1ThreadsIdMessagesPost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "description": "Request body",
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Thread"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/reopen": {
-      "post": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "Reopen a resolved thread",
-        "description": "Reopen a resolved thread",
-        "operationId": "apiV1ThreadsIdReopenPost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Thread"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/resolve": {
-      "post": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "Mark the thread resolved",
-        "description": "Mark the thread resolved",
-        "operationId": "apiV1ThreadsIdResolvePost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Thread"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/respond": {
-      "post": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "Answer a permission request or question the thread is waiting on",
-        "description": "Answer a permission request or question the thread is waiting on",
-        "operationId": "apiV1ThreadsIdRespondPost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "description": "Request body",
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RespondRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Thread"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/threads/{id}/stop": {
-      "post": {
-        "tags": [
-          "threads"
-        ],
-        "summary": "Interrupt the thread's running turn",
-        "description": "Interrupt the thread's running turn",
-        "operationId": "apiV1ThreadsIdStopPost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Resource ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Thread"
                 }
               }
             }
@@ -2169,6 +2285,42 @@
           "kind",
           "content",
           "created_at"
+        ]
+      },
+      "ProjectModelsResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Field error"
+          },
+          "models": {
+            "type": "array",
+            "description": "Field models",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            }
+          }
+        },
+        "required": [
+          "models"
+        ]
+      },
+      "ProjectRuntimeResponse": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "description": "Field base_url"
+          },
+          "cli_path": {
+            "type": "string",
+            "description": "Field cli_path"
+          }
+        },
+        "required": [
+          "cli_path",
+          "base_url"
         ]
       },
       "ProjectSummary": {

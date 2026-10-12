@@ -124,7 +124,7 @@ threads/<thread-id>.settings.json  线程的 Claude Code 设置（additionalDire
 `GET /api/v1/projects/:id/events`（SSE）：`message`（新增 / 更新，协调者流式文本）、`thread`（状态变化）、`thread_event`（线程过程新增）。前端进入项目页订阅，其余数据走 REST。
 
 ### 4.7 Review 与合并（本地版 PR）
-- `GET /threads/:id/diff`：`git diff <base>...<branch>`（+ 未提交改动提示）。
+- `GET /projects/:id/threads/:tid/diff`：`git diff <base>...<branch>`（+ 未提交改动提示）。
 - "Merge it"：仅当主仓库工作区干净且当前在 base 分支时执行 `git merge --no-ff <branch>`；否则给出原因和可复制的命令（UX 原则 11）。成功后线程 → `resolved`。
 - 删除项目：移除 worktree，保留分支（与官方"不影响分支和 PR"一致）。
 
@@ -152,3 +152,13 @@ MVP 已实现（§2 中标 ✅ 的部分）。验证：
 
 已解决的问题：
 - **agentboot 进程句柄的竞态**（上游 tingly-box）：`process/osexec.go` 启动后立即在后台 `cmd.Wait()`，而 `Wait` 会关闭 `StdoutPipe` 的读端；CLI 写完 result 后立即退出时，解码器最后一次读会报 `read |0: file already closed`，成功的一轮被判为失败。已在 [tingly-dev/tingly-box#2022](https://github.com/tingly-dev/tingly-box/pull/2022) 修复（stdout 改为自有管道，直到 `Handle.Wait` 才关闭），tingly-project 已升级到包含该修复的 agentboot，并移除了临时容错代码。
+
+## 9. 嵌入 Tingly Box（2026-10-12）
+
+tingly-project 留在自己的仓库，Tingly Box 以 git submodule（`libs/tingly-project`）引入并挂载它。依赖只朝一个方向：Tingly Box → tingly-project → `tingly-box/agentboot`、`tingly-box/swagger`；本模块绝不 import Tingly Box 根模块（`task boundary` 检查）。
+
+- **门面** `projects`：`New(Options{DataDir, Host})`、`Register(api *swagger.RouteGroup)`、`Start(ctx)`（幂等，开关打开时再调用即可）、`Close()`。`DataDir` 为空时用内存库，供宿主生成 OpenAPI。
+- **Host**：宿主提供协调者的模型客户端（`ClientFor`）、可选模型（`Models`）、线程的 Claude Code 环境（`ThreadEnv`）。独立版由设置模块实现；Tingly Box 用网关实现。类型来自公开包 `llm`。
+- **路由**：全部在 `/api/v1/projects` 下。线程是 `/projects/:id/threads/:tid/*`，只能经由所属项目访问；另有 `/projects/models`、`/projects/runtime`、`/projects/repos/inspect`。设置、Chats、health 只在独立版注册（`server.build`）。
+- **前端**：页面经 `ProjectsHostProvider` 拿到宿主的 `fetch`（带鉴权，事件流和文件库下载也走它）、路由位置（`paths`）和项目变化回调；`src/embed.ts` 是宿主挂载的入口。事件流用 fetch 读取而不是 `EventSource`，因为后者带不了鉴权头。
+- **待做**（接入 Tingly Box 时）：前端包的 exports / peerDependencies / i18n 命名空间；主题与 Tingly Box 对齐；Tingly Box 侧的 Host 适配器、实验开关和导航入口。

@@ -82,7 +82,7 @@ function ToolRow({ ev, result }: { ev: ThreadEvent; result?: ThreadEvent }) {
     );
 }
 
-function RequestCard({ ev, threadId, active }: { ev: ThreadEvent; threadId: string; active: boolean }) {
+function RequestCard({ ev, projectId, threadId, active }: { ev: ThreadEvent; projectId: string; threadId: string; active: boolean }) {
     const { t } = useTranslation();
     const notify = useNotify();
     const [answer, setAnswer] = useState('');
@@ -93,7 +93,7 @@ function RequestCard({ ev, threadId, active }: { ev: ThreadEvent; threadId: stri
     const respond = async (allow: boolean, scope?: 'once' | 'thread') => {
         setBusy(true);
         try {
-            await unwrap(api.POST('/api/v1/threads/{id}/respond', { params: { path: { id: threadId } }, body: { request_id: pl.request_id, allow, scope, answer: answer || undefined } }));
+            await unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/respond', { params: { path: { id: projectId, tid: threadId } }, body: { request_id: pl.request_id, allow, scope, answer: answer || undefined } }));
         } catch (e) {
             notify((e as Error).message, 'error');
         } finally {
@@ -148,13 +148,13 @@ function DiffDialog({ thread, open, onClose }: { thread: Thread; open: boolean; 
         setDiff(null);
         setError(null);
         setBlocked(null);
-        unwrap(api.GET('/api/v1/threads/{id}/diff', { params: { path: { id: thread.id } } })).then(setDiff).catch((e: Error) => setError(e.message));
+        unwrap(api.GET('/api/v1/projects/{id}/threads/{tid}/diff', { params: { path: { id: thread.project_id, tid: thread.id } } })).then(setDiff).catch((e: Error) => setError(e.message));
     }, [open, thread.id]);
 
     const merge = async () => {
         setBusy(true);
         try {
-            await unwrap(api.POST('/api/v1/threads/{id}/merge', { params: { path: { id: thread.id } } }));
+            await unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/merge', { params: { path: { id: thread.project_id, tid: thread.id } } }));
             notify(t('thread.merged', { branch: thread.branch, base: thread.base_branch }), 'success');
             onClose();
         } catch (e) {
@@ -213,6 +213,7 @@ function DiffDialog({ thread, open, onClose }: { thread: Thread; open: boolean; 
 }
 
 interface Props {
+    projectId: string;
     threadId: string;
     thread?: Thread;
     events: ThreadEvent[] | null;
@@ -221,7 +222,7 @@ interface Props {
     onBack: () => void;
 }
 
-export function ThreadPanel({ threadId, thread, events, running, disabled, onBack }: Props) {
+export function ThreadPanel({ projectId, threadId, thread, events, running, disabled, onBack }: Props) {
     const { t, i18n } = useTranslation();
     const notify = useNotify();
     const [diffOpen, setDiffOpen] = useState(false);
@@ -234,9 +235,9 @@ export function ThreadPanel({ threadId, thread, events, running, disabled, onBac
         if (el && stick.current) el.scrollTop = el.scrollHeight;
     }, [events]);
 
-    const act = async (path: '/api/v1/threads/{id}/stop' | '/api/v1/threads/{id}/resolve' | '/api/v1/threads/{id}/reopen') => {
+    const act = async (path: '/api/v1/projects/{id}/threads/{tid}/stop' | '/api/v1/projects/{id}/threads/{tid}/resolve' | '/api/v1/projects/{id}/threads/{tid}/reopen') => {
         try {
-            await unwrap(api.POST(path, { params: { path: { id: threadId } } }));
+            await unwrap(api.POST(path, { params: { path: { id: projectId, tid: threadId } } }));
         } catch (e) {
             notify((e as Error).message, 'error');
         }
@@ -297,10 +298,10 @@ export function ThreadPanel({ threadId, thread, events, running, disabled, onBac
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     {canReview && <Button size="small" variant="contained" startIcon={<DiffIcon />} onClick={() => setDiffOpen(true)}>{t('thread.review')}</Button>}
-                    {running && <Button size="small" variant="outlined" color="inherit" startIcon={<Stop />} onClick={() => void act('/api/v1/threads/{id}/stop')}>{t('thread.stop')}</Button>}
+                    {running && <Button size="small" variant="outlined" color="inherit" startIcon={<Stop />} onClick={() => void act('/api/v1/projects/{id}/threads/{tid}/stop')}>{t('thread.stop')}</Button>}
                     {thread.status !== 'resolved'
-                        ? <Button size="small" color="inherit" onClick={() => void act('/api/v1/threads/{id}/resolve')}>{t('thread.resolve')}</Button>
-                        : <Button size="small" color="inherit" onClick={() => void act('/api/v1/threads/{id}/reopen')}>{t('thread.reopen')}</Button>}
+                        ? <Button size="small" color="inherit" onClick={() => void act('/api/v1/projects/{id}/threads/{tid}/resolve')}>{t('thread.resolve')}</Button>
+                        : <Button size="small" color="inherit" onClick={() => void act('/api/v1/projects/{id}/threads/{tid}/reopen')}>{t('thread.reopen')}</Button>}
                     <Button size="small" color="inherit" onClick={() => setTaskOpen((v) => !v)}>{taskOpen ? t('thread.hideTask') : t('thread.showTask')}</Button>
                 </Box>
                 <Collapse in={taskOpen}>
@@ -334,7 +335,7 @@ export function ThreadPanel({ threadId, thread, events, running, disabled, onBac
                             return null;
                         case 'approval':
                         case 'ask':
-                            return <RequestCard key={e.id} ev={e} threadId={threadId} active={running} />;
+                            return <RequestCard key={e.id} ev={e} projectId={projectId} threadId={threadId} active={running} />;
                         case 'report': {
                             const pl = parse<{ commits_ahead?: number; files_changed?: number }>(e.payload);
                             return (
@@ -365,7 +366,7 @@ export function ThreadPanel({ threadId, thread, events, running, disabled, onBac
                     placeholder={thread.status === 'resolved' ? t('thread.resolvedPlaceholder') : running ? t('thread.queuePlaceholder') : t('thread.placeholder')}
                     onSend={async (text) => {
                         try {
-                            await unwrap(api.POST('/api/v1/threads/{id}/messages', { params: { path: { id: threadId } }, body: { content: text } }));
+                            await unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/messages', { params: { path: { id: projectId, tid: threadId } }, body: { content: text } }));
                             stick.current = true;
                             return true;
                         } catch (e) {

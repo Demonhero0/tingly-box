@@ -11,7 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/llm"
+	"github.com/tingly-dev/tingly-project/llm"
 )
 
 // LLMSource gives the coordinator a model client. model may be empty for

@@ -57,30 +57,30 @@ var _ module.Module = (*Handler)(nil)
 func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api := r.API
 	tag := swagger.WithTags("threads")
-	api.GET("/threads/:id", h.get, tag,
+	api.GET("/projects/:id/threads/:tid", h.get, tag,
 		swagger.WithDescription("A thread with its transcript"),
 		swagger.WithResponseModel(ThreadDetailResponse{}))
-	api.POST("/threads/:id/messages", h.send, tag,
+	api.POST("/projects/:id/threads/:tid/messages", h.send, tag,
 		swagger.WithDescription("Send a message straight to the thread (runs after its current turn)"),
 		swagger.WithRequestModel(SendRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/threads/:id/respond", h.respond, tag,
+	api.POST("/projects/:id/threads/:tid/respond", h.respond, tag,
 		swagger.WithDescription("Answer a permission request or question the thread is waiting on"),
 		swagger.WithRequestModel(RespondRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/threads/:id/stop", h.stop, tag,
+	api.POST("/projects/:id/threads/:tid/stop", h.stop, tag,
 		swagger.WithDescription("Interrupt the thread's running turn"),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/threads/:id/resolve", h.resolve, tag,
+	api.POST("/projects/:id/threads/:tid/resolve", h.resolve, tag,
 		swagger.WithDescription("Mark the thread resolved"),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/threads/:id/reopen", h.reopen, tag,
+	api.POST("/projects/:id/threads/:tid/reopen", h.reopen, tag,
 		swagger.WithDescription("Reopen a resolved thread"),
 		swagger.WithResponseModel(db.Thread{}))
-	api.GET("/threads/:id/diff", h.diff, tag,
+	api.GET("/projects/:id/threads/:tid/diff", h.diff, tag,
 		swagger.WithDescription("The thread's changes against its base branch"),
 		swagger.WithResponseModel(rt.Diff{}))
-	api.POST("/threads/:id/merge", h.merge, tag,
+	api.POST("/projects/:id/threads/:tid/merge", h.merge, tag,
 		swagger.WithDescription("Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready."),
 		swagger.WithResponseModel(db.Thread{}),
 		swagger.WithErrorResponses(swagger.ErrorResponseConfig{Code: http.StatusConflict, Message: "merge blocked", Model: MergeBlockedResponse{}}))
@@ -97,10 +97,24 @@ func fail(c *gin.Context, err error) {
 	}
 }
 
-func (h *Handler) get(c *gin.Context) {
-	t, err := h.svc.Store.GetThread(c.Param("id"))
+// thread loads the thread named in the path. A thread asked for under
+// another project is reported as not found, so a URL can never reach a
+// thread through a project it does not belong to.
+func (h *Handler) thread(c *gin.Context) (*db.Thread, bool) {
+	t, err := h.svc.Store.GetThread(c.Param("tid"))
+	if err == nil && t.ProjectID != c.Param("id") {
+		err = db.ErrNotFound
+	}
 	if err != nil {
 		fail(c, err)
+		return nil, false
+	}
+	return t, true
+}
+
+func (h *Handler) get(c *gin.Context) {
+	t, ok := h.thread(c)
+	if !ok {
 		return
 	}
 	events, err := h.svc.Store.ListThreadEvents(t.ID)
@@ -123,7 +137,11 @@ func (h *Handler) send(c *gin.Context) {
 		apierr.BadRequest(c, "message is empty")
 		return
 	}
-	t, err := h.svc.Threads.Send(c.Request.Context(), c.Param("id"), req.Content, "user")
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	t, err := h.svc.Threads.Send(c.Request.Context(), cur.ID, req.Content, "user")
 	if err != nil {
 		fail(c, err)
 		return
@@ -136,21 +154,29 @@ func (h *Handler) respond(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	if err := h.svc.Threads.Respond(c.Param("id"), req.RequestID, rt.Answer{Allow: req.Allow, Scope: req.Scope, Answer: req.Answer}); err != nil {
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.Threads.Respond(cur.ID, req.RequestID, rt.Answer{Allow: req.Allow, Scope: req.Scope, Answer: req.Answer}); err != nil {
 		fail(c, err)
 		return
 	}
-	t, err := h.svc.Store.GetThread(c.Param("id"))
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, t)
+	h.reply(c, cur.ID)
 }
 
 func (h *Handler) stop(c *gin.Context) {
-	h.svc.Threads.Stop(c.Param("id"))
-	t, err := h.svc.Store.GetThread(c.Param("id"))
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	h.svc.Threads.Stop(cur.ID)
+	h.reply(c, cur.ID)
+}
+
+// reply answers with the thread as it is now.
+func (h *Handler) reply(c *gin.Context, id string) {
+	t, err := h.svc.Store.GetThread(id)
 	if err != nil {
 		fail(c, err)
 		return
@@ -159,7 +185,11 @@ func (h *Handler) stop(c *gin.Context) {
 }
 
 func (h *Handler) resolve(c *gin.Context) {
-	t, err := h.svc.Threads.Resolve(c.Param("id"))
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	t, err := h.svc.Threads.Resolve(cur.ID)
 	if err != nil {
 		fail(c, err)
 		return
@@ -168,7 +198,11 @@ func (h *Handler) resolve(c *gin.Context) {
 }
 
 func (h *Handler) reopen(c *gin.Context) {
-	t, err := h.svc.Threads.Reopen(c.Param("id"))
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	t, err := h.svc.Threads.Reopen(cur.ID)
 	if err != nil {
 		fail(c, err)
 		return
@@ -177,7 +211,11 @@ func (h *Handler) reopen(c *gin.Context) {
 }
 
 func (h *Handler) diff(c *gin.Context) {
-	d, err := h.svc.Threads.Diff(c.Request.Context(), c.Param("id"))
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	d, err := h.svc.Threads.Diff(c.Request.Context(), cur.ID)
 	if err != nil {
 		fail(c, err)
 		return
@@ -186,7 +224,11 @@ func (h *Handler) diff(c *gin.Context) {
 }
 
 func (h *Handler) merge(c *gin.Context) {
-	t, err := h.svc.Threads.Merge(c.Request.Context(), c.Param("id"))
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	t, err := h.svc.Threads.Merge(c.Request.Context(), cur.ID)
 	var blocked *rt.MergeBlockedError
 	if errors.As(err, &blocked) {
 		c.AbortWithStatusJSON(http.StatusConflict, MergeBlockedResponse{Error: blocked.Reason, Command: blocked.Command})
