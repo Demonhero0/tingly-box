@@ -1,13 +1,13 @@
 import { useState, type ReactNode } from 'react';
-import { Badge, Box, Button, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Tooltip, Typography, useTheme } from '@mui/material';
+import { Badge, Box, Button, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem, Tooltip, Typography, useTheme } from '@mui/material';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Add, DarkMode, Folder, Forum, LightMode, MoreHoriz, Settings, SidebarCollapse, SystemMode } from '@/components/icons';
+import { Add, Check, Folder, Forum, MoreHoriz, Settings, SidebarCollapse } from '@/components/icons';
 import { useAppData } from '@/contexts/AppDataContext';
-import { useThemeMode, type ThemeMode } from '@/contexts/ThemeModeContext';
+import { useThemeMode } from '@/contexts/ThemeModeContext';
 import { ChatActionsMenu } from '@/components/ChatActionsMenu';
 import type { Conversation } from '@/client';
-import { sidebarBg } from '@/theme';
+import { THEME_MODE_VALUES, ThemeModeIcon } from '@/theme/modes';
 
 export const SIDEBAR_WIDTH = 272;
 
@@ -61,15 +61,14 @@ function ChatRow({ chat, selected }: { chat: Conversation; selected: boolean }) 
     );
 }
 
-const NEXT_MODE: Record<ThemeMode, ThemeMode> = { system: 'light', light: 'dark', dark: 'system' };
-
 export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; onNavigate?: () => void }) {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
     const { recents, starredChats, projects } = useAppData();
-    const { mode, setMode, resolved } = useThemeMode();
+    const { mode, setMode } = useThemeMode();
+    const [themeAnchor, setThemeAnchor] = useState<HTMLElement | null>(null);
     const starredIds = new Set(starredChats.map((c) => c.id));
 
     const nav = [
@@ -79,14 +78,13 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
     // Starred first, then the most recently active; waiting counts make the
     // projects that need the user stand out.
     const sideProjects = projects.slice(0, 12);
-    const ModeIcon = mode === 'system' ? SystemMode : mode === 'light' ? LightMode : DarkMode;
 
     return (
         <Box
             onClick={(e) => {
                 if ((e.target as HTMLElement).closest('a')) onNavigate?.();
             }}
-            sx={{ width: SIDEBAR_WIDTH, height: '100%', display: 'flex', flexDirection: 'column', bgcolor: sidebarBg(resolved), borderRight: 1, borderColor: 'divider' }}
+            sx={{ width: SIDEBAR_WIDTH, height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', borderRight: 1, borderColor: 'divider' }}
         >
             <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 1.5, pb: 1 }}>
                 <Box component={NavLink} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'text.primary', flex: 1 }}>
@@ -153,11 +151,20 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
                     <ListItemIcon sx={{ minWidth: 32 }}><Settings fontSize="small" /></ListItemIcon>
                     <ListItemText primary={t('nav.settings')} slotProps={{ primary: { sx: { fontSize: 14, color: 'text.primary' } } }} />
                 </ListItemButton>
-                <Tooltip title={t(`theme.${mode}`)}>
-                    <IconButton size="small" onClick={() => setMode(NEXT_MODE[mode])} aria-label={t(`theme.${mode}`)} sx={{ color: theme.palette.text.secondary }}>
-                        <ModeIcon fontSize="small" />
+                <Tooltip title={`${t('settings.theme')}: ${t(`theme.${mode}`)}`}>
+                    <IconButton size="small" onClick={(e) => setThemeAnchor(e.currentTarget)} aria-label={t('settings.theme')} sx={{ color: theme.palette.text.secondary }}>
+                        <ThemeModeIcon mode={mode} size={20} />
                     </IconButton>
                 </Tooltip>
+                <Menu anchorEl={themeAnchor} open={!!themeAnchor} onClose={() => setThemeAnchor(null)} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+                    {THEME_MODE_VALUES.map((m) => (
+                        <MenuItem key={m} selected={m === mode} onClick={() => { setMode(m); setThemeAnchor(null); }}>
+                            <ListItemIcon><ThemeModeIcon mode={m} /></ListItemIcon>
+                            <ListItemText>{t(`theme.${m}`)}</ListItemText>
+                            {m === mode && <Check fontSize="small" sx={{ ml: 2, color: 'primary.main' }} />}
+                        </MenuItem>
+                    ))}
+                </Menu>
             </Box>
         </Box>
     );

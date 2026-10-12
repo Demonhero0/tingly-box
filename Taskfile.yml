@@ -41,6 +41,15 @@ tasks:
     cmds:
       - pnpm dev
 
+  ui:sync:
+    desc: Refresh the vendored copy of Tingly Box's @tingly/ui (theme, icons, page primitives)
+    vars:
+      TINGLY_BOX: '{{.TINGLY_BOX | default "../tingly-box"}}'
+    cmds:
+      - rm -rf frontend/vendor/tingly-ui/src
+      - cp -r {{.TINGLY_BOX}}/frontend/packages/ui/src {{.TINGLY_BOX}}/frontend/packages/ui/package.json frontend/vendor/tingly-ui/
+      - git -C {{.TINGLY_BOX}} rev-parse --short HEAD > frontend/vendor/tingly-ui/SOURCE_COMMIT
+
   boundary:
     desc: Fail if this module imports Tingly Box's root module (Tingly Box imports us, never the other way)
     cmds:

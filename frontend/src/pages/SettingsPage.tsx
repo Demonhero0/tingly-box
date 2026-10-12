@@ -10,7 +10,9 @@ import { useNotify } from '@/hooks/useNotify';
 import { invalidateModels } from '@/hooks/useModels';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useThemeMode, type ThemeMode } from '@/contexts/ThemeModeContext';
+import { THEME_MODE_VALUES, ThemeModeIcon } from '@/theme/modes';
 import { LANGUAGES } from '@/i18n';
+import { PageHeader } from '@tingly/ui';
 
 type Style = 'anthropic' | 'openai';
 
@@ -124,7 +126,7 @@ export default function SettingsPage() {
     return (
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
             <Box sx={{ maxWidth: 760, mx: 'auto', px: { xs: 2, md: 4 }, pt: { xs: 7, md: 5 }, pb: 6 }}>
-                <Typography variant="h1" sx={{ mb: 3, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400 }}>{t('settings.title')}</Typography>
+                <PageHeader title={t('settings.title')} sx={{ mb: 3 }} />
 
                 <Card title={t('settings.connectionTitle')} subtitle={t('settings.connectionIntro')}>
                     {!settings ? (
@@ -274,11 +276,12 @@ export default function SettingsPage() {
                     <Stack spacing={2}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Typography sx={{ flex: 1, color: 'text.primary' }}>{t('settings.theme')}</Typography>
-                            <ToggleButtonGroup exclusive size="small" value={mode} onChange={(_, v: ThemeMode | null) => v && setMode(v)}>
-                                <ToggleButton value="system">{t('theme.system')}</ToggleButton>
-                                <ToggleButton value="light">{t('theme.light')}</ToggleButton>
-                                <ToggleButton value="dark">{t('theme.dark')}</ToggleButton>
-                            </ToggleButtonGroup>
+                            <Select size="small" value={mode} onChange={(e) => setMode(e.target.value as ThemeMode)}
+                                renderValue={(m) => <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><ThemeModeIcon mode={m} size={16} />{t(`theme.${m}`)}</Box>}>
+                                {THEME_MODE_VALUES.map((m) => (
+                                    <MenuItem key={m} value={m} sx={{ gap: 1 }}><ThemeModeIcon mode={m} size={16} />{t(`theme.${m}`)}</MenuItem>
+                                ))}
+                            </Select>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Typography sx={{ flex: 1, color: 'text.primary' }}>{t('settings.language')}</Typography>

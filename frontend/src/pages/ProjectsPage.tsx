@@ -8,6 +8,7 @@ import { NewProjectDialog } from '@/components/project/NewProjectDialog';
 import { useNotify } from '@/hooks/useNotify';
 import { useProjectsHost } from '@/host/ProjectsHost';
 import { timeAgo } from '@/utils/format';
+import { EmptyState, PageHeader } from '@tingly/ui';
 
 function ProjectCard({ p }: { p: ProjectSummary }) {
     const { t, i18n } = useTranslation();
@@ -79,11 +80,12 @@ export default function ProjectsPage() {
     return (
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
             <Box sx={{ maxWidth: 1040, mx: 'auto', px: { xs: 2, md: 4 }, pt: { xs: 7, md: 5 }, pb: 6 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="h1" sx={{ flex: 1, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400 }}>{t('projects.title')}</Typography>
-                    <Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)}>{t('projects.new')}</Button>
-                </Box>
-                <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 680 }}>{t('projects.intro')}</Typography>
+                <PageHeader
+                    title={t('projects.title')}
+                    subtitle={t('projects.intro')}
+                    actions={<Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)}>{t('projects.new')}</Button>}
+                    sx={{ mb: 3 }}
+                />
 
                 <TextField fullWidth placeholder={t('projects.search')} value={q} onChange={(e) => setQ(e.target.value)}
                     slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> } }}
@@ -98,18 +100,12 @@ export default function ProjectsPage() {
                         {[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={150} />)}
                     </Box>
                 ) : projects.length === 0 ? (
-                    <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
-                        <Folder sx={{ fontSize: 40, color: 'text.disabled' }} />
-                        <Typography variant="h4" sx={{ mt: 1.5, color: 'text.primary' }}>
-                            {q ? t('projects.noneFound') : tab === 'archived' ? t('projects.noArchived') : t('projects.emptyTitle')}
-                        </Typography>
-                        {!q && tab === 'active' && (
-                            <>
-                                <Typography sx={{ mt: 1, maxWidth: 560, mx: 'auto' }}>{t('projects.emptyBody')}</Typography>
-                                <Button variant="contained" startIcon={<Add />} sx={{ mt: 3 }} onClick={() => setCreating(true)}>{t('projects.new')}</Button>
-                            </>
-                        )}
-                    </Box>
+                    <EmptyState
+                        icon={<Folder sx={{ fontSize: 40 }} />}
+                        title={q ? t('projects.noneFound') : tab === 'archived' ? t('projects.noArchived') : t('projects.emptyTitle')}
+                        description={!q && tab === 'active' ? t('projects.emptyBody') : undefined}
+                        primaryAction={!q && tab === 'active' ? { label: t('projects.new'), onClick: () => setCreating(true) } : undefined}
+                    />
                 ) : (
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 2 }}>
                         {projects.map((p) => <ProjectCard key={p.id} p={p} />)}

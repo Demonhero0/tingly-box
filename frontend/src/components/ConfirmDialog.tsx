@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import { ConfirmDialog as TinglyConfirmDialog } from '@tingly/ui';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -11,20 +11,19 @@ interface Props {
     onClose: () => void;
 }
 
+/** Tingly Box's confirm dialog, with Projects' strings and close-on-confirm. */
 export function ConfirmDialog({ open, title, message, confirmLabel, danger, onConfirm, onClose }: Props) {
     const { t } = useTranslation();
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogContent>
-                <Typography variant="body1" color="text.secondary">{message}</Typography>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
-                <Button onClick={onClose} color="inherit">{t('common.cancel')}</Button>
-                <Button variant="contained" color={danger ? 'error' : 'primary'} onClick={() => { onConfirm(); onClose(); }}>
-                    {confirmLabel}
-                </Button>
-            </DialogActions>
-        </Dialog>
+        <TinglyConfirmDialog
+            open={open}
+            title={title}
+            description={message}
+            confirmLabel={confirmLabel}
+            cancelLabel={t('common.cancel')}
+            confirmColor={danger ? 'error' : 'primary'}
+            onClose={onClose}
+            onConfirm={() => { onConfirm(); onClose(); }}
+        />
     );
 }

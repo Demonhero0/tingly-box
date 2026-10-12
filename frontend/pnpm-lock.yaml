@@ -20,6 +20,9 @@ importers:
       '@tabler/icons-react':
         specifier: ^3.48.0
         version: 3.49.0(react@19.3.0)
+      '@tingly/ui':
+        specifier: link:./vendor/tingly-ui
+        version: link:vendor/tingly-ui
       i18next:
         specifier: ^26.4.2
         version: 26.4.3(typescript@5.9.3)

@@ -20,7 +20,7 @@ export default function HomePage() {
     return (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', px: 2, pb: '12vh', overflowY: 'auto' }}>
             <Box sx={{ width: '100%', maxWidth: 720, mx: 'auto' }}>
-                <Typography variant="h1" sx={{ textAlign: 'center', mb: 4, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400, fontSize: { xs: '1.8rem', md: '2.4rem' } }}>
+                <Typography variant="h1" sx={{ textAlign: 'center', mb: 4, fontSize: { xs: '1.8rem', md: '2.4rem' } }}>
                     {t(greetingKey())}
                 </Typography>
                 <Composer autoFocus minRows={3} model={model} onModelChange={setModel} placeholder={t('home.placeholder')} onSend={(text) => start({ text, model })} />

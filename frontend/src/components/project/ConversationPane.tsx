@@ -154,7 +154,7 @@ export function ConversationPane({ messages, threads, busy, disabled, disabledRe
                 <Box sx={{ ...COLUMN, pt: 2, pb: 3 }}>
                     {messages.length === 0 && (
                         <Box sx={{ py: { xs: 3, md: 6 } }}>
-                            <Typography variant="h3" sx={{ fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400, mb: 2 }}>{t('conversation.emptyTitle')}</Typography>
+                            <Typography variant="h3" sx={{ mb: 2 }}>{t('conversation.emptyTitle')}</Typography>
                             {[1, 2, 3].map((i) => (
                                 <Box key={i} sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
                                     <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.25 }}>{i}</Box>

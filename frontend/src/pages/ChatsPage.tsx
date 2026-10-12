@@ -4,9 +4,10 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api, unwrap, type Conversation } from '@/client';
 import { ChatActionsMenu } from '@/components/ChatActionsMenu';
-import { Add, MoreHoriz, Search, Star } from '@/components/icons';
+import { Add, ChatBubble, MoreHoriz, Search, Star } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
 import { timeAgo } from '@/utils/format';
+import { EmptyState, PageHeader } from '@tingly/ui';
 
 function Row({ chat, onChanged }: { chat: Conversation; onChanged: () => void }) {
     const { t, i18n } = useTranslation();
@@ -65,10 +66,11 @@ export default function ChatsPage() {
     return (
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
             <Box sx={{ maxWidth: 860, mx: 'auto', px: { xs: 2, md: 4 }, pt: { xs: 7, md: 5 }, pb: 6 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h1" sx={{ flex: 1, fontFamily: 'Georgia, "Songti SC", serif', fontWeight: 400 }}>{t('chats.title')}</Typography>
-                    <Button variant="contained" startIcon={<Add />} onClick={() => navigate('/chat')}>{t('nav.newChat')}</Button>
-                </Box>
+                <PageHeader
+                    title={t('chats.title')}
+                    actions={<Button variant="contained" startIcon={<Add />} onClick={() => navigate('/chat')}>{t('nav.newChat')}</Button>}
+                    sx={{ mb: 3 }}
+                />
                 <TextField
                     fullWidth
                     autoFocus
@@ -81,7 +83,12 @@ export default function ChatsPage() {
                 {chats === null ? (
                     [0, 1, 2, 3].map((i) => <Skeleton key={i} height={56} />)
                 ) : chats.length === 0 ? (
-                    <Typography color="text.secondary" sx={{ textAlign: 'center', py: 6 }}>{q ? t('chats.noneFound') : t('nav.noChats')}</Typography>
+                    <EmptyState
+                        compact
+                        icon={<ChatBubble sx={{ fontSize: 32 }} />}
+                        title={q ? t('chats.noneFound') : t('nav.noChats')}
+                        primaryAction={q ? undefined : { label: t('nav.newChat'), onClick: () => navigate('/chat') }}
+                    />
                 ) : (
                     <>
                         <Typography variant="caption" color="text.secondary">{t('chats.count', { count: chats.length })}</Typography>

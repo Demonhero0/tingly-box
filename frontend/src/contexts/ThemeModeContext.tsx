@@ -1,14 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CssBaseline, ThemeProvider, useMediaQuery } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { createAppTheme, type ResolvedMode } from '@/theme';
+import { createAppTheme, type ResolvedThemeMode, type ThemeMode } from '@/theme';
+import { isThemeMode, resolveThemeMode } from '@/theme/modes';
 import { readLocal, writeLocal } from '@/utils/storage';
 
-export type ThemeMode = 'system' | 'light' | 'dark';
+export type { ThemeMode };
 
 interface ThemeModeValue {
     mode: ThemeMode;
-    resolved: ResolvedMode;
+    resolved: ResolvedThemeMode;
     setMode: (m: ThemeMode) => void;
 }
 
@@ -16,9 +17,12 @@ const Ctx = createContext<ThemeModeValue | null>(null);
 
 export function ThemeModeProvider({ children }: { children: ReactNode }) {
     const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
-    const [mode, setModeState] = useState<ThemeMode>(() => (readLocal('themeMode') as ThemeMode) || 'system');
+    const [mode, setModeState] = useState<ThemeMode>(() => {
+        const stored = readLocal('themeMode');
+        return isThemeMode(stored) ? stored : 'system';
+    });
     const { i18n } = useTranslation();
-    const resolved: ResolvedMode = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
+    const resolved = resolveThemeMode(mode, prefersDark);
     const theme = useMemo(() => createAppTheme(resolved, i18n.language), [resolved, i18n.language]);
 
     useEffect(() => {

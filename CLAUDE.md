@@ -43,6 +43,9 @@ Instructions, Goal.
 - Every user-facing string goes through i18n, in both `en.ts` and `zh.ts`
   (`zh.ts` is type-checked against `en.ts`).
 - `localStorage` only for per-browser conveniences, via `utils/storage`.
+- The look is Tingly Box's `@tingly/ui` (theme, icons, `PageHeader`, `EmptyState`,
+  `ConfirmDialog`, …), vendored in `frontend/vendor/tingly-ui` for now and refreshed with
+  `task ui:sync`. Change it in tingly-box, not here; build pages from its primitives.
 
 # Cross frontend and backend
 

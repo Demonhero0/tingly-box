@@ -155,10 +155,56 @@ MVP 已实现（§2 中标 ✅ 的部分）。验证：
 
 ## 9. 嵌入 Tingly Box（2026-10-12）
 
-tingly-project 留在自己的仓库，Tingly Box 以 git submodule（`libs/tingly-project`）引入并挂载它。依赖只朝一个方向：Tingly Box → tingly-project → `tingly-box/agentboot`、`tingly-box/swagger`；本模块绝不 import Tingly Box 根模块（`task boundary` 检查）。
+这一节是嵌入契约，由本仓库维护。Tingly Box 那一侧怎么接（submodule、Host 适配器、开关、导航、Desk 改名），写在 tingly-box 的 `.design/projects.md`，那边只链回这里。
 
-- **门面** `projects`：`New(Options{DataDir, Host})`、`Register(api *swagger.RouteGroup)`、`Start(ctx)`（幂等，开关打开时再调用即可）、`Close()`。`DataDir` 为空时用内存库，供宿主生成 OpenAPI。
-- **Host**：宿主提供协调者的模型客户端（`ClientFor`）、可选模型（`Models`）、线程的 Claude Code 环境（`ThreadEnv`）。独立版由设置模块实现；Tingly Box 用网关实现。类型来自公开包 `llm`。
-- **路由**：全部在 `/api/v1/projects` 下。线程是 `/projects/:id/threads/:tid/*`，只能经由所属项目访问；另有 `/projects/models`、`/projects/runtime`、`/projects/repos/inspect`。设置、Chats、health 只在独立版注册（`server.build`）。
-- **前端**：页面经 `ProjectsHostProvider` 拿到宿主的 `fetch`（带鉴权，事件流和文件库下载也走它）、路由位置（`paths`）和项目变化回调；`src/embed.ts` 是宿主挂载的入口。事件流用 fetch 读取而不是 `EventSource`，因为后者带不了鉴权头。
-- **待做**（接入 Tingly Box 时）：前端包的 exports / peerDependencies / i18n 命名空间；主题与 Tingly Box 对齐；Tingly Box 侧的 Host 适配器、实验开关和导航入口。
+### 9.1 为什么留在自己的仓库
+
+| 方案 | 做法 | 取舍 |
+|---|---|---|
+| 搬进 tingly-box 做嵌套模块 | `tingly-box/projects/` 自带 go.mod | 改接口只需一个 PR；但 tingly-box 变大，Projects 失去独立节奏 |
+| **submodule 引用（采用）** | tingly-box 挂 `libs/tingly-project`，用 `replace` 指过去 | 两边独立 CI 和发版；改接口要两个 PR，用 submodule 指针对齐版本 |
+| 平铺进 tingly-box `internal/` | 代码直接并入根模块 | 边界只能靠自觉，很快会反向依赖；不能再独立运行 |
+
+边界设计和“搬进去”完全一样，将来想搬，只需把 submodule 换成 `git subtree`。
+
+### 9.2 后端边界
+
+依赖只朝一个方向：Tingly Box 根模块 → `projects` → `tingly-box/agentboot`、`tingly-box/swagger`。本模块绝不 import Tingly Box 根模块（`task boundary` 用 `go list -deps` 检查）。对外只有两个公开包：门面 `projects` 和数据类型 `llm`，其余都在 `internal/` 下。
+
+- **门面**：`New(Options{DataDir, Host})`、`Register(api *swagger.RouteGroup)`（只挂路由，不启动任何东西）、`Start(ctx)`（恢复线程、跑后台任务；幂等，开关打开时再调用即可）、`Close()`。`DataDir` 为空时用内存库，供宿主生成 OpenAPI。
+- **Host**：宿主提供协调者的模型客户端（`ClientFor(ctx, model)`）、可选模型（`Models`）、线程里 Claude Code 的环境和默认模型（`ThreadEnv`）。独立版由设置模块实现；Tingly Box 用网关实现（`ThreadEnv` 复用它的 `tbclient.GetClaudeCodeEnv`）。
+
+### 9.3 路由、鉴权、存储
+
+- **路由**：全部在 `/api/v1/projects` 下，嵌入和独立两种模式路径一致。线程是 `/projects/:id/threads/:tid/*`，只能经由所属项目访问；另有 `/projects/models`、`/projects/runtime`、`/projects/repos/inspect`。设置、Chats、health 只在独立版注册（`server.build`）。
+- **鉴权**：嵌入时挂在宿主的 V1 组下，受宿主的 Bearer token 保护。独立版无鉴权、只听本机。
+- **存储**：嵌入时 `DataDir` 是 `<tingly-box 数据目录>/projects`，数据库和项目目录（memory、library、worktree）都在这里，不和宿主主库合表：各自迁移、互不阻塞，删掉这个功能就是删一个目录。
+- **启停**：宿主的开关关闭时不调用 `Start`，不恢复线程，也不拉起 `claude` 进程。
+- **OpenAPI**：宿主生成 schema 时调用 `Register` 但不调用 `Start`，所以宿主的 `openapi.json` 会包含这些路由；本仓库也保留自己的一份，两边 codegen 互不依赖。
+
+### 9.4 前端
+
+- **入口**：`src/embed.ts` 导出 `ProjectsHostProvider`、`ProjectsPage`、`ProjectPage`。宿主通过 `ProjectsHost` 注入带鉴权的 `fetch`（事件流和 Library 下载也走它）、路由位置（`paths.list`、`paths.project(id)`）和 `onProjectsChanged`。事件流用 fetch 读取，不用 `EventSource`，因为后者带不了鉴权头。页面不带自己的 `ThemeProvider`，用宿主的。
+- **外观**：独立版和 Tingly Box 共用 `@tingly/ui`（主题、图标、页面原语：`PageHeader`、`EmptyState`、`ConfirmDialog` 等）。过渡期在 `frontend/vendor/tingly-ui` 放一份复制，用 `task ui:sync` 刷新；以后换成真正的包只改 `package.json` 一行。
+- **挂载方式**：宿主把本仓库前端加进自己的 pnpm workspace，用 `lazy()` 挂页面。不用 iframe，也不在子路径下另挂一个 SPA，否则会出现两套侧栏、两套主题和两套登录状态。
+- **共享依赖**：react、react-dom、@mui/material、react-router-dom、i18next、react-i18next 作为 peerDependencies，只打包一份；i18n 用独立命名空间 `projects`。
+- **待解决**：本仓库内部的 `@/` 别名和 Tingly Box 的冲突，接入前要改成包内相对路径或独立别名；页面自带的外边距在宿主布局里要去掉。
+
+### 9.5 产品边界
+
+Tingly Box 的 Desk 也驱动 Claude Code，但回答的是不同的问题：Desk 是坐下来和一个 Claude Code 一起干活，Projects 是丢一串任务进来就走开，回来只看“等你处理”。两者并存、不合并。嵌入后项目设置里没有“模型连接”一栏，模型选择器列的是宿主里可用的模型。Chats 只在独立版保留。
+
+### 9.6 步骤与风险
+
+1. 本仓库改边界，行为不变（#4）。
+2. 统一视觉：tingly-box 抽出 `@tingly/ui`（tingly-box #2038，已合并），本仓库复制接入并改用其原语（#5）。
+3. tingly-box 后端接入：submodule、Host 适配器、`projects` 开关。
+4. tingly-box 前端接入：workspace、路由、导航入口、i18n。
+5. 数据迁移与收尾：已有 `~/.tingly-project` 时一键导入；`@tingly/ui` 复制换成真正的包。
+
+| 事项 | 风险 / 问题 | 建议 |
+|---|---|---|
+| worktree 路径 | git 记录的是绝对路径，直接搬数据目录会断链 | 导入时跑 `git worktree repair`；失败就保留旧目录继续用 |
+| agentboot 版本 | 本仓库锁定 pseudo-version，嵌入后由宿主的 `replace` 改用其本地版本 | 第 3 步一次对齐 |
+| 并发 | Desk 和 Projects 各自拉起 `claude` 进程 | 首批不处理，以后共用 `agentboot/pool` |
+| 独立二进制 | 是否继续维护 | 保留：开发调试和离线演示都靠它 |

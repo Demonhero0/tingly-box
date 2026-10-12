@@ -8,7 +8,7 @@ export const en = {
         newChat: 'New chat', chats: 'Chats', projects: 'Projects', recentChats: 'Recent chats',
         settings: 'Settings', noChats: 'No chats yet', collapse: 'Close sidebar', expand: 'Open sidebar',
     },
-    theme: { system: 'System', light: 'Light', dark: 'Dark' },
+    theme: { system: 'System', light: 'Light', dark: 'Dark', sunlit: 'Sunlit', claude: 'Claude', ds: 'DeepSeek' },
     home: {
         greetingMorning: 'Good morning', greetingAfternoon: 'Good afternoon', greetingEvening: 'Good evening', greetingNight: 'Burning the midnight oil?',
         placeholder: 'How can I help you today?',

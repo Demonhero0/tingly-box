@@ -18,6 +18,7 @@
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^9.4.0",
     "@tabler/icons-react": "^3.48.0",
+    "@tingly/ui": "link:./vendor/tingly-ui",
     "i18next": "^26.4.2",
     "i18next-browser-languagedetector": "^8.2.1",
     "openapi-fetch": "^0.17.0",
