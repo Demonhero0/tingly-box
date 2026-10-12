@@ -41,6 +41,9 @@ Data lives in `~/.tingly-project` (override with `--data-dir` or
 `$TINGLY_PROJECT_HOME`); each project's memory, library and thread worktrees
 are under `projects/<id>/`. The server binds to `127.0.0.1` and has no login.
 
+To see the whole loop without a model key, run the scripted
+[end-to-end demo](showcase/e2e-demo/README.md).
+
 ## Development
 
 ```bash
