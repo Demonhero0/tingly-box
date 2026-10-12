@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { SCENARIOS, getHiddenScenarios } from '@/pages/scenario/scenarioRegistry';
+import { SCENARIOS, getHiddenScenarios, getPinnedScenarios } from '@/pages/scenario/scenarioRegistry';
 import { OpenAI, Anthropic, Claude, Cursor, DeepSeek, OpenCode, Pi, Xcode, VSCode, Codex, ClaudeDesktop } from '../components/BrandIcons';
 import {
     SettingsApplications,
@@ -70,6 +70,16 @@ export function useActivityItems(): ActivityItem[] {
         window.addEventListener('storage', sync);
         return () => {
             window.removeEventListener('scenario-visibility-change', sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+    const [pinnedScenarios, setPinnedScenarios] = useState<string[]>(() => getPinnedScenarios());
+    useEffect(() => {
+        const sync = () => setPinnedScenarios(getPinnedScenarios());
+        window.addEventListener('scenario-pinned-change', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener('scenario-pinned-change', sync);
             window.removeEventListener('storage', sync);
         };
     }, []);
@@ -156,7 +166,7 @@ export function useActivityItems(): ActivityItem[] {
             return s ? t(s.descKey) : undefined;
         };
         const flagged = (group: HideableScenario[]): NavItem[] =>
-            group.map(s => ({ ...s.nav, hideId: s.id, hidden: hiddenScenarios.has(s.id), hint: hintOf(s.id) }));
+            group.map(s => ({ ...s.nav, hideId: s.id, hidden: hiddenScenarios.has(s.id), hint: hintOf(s.id), pinId: s.id, pinned: pinnedScenarios.includes(s.id) }));
 
         const teamActivityItem: ActivityItem = {
             key: 'team',
@@ -189,6 +199,18 @@ export function useActivityItems(): ActivityItem[] {
         ]);
 
         const scenarioChildren: NavItem[] = [];
+        // Pinned agents lead the list (in pin order), above Claude Code; the
+        // rest keep their groups. Claude Code itself is already first, with its
+        // profiles, so it has no pin.
+        const pinnedRows = pinnedScenarios
+            .map(id => [...codingTools, ...sdkTools].find(n => n.type !== 'divider' && n.pinId === id))
+            .filter((n): n is NavItemBase => !!n);
+        const isPinnedRow = (n: NavItem) => n.type !== 'divider' && !!n.pinned;
+        codingTools.splice(0, codingTools.length, ...codingTools.filter(n => !isPinnedRow(n)));
+        sdkTools.splice(0, sdkTools.length, ...sdkTools.filter(n => !isPinnedRow(n)));
+        if (pinnedRows.length > 0) {
+            scenarioChildren.push(...pinnedRows, { type: 'divider' });
+        }
         const claudeCodeHidden = hiddenScenarios.has('claude_code');
         scenarioChildren.push({
             path: '/agent/claude_code',
@@ -392,5 +414,5 @@ export function useActivityItems(): ActivityItem[] {
         ];
 
         return items;
-    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableDesk, profiles, imageProfiles, teams, botSummary, hiddenScenarios, vmodelOff]);
+    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableDesk, profiles, imageProfiles, teams, botSummary, hiddenScenarios, pinnedScenarios, vmodelOff]);
 }

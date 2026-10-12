@@ -82,6 +82,8 @@ export default {
       "prompt": "Промпт"
     },
     "sidebar": {
+      "pinToTop": "Закрепить вверху",
+      "unpin": "Открепить",
       "newProfile": "Новый профиль",
       "newTeam": "Новая команда",
       "profileName": "Название профиля",

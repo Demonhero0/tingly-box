@@ -80,6 +80,8 @@ export default {
       "prompt": "提示词"
     },
     "sidebar": {
+      "pinToTop": "置顶",
+      "unpin": "取消置顶",
       "newProfile": "新建方案",
       "newTeam": "新建 Team",
       "profileName": "方案名称",

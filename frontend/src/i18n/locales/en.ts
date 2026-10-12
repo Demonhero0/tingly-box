@@ -80,6 +80,8 @@ export default {
       "prompt": "Prompt"
     },
     "sidebar": {
+      "pinToTop": "Pin to top",
+      "unpin": "Unpin",
       "newProfile": "New Profile",
       "newTeam": "New Team",
       "profileName": "Profile name",

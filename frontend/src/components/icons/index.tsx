@@ -100,6 +100,8 @@ import {
     IconRoute,
     IconSelector,
     IconGauge,
+    IconPin,
+    IconPinFilled,
     IconActivity,
     IconTool,
     IconPlayerStop,
@@ -232,6 +234,8 @@ export const Bolt = tablerMui(IconBolt);
 export const FiberManualRecord = tablerMui(IconPointFilled);
 
 // --- Visibility / security ---------------------------------------------------
+export const Pin = tablerMui(IconPin);
+export const PinFilled = tablerMui(IconPinFilled);
 export const Visibility = tablerMui(IconEye);
 export const VisibilityOutlined = tablerMui(IconEye);
 export const VisibilityOff = tablerMui(IconEyeOff);
