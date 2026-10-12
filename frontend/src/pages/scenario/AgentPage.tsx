@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { Box, Button, Card, Stack, Tooltip } from '@mui/material';
-import { Rule as QuickStartIcon } from '@/components/icons';
 import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -261,7 +260,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
             {quickStart && quickStartHidden && (
                 // A finished Quick Start leaves the page; this brings it back (reset).
                 <Tooltip title={t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' })}>
-                    <Button onClick={restartQuickStart} variant="text" size="small" startIcon={<QuickStartIcon />} sx={{ textTransform: 'none' }}>
+                    <Button onClick={restartQuickStart} variant="outlined" size="small">
                         {t('agentSetup.quickStart')}
                     </Button>
                 </Tooltip>
