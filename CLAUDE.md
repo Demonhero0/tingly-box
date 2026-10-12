@@ -51,6 +51,10 @@ hand-edit them. After changing API models or routes:
 task codegen   # go run ./cmd/tingly-project swagger + pnpm gen:api
 ```
 
+# Pull Requests
+
+Follow `.github/PULL_REQUEST_TEMPLATE.md` for PR title and description.
+
 # Verify
 
 ```bash
