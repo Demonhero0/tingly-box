@@ -2230,7 +2230,7 @@ export default {
       "step2Done": "已收到首个请求",
       "copy": "复制命令",
       "inherit": "Profile 默认继承主配置和模型路由；只需在「Profile Overrides」里改你要变的部分。",
-      "hide": "收起"
+      "close": "知道了"
     },
     "hide": "隐藏",
     "restartTooltip": "重新运行快速开始",

@@ -1,10 +1,12 @@
-import { Box, Button, Card, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { CheckCircle as CheckCircleIcon, ContentCopy as ContentCopyIcon } from '@/components/icons';
 import { useTranslation } from 'react-i18next';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { fontMono, fontSizes } from '@/theme/fonts';
 
-export interface ProfileSetupCardProps {
+export interface ProfileSetupDialogProps {
+    open: boolean;
+    onClose: () => void;
     /** The launch command for this profile, as the connection card shows it. */
     command: string;
     /** An AI provider is connected (null while loading). */
@@ -12,8 +14,6 @@ export interface ProfileSetupCardProps {
     /** This profile has sent a request through the gateway (null while loading). */
     launched: boolean | null;
     onConnectProvider: () => void;
-    /** Shown once every step is done, to put a card that was brought back away again. */
-    onDismiss?: () => void;
 }
 
 const Step: React.FC<{ n: number; done: boolean; active: boolean; loading?: boolean }> = ({ n, done, active, loading }) => (
@@ -31,12 +31,12 @@ const Step: React.FC<{ n: number; done: boolean; active: boolean; loading?: bool
 );
 
 /**
- * What a new Profile page is missing next to an Agent page's Quick Start: two
- * steps that say how to use it. A profile inherits the main routing, so there is
- * no model step; "done" comes from facts (a provider exists, a request arrived),
- * never from a click.
+ * The Profile page's setup guide: a button in the header opens this, like the
+ * Xcode page's. Two steps that say how to use a profile; a profile inherits the
+ * main routing, so there is no model step, and "done" comes from facts (a
+ * provider exists, a request arrived), never from a click.
  */
-export const ProfileSetupCard: React.FC<ProfileSetupCardProps> = ({ command, providerConnected, launched, onConnectProvider, onDismiss }) => {
+export const ProfileSetupDialog: React.FC<ProfileSetupDialogProps> = ({ open, onClose, command, providerConnected, launched, onConnectProvider }) => {
     const { t } = useTranslation();
     const { copied, copy } = useCopyFeedback(1500);
     const providerDone = providerConnected === true;
@@ -44,15 +44,11 @@ export const ProfileSetupCard: React.FC<ProfileSetupCardProps> = ({ command, pro
     const firstOpen = !providerDone ? 1 : !launchDone ? 2 : 0;
 
     return (
-        <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper', p: 2 }} data-testid="profile-setup-card">
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{t('agentSetup.profile.title')}</Typography>
-                {firstOpen === 0 && onDismiss && (
-                    <Button size="small" variant="text" onClick={onDismiss} sx={{ textTransform: 'none', color: 'text.secondary' }}>
-                        {t('agentSetup.profile.hide')}
-                    </Button>
-                )}
-            </Stack>
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+            <DialogTitle sx={{ pb: 1 }}>
+                <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>{t('agentSetup.profile.title')}</Typography>
+            </DialogTitle>
+            <DialogContent sx={{ pt: 1 }}>
             <Stack spacing={1}>
                 <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5, px: 1.5 }}>
                     <Step n={1} done={providerDone} active={firstOpen === 1} loading={providerConnected === null} />
@@ -86,11 +82,15 @@ export const ProfileSetupCard: React.FC<ProfileSetupCardProps> = ({ command, pro
                     )}
                 </Box>
             </Stack>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, px: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, px: 1.5 }}>
                 {t('agentSetup.profile.inherit')}
             </Typography>
-        </Card>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={onClose} variant="contained" size="small">{t('agentSetup.profile.close')}</Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 
-export default ProfileSetupCard;
+export default ProfileSetupDialog;

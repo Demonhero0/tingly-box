@@ -2239,7 +2239,7 @@ export default {
       "step2Done": "First request received",
       "copy": "Copy command",
       "inherit": "The profile inherits the main configuration and model routing; change only what you need under Profile Overrides.",
-      "hide": "Hide"
+      "close": "Done"
     },
     "hide": "Hide",
     "restartTooltip": "Run Quick Start again",

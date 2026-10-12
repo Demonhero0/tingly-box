@@ -5,7 +5,7 @@ import ScenarioLogDialog from '@/components/RuleLogDialog';
 import AgentActivityDialog from './components/AgentActivityDialog';
 import AgentStatusRow, { AgentLooksIn } from './components/AgentStatusRow';
 import AgentAccessSection, { useAccessExpanded } from './components/AgentAccessSection';
-import ProfileSetupCard from './components/ProfileSetupCard';
+import ProfileSetupDialog from './components/ProfileSetupDialog';
 import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
 import { isCredentialProvider } from '@/utils/providers';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
@@ -90,7 +90,7 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
     const { getProfiles, refresh: refreshProfiles } = useProfileContext();
     const currentProfile = getProfiles(BASE_SCENARIO).find(p => p.id === profileId);
     const [requestsOpen, setRequestsOpen] = useState(false);
-    const [setupReopened, setSetupReopened] = useState(false);
+    const [setupOpen, setSetupOpen] = useState(false);
     const [logOpen, setLogOpen] = useState(false);
     const [renameProfileOpen, setRenameProfileOpen] = useState(false);
     const [deleteProfileOpen, setDeleteProfileOpen] = useState(false);
@@ -199,8 +199,6 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
     const observation = useAgentObservation(scenario);
     const launched = observation.data ? !!observation.data.lastRequestAt : null;
     const providerConnected = isLoading ? null : providers.some((p: any) => p.enabled && isCredentialProvider(p));
-    const setupDone = launched === true && providerConnected === true;
-    const showSetup = !setupDone && (launched !== null || providerConnected === false) || setupReopened;
     const access = useAccessExpanded(scenario, launched !== true);
     const accessUrl = `${baseUrl}/tingly/${scenario}`;
 
@@ -221,13 +219,9 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                 // Same shape as the Agent pages: title left, one row of buttons right.
                 actions={(
                     <>
-                        {!showSetup && (
-                            <Tooltip title={t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' })}>
-                                <Button onClick={() => setSetupReopened(true)} variant="outlined" size="small">
-                                    {t('agentSetup.quickStart')}
-                                </Button>
-                            </Tooltip>
-                        )}
+                        <Button onClick={() => setSetupOpen(true)} variant="outlined" size="small">
+                            {t('scenarioPage.setupGuide')}
+                        </Button>
                         <AgentLooksIn
                             onOpenRequests={() => setRequestsOpen(true)}
                             onOpenLog={() => setLogOpen(true)}
@@ -259,17 +253,8 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                 {' · '}
                 {unifiedMode ? t('claudeCode.profile.unified') : t('claudeCode.profile.separate')}
             </Typography>
-            <AgentStatusRow observation={observation.data} connected={launched === true} configStatus={null} />
+            <AgentStatusRow observation={observation.data} connected={launched === true} configStatus={null} unconnectedText={t('agentStatus.noRequestsYet')} />
             </Stack>
-            {showSetup && (
-                <ProfileSetupCard
-                    command={ccCommand}
-                    providerConnected={providerConnected}
-                    launched={launched}
-                    onConnectProvider={() => navigate('/help')}
-                    onDismiss={() => setSetupReopened(false)}
-                />
-            )}
             <CardGrid>
                 <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
                   <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
@@ -418,6 +403,15 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
 
                 <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
                 <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
+
+                <ProfileSetupDialog
+                    open={setupOpen}
+                    onClose={() => setSetupOpen(false)}
+                    command={ccCommand}
+                    providerConnected={providerConnected}
+                    launched={launched}
+                    onConnectProvider={() => navigate('/help')}
+                />
 
                 {/* Rename profile dialog */}
                 <Dialog

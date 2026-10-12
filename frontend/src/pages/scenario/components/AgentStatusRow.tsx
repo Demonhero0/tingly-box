@@ -36,6 +36,8 @@ export interface AgentStatusRowProps {
     connected: boolean;
     /** The client's config readback, for agents that have one. */
     configStatus: ClientConfigStatus | null;
+    /** What to say when nothing has arrived and it is not connected, if "below" does not point at anything. */
+    unconnectedText?: string;
 }
 
 const Dot: React.FC<{ color: string }> = ({ color }) => (
@@ -46,6 +48,7 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
     observation,
     connected,
     configStatus,
+    unconnectedText,
 }) => {
     const { t, i18n } = useTranslation();
     const hasRequests = !!observation?.lastRequestAt;
@@ -60,10 +63,10 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
             const rate = formatErrorRate(observation.requestsToday, observation.errorsToday);
             if (rate) parts.push(t('agentStatus.errorRate', { rate }));
         } else {
-            parts.push(connected ? t('agentStatus.noRequestsYet') : t('agentStatus.noRequestsFinishSetup'));
+            parts.push(connected ? t('agentStatus.noRequestsYet') : (unconnectedText ?? t('agentStatus.noRequestsFinishSetup')));
         }
         return parts.join(' · ');
-    }, [observation, connected, t, i18n.language]);
+    }, [observation, connected, unconnectedText, t, i18n.language]);
 
     const outdated = configStatus?.state === 'outdated';
     const notApplied = !!configStatus && configStatus.state !== 'applied' && !outdated;
