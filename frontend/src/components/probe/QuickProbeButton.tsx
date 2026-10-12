@@ -24,7 +24,7 @@ interface QuickProbeButtonProps {
 }
 
 // QuickProbeButton: one-click streaming probe for a rule, living in the rule
-// card header. No menu, no dialog up front — click the bolt, get a compact
+// card header. No menu, no dialog up front — click "Test", get a compact
 // verdict pill (status + latency) in place. Clicking the pill opens the full
 // ProbeDialog pre-loaded with this result for the journey/response details.
 export const QuickProbeButton: React.FC<QuickProbeButtonProps> = ({ ruleUuid, ruleName, scenario, model, runSignal }) => {
@@ -128,10 +128,13 @@ export const QuickProbeButton: React.FC<QuickProbeButtonProps> = ({ ruleUuid, ru
 
             <Tooltip title={t('probe.quickTest')}>
                 <span>
+                    {/* Icon only, the same size as the "⋯" and fold icons beside it;
+                        the label is the tooltip and the aria-label. */}
                     <IconButton
                         size="small"
                         onClick={run}
                         disabled={running}
+                        aria-label={t('ruleHeader.test')}
                         sx={{ color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}
                     >
                         {running ? <CircularProgress size={16} thickness={5} /> : <BoltIcon fontSize="small" />}

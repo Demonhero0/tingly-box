@@ -4,11 +4,13 @@ import {
     ContentCopy as CopyIcon,
     Delete as DeleteIcon,
     Edit as EditIcon,
+    Extension as PluginsIcon,
+    MoreHoriz as MoreIcon,
     PlayArrow as ProbeIcon,
-    Settings as SettingsIcon,
 } from '@/components/icons';
-import { IconButton, Menu, MenuItem, Tooltip, Divider } from '@mui/material';
+import { Box, IconButton, Menu, MenuItem, Tooltip, Divider } from '@mui/material';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProbeMenu } from './probe';
 
 export interface GraphSettingsMenuProps {
@@ -21,6 +23,9 @@ export interface GraphSettingsMenuProps {
     onDelete: () => void;
     onToggleActive: () => void;
     onEditFlags?: () => void;
+    /** Opens the plugin catalog (add / remove); `pluginsCount` is shown beside it. */
+    onOpenPlugins?: () => void;
+    pluginsCount?: number;
     // Probe props
     ruleUuid?: string;
     ruleName?: string;
@@ -38,11 +43,14 @@ export const GraphSettingsMenu = ({
     onDelete,
     onToggleActive,
     onEditFlags,
+    onOpenPlugins,
+    pluginsCount = 0,
     ruleUuid,
     ruleName,
     scenario,
     model,
 }: GraphSettingsMenuProps) => {
+    const { t } = useTranslation();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [probeOpen, setProbeOpen] = useState(false);
 
@@ -50,13 +58,14 @@ export const GraphSettingsMenu = ({
 
     return (
         <>
-            <Tooltip title="Rule actions">
+            <Tooltip title={t('ruleHeader.ruleActions')}>
                 <IconButton
                     size="small"
                     onClick={(e) => setMenuAnchorEl(e.currentTarget)}
+                    aria-label={t('ruleHeader.ruleActions')}
                     sx={{ color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}
                 >
-                    <SettingsIcon fontSize="small" />
+                    <MoreIcon fontSize="small" />
                 </IconButton>
             </Tooltip>
 
@@ -67,6 +76,15 @@ export const GraphSettingsMenu = ({
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
+                {onOpenPlugins && (
+                    <MenuItem onClick={() => { closeMenu(); onOpenPlugins(); }}>
+                        <PluginsIcon fontSize="small" sx={{ mr: 1 }} />{t('ruleHeader.plugins')}
+                        {pluginsCount > 0 && (
+                            <Box component="span" sx={{ ml: 'auto', pl: 2, color: 'text.secondary', fontSize: '0.8125rem' }}>{pluginsCount}</Box>
+                        )}
+                    </MenuItem>
+                )}
+
                 {ruleUuid && (
                     <MenuItem onClick={() => { closeMenu(); setProbeOpen(true); }}>
                         <ProbeIcon fontSize="small" sx={{ mr: 1 }} />Test Probe

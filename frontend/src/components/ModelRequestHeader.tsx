@@ -18,7 +18,9 @@ import {
     Check as CheckIcon,
     Close as CloseIcon,
     ExpandMore as ExpandMoreIcon,
+    Extension as ExtensionIcon,
 } from '@/components/icons';
+import { useTranslation } from 'react-i18next';
 import { isWildcardModelName } from '@/components/rule-card/utils';
 import { notify } from '@/utils/notify';
 import { fontMono, fontSizes } from '@/theme/fonts';
@@ -65,8 +67,10 @@ const HeaderContainer = styled(Box, {
     shouldForwardProp: (prop) => prop !== 'collapsible',
 })<{ collapsible?: boolean }>(({ collapsible, theme }) => ({
     display: 'flex',
-    flexWrap: 'wrap' as const,
-    alignItems: 'center',
+    // The actions stay at the right of the first row; at narrow widths it is
+    // the title section that wraps (its controls drop to a second row).
+    flexWrap: 'nowrap' as const,
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     padding: `${HEADER_PADDING_Y}px ${HEADER_PADDING_X}px`,
     gap: 4,
@@ -78,13 +82,17 @@ const HeaderContainer = styled(Box, {
     }),
 }));
 
+// Name + controls, then the description. One line: the description is what
+// gives way (it ellipsizes), so every rule card's header lines up and the
+// actions stay on the same row as the name instead of dropping under it.
 const TitleSection = styled(Box)(({ theme }) => ({
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: theme.spacing(0.5),
-    flexGrow: 0,
+    flex: '1 1 0',
     minWidth: 0,
+    // Only the controls ever wrap (below); the description just shortens.
     flexWrap: 'wrap' as const,
 }));
 
@@ -93,6 +101,9 @@ const ActionsSection = styled(Box)(({ theme }) => ({
     alignItems: 'center',
     gap: theme.spacing(0.25),
     flexShrink: 0,
+    // Stay at the right edge, level with the first row of the title.
+    marginLeft: 'auto',
+    minHeight: 28,
 }));
 
 const ModelNameText = styled(Typography)(({ theme }) => ({
@@ -125,6 +136,13 @@ export interface ModelRequestHeaderProps {
     endpointSelection?: OpenAIEndpointSelection;
     responsesProbing?: boolean;
     onEndpointSelect?: (selection: OpenAIEndpointSelection) => void;
+    // False when none of the rule's services is OpenAI-compatible: the chip stays
+    // (and works) but its tooltip says it has no effect there.
+    endpointApplicable?: boolean;
+    // Plugins are low-frequency: a "Plugins N" tag shows only when the rule
+    // has some; adding / removing lives in the rule's "⋯" menu.
+    pluginsCount?: number;
+    onPluginsClick?: (anchor: HTMLElement) => void;
 }
 
 export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
@@ -144,7 +162,11 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
     endpointSelection = 'auto',
     responsesProbing = false,
     onEndpointSelect,
+    endpointApplicable = true,
+    pluginsCount = 0,
+    onPluginsClick,
 }) => {
+    const { t } = useTranslation();
     const [editMode, setEditMode] = useState(false);
     const [tempValue, setTempValue] = useState(modelName);
     const [contextMenuAnchor, setContextMenuAnchor] = useState<HTMLElement | null>(null);
@@ -227,7 +249,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
         }
 
         return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexWrap: 'wrap', rowGap: 0.5 }} onClick={(e) => e.stopPropagation()}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: NAME_SLOT_WIDTH, flexShrink: 0 }}>
                     <Tooltip
                         title={modelName ? `${modelName} (click to copy)` : 'No model specified'}
@@ -294,6 +316,9 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                     </Tooltip>
                 </Box>
 
+                {/* The rule's chips (1M, Endpoint, Plugins) move as one group: when the
+                    row is too narrow they drop to a line of their own, together. */}
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'nowrap' }}>
                 {/* Keep 1M visible; Off only means this rule does not add 1M. */}
                 {onContext1MToggle && (
                     <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
@@ -348,7 +373,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
 
                 {onEndpointSelect && (
                     <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
-                        <Tooltip title="Choose the upstream OpenAI endpoint for this rule">
+                        <Tooltip title={endpointApplicable ? 'Choose the upstream OpenAI endpoint for this rule' : t('ruleHeader.endpointNotApplicable')}>
                             <span>
                                 <Button
                                     size="small"
@@ -397,6 +422,26 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                         </Menu>
                     </Box>
                 )}
+
+                {pluginsCount > 0 && onPluginsClick && (
+                    <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title={t('ruleHeader.pluginsTooltip')}>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                startIcon={<ExtensionIcon sx={{fontSize: 14}} />}
+                                aria-label={`${t('ruleHeader.plugins')} ${pluginsCount}`}
+                                aria-haspopup="dialog"
+                                onClick={(e) => onPluginsClick(e.currentTarget)}
+                                sx={{...strategyButtonSx, '& .MuiButton-startIcon': {mr: 0.5, ml: 0}}}
+                            >
+                                {t('ruleHeader.plugins')} {pluginsCount}
+                            </Button>
+                        </Tooltip>
+                    </Box>
+                )}
+                </Box>
             </Box>
         );
     };
@@ -444,7 +489,17 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
             <TitleSection>
                 {renderTitle()}
                 {subtitle && !editMode && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
+                    <Typography
+                        variant="caption"
+                        title={typeof subtitle === 'string' ? subtitle : undefined}
+                        sx={{
+                            color: 'text.secondary', ml: 1, flex: '1 1 120px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            // Less than ~120px left beside the controls: the description drops
+                            // to its own line (full width) instead of showing as "R…".
+                            // Its text length itself never counts toward the width.
+                            contain: 'inline-size',
+                        }}
+                    >
                         {subtitle}
                     </Typography>
                 )}

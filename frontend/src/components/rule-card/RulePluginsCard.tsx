@@ -69,6 +69,105 @@ const flagStringValue = (flags: RuleFlags | undefined, key: string): string =>
 const flagServiceRefDisplay = (flags: RuleFlags | undefined, key: string): string =>
     (getFlagValue(flags, key) as VisionProxyServiceRef | undefined)?.model ?? '';
 
+export interface RulePluginsListProps {
+    flags?: RuleFlags;
+    enabled: FlagSpec[];
+    onOpenCatalog: (flagKey?: string) => void;
+    onRemoveFlag?: (key: string) => void;
+}
+
+/** The rows of enabled plugins (label, value, remove ×), shared by the card and the rule header's popover. */
+export const RulePluginsList: React.FC<RulePluginsListProps> = ({ flags, enabled, onOpenCatalog, onRemoveFlag }) => (
+    <Stack sx={{
+        gap: 0.4
+    }}>
+        {enabled.map((spec) => {
+            const isString = spec.type === 'string';
+            const isEnum = spec.type === 'enum';
+            const isServiceRef = spec.type === 'service_ref';
+            const stringVal = isString || isEnum ? flagStringValue(flags, spec.key) : '';
+            let displayVal = stringVal;
+            if (isEnum) {
+                const opt = (spec.options || []).find((o) => o.value === stringVal);
+                if (opt) displayVal = opt.label;
+            }
+            if (isServiceRef) displayVal = flagServiceRefDisplay(flags, spec.key);
+            // Headers: show the concrete header names, not a count.
+            if (spec.type === 'headers') displayVal = Object.keys(headersValue(flags, spec.key)).join(', ');
+            const tooltipTitle = ((isString || isEnum) && stringVal) || ((isServiceRef || spec.type === 'headers') && displayVal)
+                ? `${spec.description}\nValue: ${displayVal}`
+                : spec.description;
+            return (
+                <Tooltip key={spec.key} title={spec.type === 'int' ? `${spec.label}: ${spec.description}\nValue: ${formatSeconds(flagIntValue(flags, spec.key))}` : `${spec.label}: ${tooltipTitle}`} placement="left">
+                    <Box
+                        onClick={(e) => { e.stopPropagation(); onOpenCatalog(spec.key); }}
+                        sx={{
+                            width: '100%',
+                            cursor: 'pointer',
+                            px: 0.75,
+                            py: 0.35,
+                            borderRadius: 0.75,
+                            border: '1px solid',
+                            borderColor: 'transparent',
+                            backgroundColor: 'action.hover',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            overflow: 'hidden',
+                            minHeight: 22,
+                        }}
+                    >
+                        <Typography
+                            variant="body2"
+                            component="span"
+                            sx={{
+                                ...NODE_LAYER_STYLES.typography,
+                                fontSize: fontSizes.sm,
+                                fontWeight: 500,
+                                color: 'text.secondary',
+                                minWidth: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {spec.label}
+                        </Typography>
+                        {(displayVal || spec.type === 'int') && (
+                            <Typography
+                                variant="body2"
+                                component="span"
+                                sx={{
+                                    ...NODE_LAYER_STYLES.typography,
+                                    fontSize: fontSizes.sm,
+                                    fontWeight: 400,
+                                    color: 'text.secondary',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    flexGrow: 1,
+                                }}
+                            >
+                                : {spec.type === 'int' ? formatSeconds(flagIntValue(flags, spec.key)) : displayVal}
+                            </Typography>
+                        )}
+                        {onRemoveFlag && (
+                            <IconButton
+                                size="small"
+                                aria-label={`Remove ${spec.label}`}
+                                onClick={(e) => { e.stopPropagation(); onRemoveFlag(spec.key); }}
+                                sx={{ p: 0, ml: 'auto', flexShrink: 0, color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                            >
+                                <CloseIcon sx={{ fontSize: fontSizes.xs }} />
+                            </IconButton>
+                        )}
+                    </Box>
+                </Tooltip>
+            );
+        })}
+    </Stack>
+);
+
 /**
  * RulePluginsCard renders a compact card displaying the rule's enabled
  * plugin flags. The "+ Add" action opens the catalog dialog where users
@@ -144,94 +243,7 @@ export const RulePluginsCard: React.FC<RulePluginsCardProps> = ({
                     onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => e.stopPropagation()}
                 >
-                    <Stack sx={{
-                        gap: 0.4
-                    }}>
-                        {enabled.map((spec) => {
-                            const isString = spec.type === 'string';
-                            const isEnum = spec.type === 'enum';
-                            const isServiceRef = spec.type === 'service_ref';
-                            const stringVal = isString || isEnum ? flagStringValue(flags, spec.key) : '';
-                            let displayVal = stringVal;
-                            if (isEnum) {
-                                const opt = (spec.options || []).find((o) => o.value === stringVal);
-                                if (opt) displayVal = opt.label;
-                            }
-                            if (isServiceRef) displayVal = flagServiceRefDisplay(flags, spec.key);
-                            // Headers: show the concrete header names, not a count.
-                            if (spec.type === 'headers') displayVal = Object.keys(headersValue(flags, spec.key)).join(', ');
-                            const tooltipTitle = ((isString || isEnum) && stringVal) || ((isServiceRef || spec.type === 'headers') && displayVal)
-                                ? `${spec.description}\nValue: ${displayVal}`
-                                : spec.description;
-                            return (
-                                <Tooltip key={spec.key} title={spec.type === 'int' ? `${spec.label}: ${spec.description}\nValue: ${formatSeconds(flagIntValue(flags, spec.key))}` : `${spec.label}: ${tooltipTitle}`} placement="left">
-                                    <Box
-                                        onClick={(e) => { e.stopPropagation(); onOpenCatalog(spec.key); }}
-                                        sx={{
-                                            width: '100%',
-                                            cursor: 'pointer',
-                                            px: 0.75,
-                                            py: 0.35,
-                                            borderRadius: 0.75,
-                                            border: '1px solid',
-                                            borderColor: 'transparent',
-                                            backgroundColor: 'action.hover',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 0.5,
-                                            overflow: 'hidden',
-                                            minHeight: 22,
-                                        }}
-                                    >
-                                        <Typography
-                                            variant="body2"
-                                            component="span"
-                                            sx={{
-                                                ...NODE_LAYER_STYLES.typography,
-                                                fontSize: fontSizes.sm,
-                                                fontWeight: 500,
-                                                color: 'text.secondary',
-                                                minWidth: 0,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                            }}
-                                        >
-                                            {spec.label}
-                                        </Typography>
-                                        {(displayVal || spec.type === 'int') && (
-                                            <Typography
-                                                variant="body2"
-                                                component="span"
-                                                sx={{
-                                                    ...NODE_LAYER_STYLES.typography,
-                                                    fontSize: fontSizes.sm,
-                                                    fontWeight: 400,
-                                                    color: 'text.secondary',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
-                                                    flexGrow: 1,
-                                                }}
-                                            >
-                                                : {spec.type === 'int' ? formatSeconds(flagIntValue(flags, spec.key)) : displayVal}
-                                            </Typography>
-                                        )}
-                                        {onRemoveFlag && (
-                                            <IconButton
-                                                size="small"
-                                                aria-label={`Remove ${spec.label}`}
-                                                onClick={(e) => { e.stopPropagation(); onRemoveFlag(spec.key); }}
-                                                sx={{ p: 0, ml: 'auto', flexShrink: 0, color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-                                            >
-                                                <CloseIcon sx={{ fontSize: fontSizes.xs }} />
-                                            </IconButton>
-                                        )}
-                                    </Box>
-                                </Tooltip>
-                            );
-                        })}
-                    </Stack>
+                    <RulePluginsList flags={flags} enabled={enabled} onOpenCatalog={onOpenCatalog} onRemoveFlag={onRemoveFlag} />
                 </Box>
             )}
         </StyledPluginsCard>

@@ -29,6 +29,9 @@ interface CompactConfigCardProps {
     title?: string;
     /** Optional: available environment modes (defaults to local + docker) */
     environmentModes?: EnvironmentMode[];
+    /** Controlled environment mode (a page that also shows the URL elsewhere); omit to keep it local. */
+    envMode?: EnvironmentMode;
+    onEnvModeChange?: (mode: EnvironmentMode) => void;
 }
 
 // ============================================================================
@@ -61,11 +64,15 @@ export const CompactConfigCard: React.FC<CompactConfigCardProps> = ({
     apiKeyLabel = 'API Key',
     title,
     environmentModes,
+    envMode: envModeProp,
+    onEnvModeChange,
 }) => {
     const { t } = useTranslation();
     // Get modal state from context
     const { token, setShowTokenModal } = useScenarioPageModal();
-    const [envMode, setEnvMode] = useState<EnvironmentMode>('local');
+    const [localEnvMode, setLocalEnvMode] = useState<EnvironmentMode>('local');
+    const envMode = envModeProp ?? localEnvMode;
+    const setEnvMode = onEnvModeChange ?? setLocalEnvMode;
 
     // Build full URL based on environment mode
     const fullUrl = React.useMemo(() => {

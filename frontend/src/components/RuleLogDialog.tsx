@@ -16,9 +16,11 @@ interface ScenarioLogDialogProps {
     open: boolean;
     onClose: () => void;
     scenario: string;
+    /** Dialog title; defaults to "Troubleshoot". */
+    title?: string;
 }
 
-const ScenarioLogDialog = ({ open, onClose, scenario }: ScenarioLogDialogProps) => {
+const ScenarioLogDialog = ({ open, onClose, scenario, title }: ScenarioLogDialogProps) => {
     const { t } = useTranslation();
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth slotProps={{
@@ -34,7 +36,7 @@ const ScenarioLogDialog = ({ open, onClose, scenario }: ScenarioLogDialogProps) 
                     <Stack direction="row" spacing={1} sx={{
                         alignItems: "center"
                     }}>
-                        <Typography variant="h6">{t('templateActions.troubleshoot')}</Typography>
+                        <Typography variant="h6">{title ?? t('templateActions.troubleshoot')}</Typography>
                         <Chip label={scenario} size="small" variant="outlined" sx={{ fontSize: fontSizes.xs, height: 22 }} />
                     </Stack>
                     <IconButton size="small" onClick={onClose}>

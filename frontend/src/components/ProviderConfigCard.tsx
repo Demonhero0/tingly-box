@@ -44,6 +44,11 @@ export interface ProviderConfigCardProps {
     compact?: boolean;
     /** Container props */
     containerProps?: BoxProps;
+    /** Controlled Local / Docker mode (the page also shows the URL elsewhere); omit to keep it local. */
+    envMode?: EnvironmentMode;
+    onEnvModeChange?: (mode: EnvironmentMode) => void;
+    /** Show the scenario's plugin row (default); a page that places it itself passes false. */
+    showPlugins?: boolean;
 }
 
 /**
@@ -77,10 +82,13 @@ export const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
     baseUrlLabel = 'Base URL',
     compact = false,
     containerProps,
+    envMode: envModeProp,
+    onEnvModeChange,
+    showPlugins = true,
 }) => {
     // Get modal state from context instead of props
     const { token, setShowTokenModal } = useScenarioPageModal();
-    const showOptionalSections = scenario || modeSelection || extraContent;
+    const showOptionalSections = (showPlugins && scenario) || modeSelection || extraContent;
     const hasDivider = showApiKeyRow && showOptionalSections;
 
     // Compact mode: single horizontal layout with tab switching
@@ -94,6 +102,8 @@ export const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
                         onCopy={onCopy}
                         baseUrlLabel={baseUrlLabel}
                         title={title}
+                        envMode={envModeProp}
+                        onEnvModeChange={onEnvModeChange}
                     />
                 </Box>
 
@@ -112,7 +122,7 @@ export const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
                 )}
 
                 {/* Scenario Features - Optional */}
-                {scenario && (
+                {showPlugins && scenario && (
                     <Box sx={{ px: 2, pt: 0.5 }}>
                         <PluginFeatures scenario={scenario} />
                     </Box>
@@ -122,7 +132,9 @@ export const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
     }
 
     // Standard mode: two separate rows using ConfigRow (single tab each)
-    const [envMode, setEnvMode] = useState<EnvironmentMode>('local');
+    const [localEnvMode, setLocalEnvMode] = useState<EnvironmentMode>('local');
+    const envMode = envModeProp ?? localEnvMode;
+    const setEnvMode = onEnvModeChange ?? setLocalEnvMode;
 
     // Build full URL based on environment mode
     const fullUrl = React.useMemo(() => {
@@ -228,7 +240,7 @@ export const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
             )}
 
             {/* Scenario Plugins (Thinking Effort + scenario-level plugins) - Optional (when scenario is provided) */}
-            {scenario && (
+            {showPlugins && scenario && (
                 <Box sx={{ px: 2, py: 0.5 }}>
                     <PluginFeatures scenario={scenario} />
                 </Box>

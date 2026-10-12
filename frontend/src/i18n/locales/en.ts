@@ -489,6 +489,9 @@ export default {
   },
   "templateActions": {
     "troubleshoot": "Troubleshoot",
+    "more": "More",
+    "sortMenuToName": "Sort by name (A→Z)",
+    "sortMenuToOriginal": "Sort by original order",
     "collapseAllRules": "Collapse all rules",
     "expandAllRules": "Expand all rules",
     "connectAI": "Connect AI",
@@ -2186,17 +2189,42 @@ export default {
       "videoWebmOnly": "This browser has no H.264 encoder, so the file will be a WebM — playable in browsers, but some chat apps refuse it."
     }
   },
-  "agentActivity": {
+  "ruleHeader": {
+    "plugins": "Plugins",
+    "pluginsTooltip": "Plugins enabled on this rule",
+    "endpointNotApplicable": "Only applies to OpenAI-compatible upstreams. This rule has none, so the choice has no effect for now.",
+    "managePlugins": "Manage plugins",
+    "test": "Test",
+    "ruleActions": "Rule actions"
+  },
+  "agentStatus": {
+    "connected": "Connected",
+    "lastRequest": "Last request {{ago}}",
+    "today_one": "{{count}} request today",
+    "today_other": "{{count}} requests today",
+    "errorRate": "{{rate}} error rate",
+    "noRequestsYet": "No requests yet",
+    "noRequestsFinishSetup": "No requests yet · finish the setup below",
+    "stale_one": "Config out of date · {{count}} difference",
+    "stale_other": "Config out of date · {{count}} differences",
+    "requests": "Requests",
     "usage": "Usage",
+    "log": "Log",
+    "logTooltip": "Open this agent's logs (AI requests and system log)",
+    "usageTooltip": "Open the Dashboard filtered to this agent"
+  },
+  "agentAccess": {
+    "title": "Connection",
+    "expand": "Show connection details",
+    "collapse": "Hide connection details"
+  },
+  "agentActivity": {
     "requests": "Requests",
     "openDashboard": "Open in Dashboard",
     "refresh": "Refresh",
-    "requestsToday": "Requests today",
-    "tokensToday": "Tokens today",
-    "errorsToday": "Errors today",
     "ok": "OK",
     "error": "Error",
-    "empty": "No requests from this agent yet. Once it sends one, today's numbers and the latest requests show up here.",
+    "empty": "No requests from this agent yet. Once it sends one, the latest requests show up here.",
     "loadFailed": "Couldn't load this agent's requests."
   },
   "agentSetup": {
@@ -2257,7 +2285,6 @@ export default {
   },
   "scenarioPage": {
     "slotMode": "Model mode",
-    "lookIn": "Status",
     "setupGuide": "Setup Guide",
     "config": "Config",
     "autoConfig": "Auto Config",

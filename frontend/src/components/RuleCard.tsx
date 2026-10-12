@@ -14,15 +14,13 @@ import UnifiedRoutingGraph from '@/components/UnifiedRoutingGraph';
 import SmartRuleCatalogDialog from '@/components/rule-card/SmartRuleCatalogDialog';
 import GraphSettingsMenu from '@/components/GraphSettingsMenu';
 import { QuickProbeButton } from '@/components/probe';
-import { Box, Button, Tooltip } from '@mui/material';
-import { Add as AddIcon } from '@/components/icons';
-import RulePluginsCard from '@/components/rule-card/RulePluginsCard';
+import { Box } from '@mui/material';
+import RulePluginsPopover from '@/components/rule-card/RulePluginsPopover';
 import FlagCatalogDialog from '@/components/rule-card/FlagCatalogDialog';
 import { formatRuleFlags, parseRuleFlags } from '@/components/rule-card/utils';
 import { flagDefault, isFlagActive, setFlagValue } from '@/components/rule-card/flagHelpers';
 import { formatModelNameWithContext1M } from '@/components/rule-card/modelNameUtils';
 import { useProviderEditDialog } from '@/hooks/useProviderEditDialog';
-import { fontSizes } from '@/theme/fonts';
 
 // Module-level cache so we only fetch the flag catalog once per session.
 // `undefined` = never fetched; `[]` = fetched but empty (don't re-fetch).
@@ -139,6 +137,8 @@ export const RuleCard: React.FC<RuleCardProps> = ({
     // Catalog dialog state + registry
     const [catalogOpen, setCatalogOpen] = useState(false);
     const [catalogFocusKey, setCatalogFocusKey] = useState<string | undefined>();
+    // The "Plugins N" tag in the header opens the list as a popover.
+    const [pluginsAnchor, setPluginsAnchor] = useState<HTMLElement | null>(null);
     const [flagRegistry, setFlagRegistry] = useState<FlagSpec[]>(flagRegistryCache ?? []);
     const [registryLoaded, setRegistryLoaded] = useState(flagRegistryCache !== undefined);
     const [registryLoading, setRegistryLoading] = useState(false);
@@ -295,42 +295,20 @@ export const RuleCard: React.FC<RuleCardProps> = ({
 
     if (!configRecord) return null;
 
-    // A rule with no plugins doesn't reserve the pinned Plugins column (it
-    // took ~240px of every rule card and pushed the route graph off the right
-    // edge); an "+ Plugins" button in the header opens the same catalog.
-    const hasPlugins = (flagRegistry || []).some((spec) => isFlagActive(spec, configRecord.flags ?? {}));
-    const extensionsCard = hasPlugins && (
-        <RulePluginsCard
-            flags={configRecord.flags}
-            registry={flagRegistry}
-            active={configRecord.active}
-            onOpenCatalog={(flagKey) => {
-                setCatalogFocusKey(flagKey);
-                setCatalogOpen(true);
-            }}
-            onRemoveFlag={handleRemoveFlagFromCard}
-        />
-    );
+    // Plugins are low-frequency: the header shows a "Plugins N" tag only when
+    // the rule has some (it opens a popover with the list, in place of the
+    // ~240px column that used to sit beside the graph and squeeze it); adding
+    // is in the rule's "⋯" menu, which opens the catalog.
+    const enabledPlugins = (flagRegistry || []).filter((spec) => isFlagActive(spec, configRecord.flags ?? {}));
+    const openCatalog = (flagKey?: string) => {
+        setCatalogFocusKey(flagKey);
+        setCatalogOpen(true);
+    };
 
-    // Extra actions - quick streaming test + settings menu, shared between
+    // Extra actions - quick streaming test + the "⋯" menu, shared between
     // RoutingGraph and SmartRoutingGraph
     const extraActions = (
-        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
-            {!hasPlugins && (
-                <Tooltip title="Add plugins to this rule" arrow>
-                    <Button
-                        size="small"
-                        startIcon={<AddIcon sx={{ fontSize: '14px !important' }} />}
-                        onClick={() => {
-                            setCatalogFocusKey(undefined);
-                            setCatalogOpen(true);
-                        }}
-                        sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: fontSizes.sm, fontWeight: 500, color: 'text.secondary', textTransform: 'none' }}
-                    >
-                        Plugins
-                    </Button>
-                </Tooltip>
-            )}
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
             {rule.uuid && (
                 <QuickProbeButton
                     ruleUuid={rule.uuid}
@@ -352,6 +330,8 @@ export const RuleCard: React.FC<RuleCardProps> = ({
                 onDelete={handleDeleteButtonClick}
                 onToggleActive={() => updateField(configRecord, setConfigRecord, 'active', !configRecord.active)}
                 onEditFlags={handleOpenFlagEditor}
+                onOpenPlugins={() => openCatalog()}
+                pluginsCount={enabledPlugins.length}
                 ruleUuid={rule.uuid}
                 ruleName={formatModelNameWithContext1M(rule.request_model || rule.uuid, configRecord.flags)}
                 scenario={rule.scenario}
@@ -372,7 +352,8 @@ export const RuleCard: React.FC<RuleCardProps> = ({
                 expanded={expanded}
                 onToggleExpanded={handleToggleExpanded}
                 extraActions={extraActions}
-                extensionsCard={extensionsCard || undefined}
+                pluginsCount={enabledPlugins.length}
+                onPluginsClick={setPluginsAnchor}
                 onUpdateRecord={(field, value) => updateField(configRecord, setConfigRecord, field, value)}
                 onServiceNodeClick={handleServiceNodeClick}
                 onEditProvider={editProvider}
@@ -387,6 +368,15 @@ export const RuleCard: React.FC<RuleCardProps> = ({
                 onDeleteServiceFromSmartRule={smartHandlers.handleDeleteServiceFromSmartRule}
                 onSwitchRoutingMode={handleRoutingModeSwitch}
                 onContext1MToggle={onContext1MToggle}
+            />
+
+            <RulePluginsPopover
+                anchorEl={pluginsAnchor}
+                onClose={() => setPluginsAnchor(null)}
+                flags={configRecord.flags}
+                enabled={enabledPlugins}
+                onOpenCatalog={openCatalog}
+                onRemoveFlag={handleRemoveFlagFromCard}
             />
 
             {/* Delete Confirmation Dialog */}

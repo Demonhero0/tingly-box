@@ -487,6 +487,9 @@ export default {
   },
   "templateActions": {
     "troubleshoot": "错误检查",
+    "more": "更多",
+    "sortMenuToName": "按名称排序（A→Z）",
+    "sortMenuToOriginal": "按原始顺序排序",
     "collapseAllRules": "收起所有规则",
     "expandAllRules": "展开所有规则",
     "connectAI": "连接 AI",
@@ -2179,17 +2182,40 @@ export default {
       "videoWebmOnly": "当前浏览器没有 H.264 编码器,只能导出 WebM——浏览器里能播放,但部分聊天应用不接受。"
     }
   },
-  "agentActivity": {
+  "ruleHeader": {
+    "plugins": "插件",
+    "pluginsTooltip": "此规则已启用的插件",
+    "endpointNotApplicable": "只对 OpenAI 兼容上游生效。此规则目前没有这类上游，所以选择暂时不起作用。",
+    "managePlugins": "管理插件",
+    "test": "测试",
+    "ruleActions": "规则操作"
+  },
+  "agentStatus": {
+    "connected": "已接入",
+    "lastRequest": "最近请求 {{ago}}",
+    "today_other": "今日 {{count}} 次",
+    "errorRate": "错误率 {{rate}}",
+    "noRequestsYet": "尚未收到请求",
+    "noRequestsFinishSetup": "尚未收到请求 · 先完成下面的接入",
+    "stale_other": "配置已过期 · {{count}} 处差异",
+    "requests": "请求记录",
     "usage": "用量",
+    "log": "日志",
+    "logTooltip": "打开此 Agent 的日志（AI 请求与系统日志）",
+    "usageTooltip": "打开仪表盘，并按此 Agent 过滤"
+  },
+  "agentAccess": {
+    "title": "接入",
+    "expand": "展开接入信息",
+    "collapse": "收起接入信息"
+  },
+  "agentActivity": {
     "requests": "请求",
     "openDashboard": "在仪表盘中查看",
     "refresh": "刷新",
-    "requestsToday": "今日请求",
-    "tokensToday": "今日 Token",
-    "errorsToday": "今日错误",
     "ok": "成功",
     "error": "错误",
-    "empty": "这个 Agent 还没有发过请求。收到第一个请求后，今日数据和最近请求会显示在这里。",
+    "empty": "这个 Agent 还没有发过请求。收到第一个请求后，最近请求会显示在这里。",
     "loadFailed": "无法加载该 Agent 的请求。"
   },
   "agentSetup": {
@@ -2250,7 +2276,6 @@ export default {
   },
   "scenarioPage": {
     "slotMode": "模型模式",
-    "lookIn": "状态",
     "setupGuide": "配置指南",
     "config": "配置",
     "autoConfig": "自动配置",

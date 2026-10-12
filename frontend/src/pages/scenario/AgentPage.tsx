@@ -1,23 +1,29 @@
 import { useCallback, useRef, useState } from 'react';
-import { Box, Button, Stack, Tooltip } from '@mui/material';
-import { BarChart as UsageIcon, ListAlt as RequestsIcon, Rule as QuickStartIcon } from '@/components/icons';
+import { Box, Button, Card, Stack, Tooltip } from '@mui/material';
+import { Rule as QuickStartIcon } from '@/components/icons';
+import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import ChoiceToggle from '@/components/ChoiceToggle';
 import ConfigRow from '@/components/ConfigRow';
 import PageHeader from '@/components/PageHeader';
-import { ClientConfigStatusChip } from '@/components/ClientConfigStatusChip';
 import ConnectAIDialogs from '@/components/ConnectAIDialogs';
 import PageLayout from '@/components/PageLayout';
 import ProviderConfigCard from '@/components/ProviderConfigCard.tsx';
-import UnifiedCard from '@/components/UnifiedCard.tsx';
+import ScenarioLogDialog from '@/components/RuleLogDialog';
+import PluginFeatures from '@/components/PluginFeatures';
+import type { EnvironmentMode } from '@/components/EnvironmentModeSwitcher';
+import { transformUrlByMode } from '@/utils/tokenUtils';
 import { type ClientConfigTool, useClientConfigStatus } from '@/hooks/useClientConfigStatus';
 import { useProviderDialog } from '@/hooks/useProviderDialog';
 import { ScenarioPageModalProvider } from '@/pages/scenario/context/ScenarioPageContext';
 import { useContext1MToggle } from '@/pages/scenario/hooks/useContext1MToggle';
 import { useScenarioPageInternal } from '@/pages/scenario/hooks/useScenarioPageInternal.ts';
 import { type SlotMode, useSlotRouting } from '@/pages/scenario/hooks/useSlotRouting';
-import AgentActivityDialog, { type AgentActivityView } from './components/AgentActivityDialog';
+import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
+import AgentAccessSection, { useAccessExpanded } from './components/AgentAccessSection';
+import AgentActivityDialog from './components/AgentActivityDialog';
+import AgentStatusRow from './components/AgentStatusRow';
 import AgentSetupCard, {
     type AgentApplyResult,
     type AgentInstallAction,
@@ -159,8 +165,12 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     const [isApplyLoading, setIsApplyLoading] = useState(false);
     // Whether every Quick Start step is done; null until the card has worked it out.
     const [setupDone, setSetupDone] = useState<boolean | null>(null);
-    // Requests and Usage are looks-in opened from the status row, one dialog at a time.
-    const [lookIn, setLookIn] = useState<AgentActivityView | null>(null);
+    // Requests (a dialog) and Usage (the Dashboard, filtered to this agent) are looks-in
+    // from the status row.
+    const [requestsOpen, setRequestsOpen] = useState(false);
+    const [logOpen, setLogOpen] = useState(false);
+    const navigate = useNavigate();
+    const observation = useAgentObservation(scenario);
     // A finished Quick Start leaves the page; its button in the status row brings it back
     // (and resets it). `reopened` keeps it on show until it is finished again.
     const [quickStartReopened, setQuickStartReopened] = useState(false);
@@ -215,14 +225,31 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     };
     const openDialog = () => setDialogOpen(true);
 
+    // Until progress is known, an agent that already routes a model counts as done.
+    const setupFinished = setupDone ?? hasModelOnAnyRule(rules);
+    const quickStartHidden = !quickStart || (setupFinished && !quickStartReopened);
+    const slotModeLabel = t('scenarioPage.slotMode', { defaultValue: 'Model mode' });
+    const restartQuickStart = () => {
+        resetSetupProgress(scenario);
+        wasAllDone.current = null;
+        setQuickStartReopened(true);
+        setQuickStartResetKey((k) => k + 1); // remount: the card re-reads its (now empty) progress
+    };
+    // "Connected" is the signal Quick Start already uses (every step done); pages
+    // without a Quick Start have no steps, so for them it is "has sent a request".
+    const connected = quickStart ? setupFinished : !!observation.data?.lastRequestAt;
+    // The connection section: open until connected, or while the client's config is
+    // out of date; the user's own open / close (kept locally) wins over that.
+    const [envMode, setEnvMode] = useState<EnvironmentMode>('local');
+    const accessUrl = transformUrlByMode(`${baseUrl}/tingly/${scenario}`, envMode);
+    const access = useAccessExpanded(scenario, !connected || clientConfigStatus?.state === 'outdated');
+
+    const configApplied = clientConfigStatus?.state === 'applied';
     // Only the action that matters now is filled: a header link (DSH's Web UI),
     // else Auto Config until the client's config reads back as applied.
-    const configApplied = clientConfigStatus?.state === 'applied';
     const configButton = setup.kind !== 'none' && (
         <Button
             onClick={openDialog}
-            // One filled button at a time: while the setup row is on the page it carries
-            // the step to do (Auto Config at the apply step), so this one steps back.
             variant={headerLinks?.length || configApplied ? 'outlined' : 'contained'}
             size="small"
         >
@@ -231,6 +258,14 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     );
     const headerActions = (
         <>
+            {quickStart && quickStartHidden && (
+                // A finished Quick Start leaves the page; this brings it back (reset).
+                <Tooltip title={t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' })}>
+                    <Button onClick={restartQuickStart} variant="text" size="small" startIcon={<QuickStartIcon />} sx={{ textTransform: 'none' }}>
+                        {t('agentSetup.quickStart')}
+                    </Button>
+                </Tooltip>
+            )}
             {headerLinks?.map(link => (
                 <Tooltip key={link.href} title={link.href}>
                     <Button href={link.href} target="_blank" rel="noopener noreferrer" variant="contained" size="small">
@@ -242,18 +277,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
         </>
     );
 
-    // Until progress is known, an agent that already routes a model counts as done.
-    const setupFinished = setupDone ?? hasModelOnAnyRule(rules);
-    const quickStartHidden = !quickStart || (setupFinished && !quickStartReopened);
-    const slotModeLabel = t('scenarioPage.slotMode', { defaultValue: 'Model mode' });
-    const statusLabel = t('scenarioPage.lookIn', { defaultValue: 'Status' });
-    const restartQuickStart = () => {
-        resetSetupProgress(scenario);
-        wasAllDone.current = null;
-        setQuickStartReopened(true);
-        setQuickStartResetKey((k) => k + 1); // remount: the card re-reads its (now empty) progress
-    };
-
     return (
         <PageLayout loading={isLoading} loadingContent={<ScenarioPageSkeleton />} notification={notification}>
             <Stack spacing={2}>
@@ -262,7 +285,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         <ScenarioCardHeader
                             title={agent.title}
                             tooltipKey={agent.tooltipKey}
-                            addon={agent.clientConfigTool && <ClientConfigStatusChip status={clientConfigStatus} onApply={openDialog} />}
                         />
                     }
                     actions={headerActions}
@@ -276,64 +298,59 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         '& h1': { whiteSpace: 'nowrap' },
                     }}
                 />
-                {/* The header card: how this tool connects (Base URL, API Key, Plugins)
-                    and, as the last row of the same list, three looks at it, each a
-                    button that opens its own dialog — Quick Start (leads until it is
-                    done, then moves to the end), Requests and Usage. Unified /
-                    Separate chooses how the model rules below are laid out, so it
-                    ends this row. */}
-                <UnifiedCard size="full" contentMaxWidth={SCENARIO_HEADER_CONTENT_MAX_WIDTH}>
-                    <ProviderConfigCard
-                        title={connection?.titleKey ? t(connection.titleKey) : agent.title}
-                        baseUrlPath={`/tingly/${scenario}`}
-                        baseUrl={baseUrl}
-                        onCopy={copyToClipboard}
-                        scenario={scenario}
-                        compact={connection?.compact}
-                        showApiKeyRow={connection?.apiKeyRow}
-                        showBaseUrlRow={connection?.baseUrlRow}
-                    />
-                    {/* More rows of the same list (ConfigRow, like the ones above): Claude
-                        Code's Unified / Separate, and three looks at the agent as one
-                        segmented control, like Local | Docker. */}
-                    <Box sx={{ px: 2, py: 0.5 }}>
+                <AgentStatusRow
+                    observation={observation.data}
+                    connected={connected}
+                    configStatus={clientConfigStatus}
+                    onApplyConfig={openDialog}
+                    onOpenRequests={() => setRequestsOpen(true)}
+                    onOpenLog={() => setLogOpen(true)}
+                    // The Dashboard already opens filtered to one agent (?scenario=).
+                    onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
+                />
+                {/* Connection: always here, between the status row and the rules; open
+                    until the agent is connected (or while its config is out of date),
+                    then folded to just the URL. Page-level Plugins are their own card. */}
+                <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
+                    <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
+                        <ProviderConfigCard
+                            title={connection?.titleKey ? t(connection.titleKey) : agent.title}
+                            baseUrlPath={`/tingly/${scenario}`}
+                            baseUrl={baseUrl}
+                            onCopy={copyToClipboard}
+                            scenario={scenario}
+                            showPlugins={false}
+                            envMode={envMode}
+                            onEnvModeChange={setEnvMode}
+                            compact={connection?.compact}
+                            showApiKeyRow={connection?.apiKeyRow}
+                            showBaseUrlRow={connection?.baseUrlRow}
+                        />
                         {slotRouting && (
-                            <ToggleRow label={slotModeLabel}>
-                                <ChoiceToggle<SlotMode>
-                                    value={slots.mode}
-                                    options={slots.modeOptions}
-                                    onChange={slots.requestMode}
-                                    optionWidth={112}
-                                flush
-                                    ariaLabel={slotModeLabel}
-                                />
-                            </ToggleRow>
+                            <Box sx={{ px: 2, py: 0.5 }}>
+                                <ToggleRow label={slotModeLabel}>
+                                    <ChoiceToggle<SlotMode>
+                                        value={slots.mode}
+                                        options={slots.modeOptions}
+                                        onChange={slots.requestMode}
+                                        optionWidth={112}
+                                        flush
+                                        ariaLabel={slotModeLabel}
+                                    />
+                                </ToggleRow>
+                            </Box>
                         )}
-                        <ToggleRow label={statusLabel}>
-                            {/* None is ever selected: each option just opens something. Quick
-                                Start is not a dialog — it sits above the rules while there is
-                                setup to do and leaves when done — so its option exists only
-                                while hidden, and brings it back, reset. */}
-                            <ChoiceToggle<'requests' | 'usage' | 'quickstart' | ''>
-                                value=""
-                                optionWidth={100}
-                                flush
-                                ariaLabel={statusLabel}
-                                onChange={(next) => {
-                                    if (next === 'quickstart') restartQuickStart();
-                                    else if (next) setLookIn(next);
-                                }}
-                                options={[
-                                    { value: 'requests', label: t('agentActivity.requests'), icon: <RequestsIcon /> },
-                                    { value: 'usage', label: t('agentActivity.usage'), icon: <UsageIcon /> },
-                                    ...(quickStart && quickStartHidden
-                                        ? [{ value: 'quickstart' as const, label: t('agentSetup.quickStart'), icon: <QuickStartIcon />, tooltip: t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' }) }]
-                                        : []),
-                                ]}
-                            />
-                        </ToggleRow>
                     </Box>
-                </UnifiedCard>
+                </AgentAccessSection>
+
+                {/* Page-level plugins (Thinking, Vision Proxy, Record): their own card,
+                    always shown, whether the connection above is folded or not. */}
+                <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper' }}>
+                    {/* Same height and left inset as the folded connection card above. */}
+                    <Box sx={{ px: 2, py: 0.5, minHeight: 58, display: 'flex', alignItems: 'center', '& > *': { flex: 1, minWidth: 0 } }}>
+                        <PluginFeatures scenario={scenario} />
+                    </Box>
+                </Card>
 
                 {quickStart && (
                     // Embedded where it always was, above the rules; gone once done.
@@ -386,11 +403,12 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         })}
                     {...(agent.rulesTitleKey ? { title: t(agent.rulesTitleKey) } : {})}
                     collapsible={true}
+                    hideTroubleshoot
                     {...(agent.context1M ? { onContext1MToggle: context1M.handleContext1MToggle } : {})}
                 />
 
-                <AgentActivityDialog scenario={scenario} view="usage" open={lookIn === 'usage'} onClose={() => setLookIn(null)} />
-                <AgentActivityDialog scenario={scenario} view="requests" open={lookIn === 'requests'} onClose={() => setLookIn(null)} />
+                <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
+                <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
                 {slotRouting && slots.modeDialog}
                 {setup.kind !== 'none' && setup.renderDialog(slot)}
                 {quickStart && <ConnectAIDialogs flow={connectAI} />}

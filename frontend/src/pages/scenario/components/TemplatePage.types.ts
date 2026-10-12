@@ -23,6 +23,8 @@ export interface TemplatePageProps {
     allowDeleteRule?: boolean;
     allowToggleRule?: boolean;
     allowAddRule?: boolean;
+    /** The page offers its own way into the scenario's logs (the Agent page's status row): no Troubleshoot in the "..." menu. */
+    hideTroubleshoot?: boolean;
     showAddApiKeyButton?: boolean;
     showCreateRuleButton?: boolean;
     showExpandCollapseButton?: boolean;
