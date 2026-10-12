@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TemplatePageActions } from './TemplatePageActions';
+import { TitleIconButtons } from './TitleIconButtons';
 
 // No i18n instance in tests: t() returns the key, which is what we match on.
 const base = {
@@ -13,47 +14,35 @@ const base = {
 };
 
 describe('TemplatePageActions', () => {
-    it('keeps Test All and Connect AI out of the menu, and the rest in it', () => {
+    it('shows the everyday actions as buttons, with no "⋯" menu', () => {
         const onViewLogs = vi.fn();
+        render(<TemplatePageActions {...base} onProbeAll={vi.fn()} onViewLogs={onViewLogs} />);
+        expect(screen.getByRole('button', { name: /probe.testAll/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /templateActions.connectAI/ })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'templateActions.more' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'templateActions.troubleshoot' }));
+        expect(onViewLogs).toHaveBeenCalledOnce();
+    });
+});
+
+describe('TitleIconButtons', () => {
+    it('keeps sort, fold and the guide as icon buttons beside the title', () => {
         const onToggleSort = vi.fn();
         const onShowGuide = vi.fn();
         const onToggleExpandAll = vi.fn();
         render(
-            <TemplatePageActions
-                {...base}
-                onProbeAll={vi.fn()}
-                onViewLogs={onViewLogs}
+            <TitleIconButtons
+                collapsible
+                allExpanded
+                onToggleExpandAll={onToggleExpandAll}
                 onShowGuide={onShowGuide}
                 sortMode="original"
                 onToggleSort={onToggleSort}
-                onToggleExpandAll={onToggleExpandAll}
             />,
         );
-        expect(screen.getByRole('button', { name: /probe.testAll/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /templateActions.connectAI/ })).toBeInTheDocument();
-        // Troubleshoot is no longer a toolbar button
-        expect(screen.queryByRole('button', { name: 'templateActions.troubleshoot' })).toBeNull();
-
-        const open = () => fireEvent.click(screen.getByRole('button', { name: 'templateActions.more' }));
-        open();
-        fireEvent.click(screen.getByRole('menuitem', { name: 'templateActions.troubleshoot' }));
-        expect(onViewLogs).toHaveBeenCalledOnce();
-
-        open();
-        fireEvent.click(screen.getByRole('menuitem', { name: 'templateActions.sortMenuToName' }));
+        fireEvent.click(screen.getByRole('button', { name: 'templateActions.sortByName' }));
         expect(onToggleSort).toHaveBeenCalledOnce();
-
-        open();
-        fireEvent.click(screen.getByRole('menuitem', { name: 'templateActions.collapseAllRules' }));
-        expect(onToggleExpandAll).toHaveBeenCalledOnce();
-
-        open();
-        fireEvent.click(screen.getByRole('menuitem', { name: /howRoutingWorks|How routing works/ }));
+        fireEvent.click(screen.getByRole('button', { name: /howRoutingWorks|How routing works/ }));
         expect(onShowGuide).toHaveBeenCalledOnce();
-    });
-
-    it('has no menu when there is nothing to put in it', () => {
-        render(<TemplatePageActions {...base} collapsible={false} />);
-        expect(screen.queryByRole('button', { name: 'templateActions.more' })).toBeNull();
     });
 });
