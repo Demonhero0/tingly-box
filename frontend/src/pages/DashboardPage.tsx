@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Box, Grid, Skeleton } from '@mui/material';
-import { Outbound as CallMadeIcon, ErrorOutline as ErrorOutlineIcon, Token as PaidIcon, Stream as StreamIcon, Autorenew as CachedIcon } from '@/components/icons';
+import { Box, Grid, Paper, Skeleton, Tab, Tabs } from '@mui/material';
 import {
     StatCard,
     DailyTokenHistoryChart,
@@ -17,7 +16,6 @@ import {
     getErrorRateColor,
     computeUsageSummary,
 } from '@/components/dashboard';
-import { ToggleButtonGroup, ToggleButton } from '@mui/material';
 import PageHeader from '@/components/PageHeader';
 import { useTranslation } from 'react-i18next';
 import { useDashboardData, TIME_RANGE_CONFIG } from '@/hooks/useDashboardData';
@@ -138,7 +136,7 @@ export default function DashboardPage() {
         return <DashboardSkeleton />;
     }
 
-    const headerActions = (
+    const toolbar = (
         <DashboardFilterBar
             providerGroups={groupedProviderOptions}
             modelOptions={modelOptions}
@@ -159,6 +157,11 @@ export default function DashboardPage() {
             onAutoRefreshChange={setAutoRefresh}
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            // The time range is a filter on this page, not a place to go — it
+            // used to be six rows in the Dashboard sidebar. Each range keeps
+            // its own URL (/dashboard/7d, …).
+            timeRange={timeRange}
+            onTimeRangeChange={(range) => navigate(`/dashboard/${range}`)}
         />
     );
 
@@ -173,25 +176,8 @@ export default function DashboardPage() {
         >
             <PageHeader
                 title={t('dashboard.overview.title', { defaultValue: 'Usage Dashboard' })}
-                subtitle={
-                    // The time range is a filter on this page, not a place to
-                    // go — it used to be six rows in the Dashboard sidebar.
-                    // Each range keeps its own URL (/dashboard/7d, …).
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={timeRange}
-                        onChange={(_, range: TimeRange | null) => range && navigate(`/dashboard/${range}`)}
-                        aria-label={t('dashboard.overview.timeRange')}
-                        sx={{ mt: 1, flexWrap: 'wrap', '& .MuiToggleButton-root': { px: 1.25, py: 0.25, textTransform: 'none' } }}
-                    >
-                        {validTimeRanges.map(range => (
-                            <ToggleButton key={range} value={range}>{t(TIME_RANGE_CONFIG[range].labelKey)}</ToggleButton>
-                        ))}
-                    </ToggleButtonGroup>
-                }
-                actions={headerActions}
             />
+            {toolbar}
             {/* Main Content */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {/* Stat Cards Row - 5 cards */}
@@ -201,7 +187,6 @@ export default function DashboardPage() {
                             title={t('dashboard.overview.statCards.totalRequests', { defaultValue: 'Total Requests' })}
                             value={totalRequests.toLocaleString()}
                             subtitle={t(TIME_RANGE_CONFIG[timeRange].labelKey)}
-                            icon={<CallMadeIcon />}
                             // Volume metric — no health judgment, so keep it neutral.
                             color="secondary"
                         />
@@ -215,7 +200,6 @@ export default function DashboardPage() {
                                 cache: formatNumber(totalCacheTokens),
                                 output: formatNumber(totalOutputTokens),
                             })}
-                            icon={<PaidIcon />}
                             // Volume metric — no health judgment, so keep it neutral.
                             color="secondary"
                         />
@@ -228,7 +212,7 @@ export default function DashboardPage() {
                                 read: t('dashboard.overview.statCards.cacheRead', { defaultValue: 'read' }),
                                 written: t('dashboard.overview.statCards.cacheWrite', { defaultValue: 'written' }),
                             })}
-                            icon={<CachedIcon />}
+                            statusDot
                             color={getCacheHitRateColor(cacheHitRate)}
                         />
                     </Grid>
@@ -237,7 +221,7 @@ export default function DashboardPage() {
                             title={t('dashboard.overview.statCards.errorRate', { defaultValue: 'Error Rate' })}
                             value={`${errorRate.toFixed(2)}%`}
                             subtitle={t('dashboard.overview.statCards.errors', { count: totalErrors })}
-                            icon={<ErrorOutlineIcon />}
+                            statusDot
                             color={getErrorRateColor(errorRate)}
                         />
                     </Grid>
@@ -246,78 +230,77 @@ export default function DashboardPage() {
                             title={t('dashboard.overview.statCards.streamedRate', { defaultValue: 'Streamed Rate' })}
                             value={`${streamedRate.toFixed(1)}%`}
                             subtitle={t('dashboard.overview.statCards.streamed', { count: totalStreamed })}
-                            icon={<StreamIcon />}
                             color="secondary"
                         />
                     </Grid>
                 </Grid>
 
-                {/* Chart view toggle: Summary trend, By Request (hourly only),
-                    or the 12-month Activity heatmap. flex: 1 so the active
-                    view can use the full pane height (the Activity grid
-                    centers itself vertically in it). */}
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                        <ToggleButtonGroup
-                            value={effectiveViewMode}
-                            exclusive
-                            onChange={(_, v) => v && setViewMode(v)}
-                            size="small"
-                            sx={{
-                                '& .MuiToggleButton-root': {
-                                    px: 1.75,
-                                    py: 0.375,
-                                    fontSize: fontSizes.md,
-                                    textTransform: 'none',
-                                },
-                            }}
-                        >
-                            <ToggleButton value="summary">{t('dashboard.overview.viewModes.summary', { defaultValue: 'Summary' })}</ToggleButton>
-                            {isHourlyRange && <ToggleButton value="requests">{t('dashboard.overview.viewModes.byRequest', { defaultValue: 'By Request' })}</ToggleButton>}
-                            <ToggleButton value="activity">{t('dashboard.overview.viewModes.activity', { defaultValue: 'Activity' })}</ToggleButton>
-                        </ToggleButtonGroup>
+                {/* View tabs: Summary trend, By Request (hourly only), or the
+                    12-month Activity heatmap. They sit at the top of the content
+                    panel; flex: 1 so the active view can use the full pane
+                    height (the Activity grid centers itself vertically in it). */}
+                <Paper variant="outlined" sx={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 2 }}>
+                    <Tabs
+                        value={effectiveViewMode}
+                        onChange={(_, v) => setViewMode(v)}
+                        sx={{
+                            px: 1,
+                            minHeight: 44,
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                            '& .MuiTab-root': {
+                                minHeight: 44,
+                                fontSize: fontSizes.md,
+                                textTransform: 'none',
+                            },
+                        }}
+                    >
+                        <Tab value="summary" label={t('dashboard.overview.viewModes.summary', { defaultValue: 'Summary' })} />
+                        {isHourlyRange && <Tab value="requests" label={t('dashboard.overview.viewModes.byRequest', { defaultValue: 'By Request' })} />}
+                        <Tab value="activity" label={t('dashboard.overview.viewModes.activity', { defaultValue: 'Activity' })} />
+                    </Tabs>
+                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, p: 2 }}>
+                        {effectiveViewMode === 'activity' ? (
+                            <DashboardHeatmapSection
+                                provider={selectedProvider}
+                                model={selectedModel}
+                                user={selectedUser}
+                                scenario={selectedScenario}
+                                refreshKey={heatmapRefresh}
+                            />
+                        ) : effectiveViewMode === 'summary' ? (
+                            <Box
+                                sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'minmax(0, 1fr)',
+                                    '@media (min-width: 1280px)': {
+                                        gridTemplateColumns: '320px minmax(0, 1fr)',
+                                    },
+                                    gap: 2,
+                                    alignItems: 'stretch',
+                                }}
+                            >
+                                <Box sx={{ minWidth: 0, display: 'flex' }}>
+                                    <PerformanceSummary queryParams={recordsParams} />
+                                </Box>
+                                <Box sx={{ minWidth: 0, display: 'flex' }}>
+                                    {timeRange === 'today' || timeRange === 'yesterday' ? (
+                                        <HourlyTokenHistoryChart data={timeSeries} />
+                                    ) : (
+                                        <DailyTokenHistoryChart data={timeSeries} />
+                                    )}
+                                </Box>
+                            </Box>
+                        ) : (
+                            <RequestsView
+                                records={records}
+                                loading={recordsLoading}
+                                totalCount={recordsTotal}
+                                queryParams={recordsParams}
+                            />
+                        )}
                     </Box>
-
-                    {effectiveViewMode === 'activity' ? (
-                        <DashboardHeatmapSection
-                            provider={selectedProvider}
-                            model={selectedModel}
-                            user={selectedUser}
-                            scenario={selectedScenario}
-                            refreshKey={heatmapRefresh}
-                        />
-                    ) : effectiveViewMode === 'summary' ? (
-                        <Box
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: 'minmax(0, 1fr)',
-                                '@media (min-width: 1280px)': {
-                                    gridTemplateColumns: '320px minmax(0, 1fr)',
-                                },
-                                gap: 2,
-                                alignItems: 'stretch',
-                            }}
-                        >
-                            <Box sx={{ minWidth: 0, display: 'flex' }}>
-                                <PerformanceSummary queryParams={recordsParams} />
-                            </Box>
-                            <Box sx={{ minWidth: 0, display: 'flex' }}>
-                                {timeRange === 'today' || timeRange === 'yesterday' ? (
-                                    <HourlyTokenHistoryChart data={timeSeries} />
-                                ) : (
-                                    <DailyTokenHistoryChart data={timeSeries} />
-                                )}
-                            </Box>
-                        </Box>
-                    ) : (
-                        <RequestsView
-                            records={records}
-                            loading={recordsLoading}
-                            totalCount={recordsTotal}
-                            queryParams={recordsParams}
-                        />
-                    )}
-                </Box>
+                </Paper>
             </Box>
             {/* Stats Table */}
             <ServiceStatsTable stats={stats} />

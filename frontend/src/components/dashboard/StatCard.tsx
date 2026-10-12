@@ -8,10 +8,12 @@ interface StatCardProps {
     value: string | number;
     subtitle?: string;
     icon?: ReactNode;
+    // Health indicator instead of an icon: a small dot in the accent colour.
+    statusDot?: boolean;
     color?: 'primary' | 'success' | 'info' | 'warning' | 'error' | 'secondary';
 }
 
-export default function StatCard({ title, value, subtitle, icon, color = 'primary' }: StatCardProps) {
+export default function StatCard({ title, value, subtitle, icon, statusDot, color = 'primary' }: StatCardProps) {
     const theme = useTheme();
 
     // Accent comes from the active palette, so every theme (incl. claude/ds)
@@ -51,7 +53,7 @@ export default function StatCard({ title, value, subtitle, icon, color = 'primar
                 <Box
                     sx={{
                         display: 'grid',
-                        gridTemplateColumns: 'minmax(0, 1fr) 28px',
+                        gridTemplateColumns: icon ? 'minmax(0, 1fr) 28px' : 'minmax(0, 1fr) auto',
                         alignItems: 'flex-start',
                         gap: 1,
                         mb: 1,
@@ -100,6 +102,12 @@ export default function StatCard({ title, value, subtitle, icon, color = 'primar
                         >
                             {icon}
                         </Box>
+                    )}
+                    {!icon && statusDot && (
+                        <Box
+                            aria-hidden="true"
+                            sx={{ width: 10, height: 10, mt: 0.5, borderRadius: '50%', backgroundColor: colors.text }}
+                        />
                     )}
                 </Box>
                 <Typography
