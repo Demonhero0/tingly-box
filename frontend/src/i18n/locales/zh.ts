@@ -2220,6 +2220,18 @@ export default {
     "loadFailed": "无法加载该 Agent 的请求。"
   },
   "agentSetup": {
+    "profile": {
+      "title": "开始使用这个 Profile",
+      "step1": "连接 AI 服务",
+      "step1Done": "已连接",
+      "connect": "连接 AI",
+      "step2": "用这个 Profile 启动 Claude Code",
+      "step2Hint": "在终端运行下面的命令，即可用该 Profile 的配置启动 Claude Code。",
+      "step2Done": "已收到首个请求",
+      "copy": "复制命令",
+      "inherit": "Profile 默认继承主配置和模型路由；只需在「Profile Overrides」里改你要变的部分。",
+      "hide": "收起"
+    },
     "hide": "隐藏",
     "restartTooltip": "重新运行快速开始",
     "autoSkipped": "已跳过：已经配置了模型",
