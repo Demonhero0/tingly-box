@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/tingly-dev/tingly-box/agentboot"
+	"github.com/tingly-dev/tingly-box/agentboot/engine"
 	"github.com/tingly-dev/tingly-project/internal/db"
 )
 
@@ -57,29 +58,40 @@ const (
 	ReportFailed     = "failed"
 )
 
-// Threads runs and tracks every project's threads.
+// Threads runs and tracks every project's threads. Each thread is one
+// Claude Code session, driven by agentboot's session engine; this type adds
+// what makes it a thread: its queue, the per-project limit, approvals in the
+// thread view, and the report to the coordinator after each turn.
 type Threads struct {
 	store  *db.Store
 	layout Layout
 	hub    *Hub
-	runner Runner
+	engine *engine.Engine
 	env    ThreadEnv
 	// OnReport is called after each turn that was not stopped by the user.
 	OnReport func(Report)
 
 	mu      sync.Mutex
 	active  map[string]*activeThread
-	slots   map[string]chan struct{}
-	threads map[string]*sync.Mutex // serializes writes to one thread row
+	turns   map[string]*turnTally
+	prompts map[string]*threadPrompter
+	// The engine knows a thread by its Claude Code session id.
+	sessionOfThread map[string]string
+	threadOfSession map[string]string
+	slots           map[string]chan struct{}
+	threads         map[string]*sync.Mutex // serializes writes to one thread row
 	// allowed holds tools the user allowed for the rest of a thread.
 	allowed map[string]map[string]bool
 }
 
+// activeThread is a thread with a message in flight: waiting for a slot,
+// or in a turn it started.
 type activeThread struct {
-	cancel   context.CancelFunc
-	prompter *threadPrompter
-	queue    []queued
-	stopped  bool
+	cancel  context.CancelFunc // gives up waiting for a slot
+	current *queued            // the message of the turn in flight
+	slot    chan struct{}      // held while current runs
+	queue   []queued
+	stopped bool
 }
 
 type queued struct {
@@ -87,13 +99,87 @@ type queued struct {
 	from string
 }
 
+// turnTally is what a turn's transcript entries add up to, for its report.
+type turnTally struct {
+	text         string // the main conversation's last text
+	inputTokens  int64
+	outputTokens int64
+	model        string
+	launchModel  string
+}
+
 // NewThreads builds the thread manager.
-func NewThreads(store *db.Store, layout Layout, hub *Hub, runner Runner, env ThreadEnv) *Threads {
-	return &Threads{
-		store: store, layout: layout, hub: hub, runner: runner, env: env,
-		active: map[string]*activeThread{}, slots: map[string]chan struct{}{}, threads: map[string]*sync.Mutex{},
+func NewThreads(store *db.Store, layout Layout, hub *Hub, agents Agents, env ThreadEnv) *Threads {
+	m := &Threads{
+		store: store, layout: layout, hub: hub, env: env,
+		active: map[string]*activeThread{}, turns: map[string]*turnTally{}, prompts: map[string]*threadPrompter{},
+		sessionOfThread: map[string]string{}, threadOfSession: map[string]string{},
+		slots: map[string]chan struct{}{}, threads: map[string]*sync.Mutex{},
 		allowed: map[string]map[string]bool{},
 	}
+	m.engine = engine.New(engine.Config{
+		Agent:     agents.Service,
+		Pool:      agents.Pool,
+		Store:     threadStore{m},
+		Prompter:  func(sid string) agentboot.Prompter { return m.prompter(m.threadOf(sid)) },
+		OnTurnEnd: func(sid string, end engine.TurnEnd) { m.turnEnded(m.threadOf(sid), end) },
+		PermissionMode: func(sid string) string {
+			if t, err := store.GetThread(m.threadOf(sid)); err == nil {
+				if p, err := store.GetProject(t.ProjectID); err == nil {
+					return permissionMode(p)
+				}
+			}
+			return DefaultPermissionMode
+		},
+	})
+	return m
+}
+
+// Shutdown stops every turn and closes every resident process.
+func (m *Threads) Shutdown(ctx context.Context) { m.engine.Shutdown(ctx) }
+
+// sessionOf is the session id the engine knows threadID by.
+func (m *Threads) sessionOf(threadID string) string {
+	m.mu.Lock()
+	sid, ok := m.sessionOfThread[threadID]
+	m.mu.Unlock()
+	if ok {
+		return sid
+	}
+	t, err := m.store.GetThread(threadID)
+	if err != nil {
+		return ""
+	}
+	m.mu.Lock()
+	m.sessionOfThread[threadID], m.threadOfSession[t.SessionID] = t.SessionID, threadID
+	m.mu.Unlock()
+	return t.SessionID
+}
+
+// threadOf is the thread whose session the engine calls sid. Every session
+// the engine runs was started through sessionOf, so it is known.
+func (m *Threads) threadOf(sid string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.threadOfSession[sid]
+}
+
+func (m *Threads) prompter(threadID string) *threadPrompter {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.prompts[threadID]
+	if !ok {
+		p = newThreadPrompter(m, threadID)
+		m.prompts[threadID] = p
+	}
+	return p
+}
+
+func permissionMode(p *db.Project) string {
+	if p.ThreadPermissionMode != "" {
+		return p.ThreadPermissionMode
+	}
+	return DefaultPermissionMode
 }
 
 func (m *Threads) slot(projectID string) chan struct{} {
@@ -291,59 +377,62 @@ func (m *Threads) Send(ctx context.Context, threadID, text, from string) (*db.Th
 	return m.store.GetThread(threadID)
 }
 
-// enqueue records the message and starts a turn unless one is running.
+// enqueue records the message and starts a turn unless the thread is busy,
+// in which case it runs after the current one.
 func (m *Threads) enqueue(threadID string, q queued) {
 	t, err := m.store.GetThread(threadID)
 	if err != nil {
 		return
 	}
 	m.addEvent(t, &db.ThreadEvent{Kind: db.EvUser, Content: q.text, From: q.from})
+	followingUp := m.engine.Busy(m.sessionOf(threadID))
 	m.mu.Lock()
-	if a, busy := m.active[threadID]; busy {
+	if a, busy := m.active[threadID]; busy || followingUp {
+		if !busy {
+			// Claude is following up on a background task by itself; the
+			// message goes after that turn.
+			a = &activeThread{}
+			m.active[threadID] = a
+		}
+		// A message sent after Stop is new work, not part of what was
+		// stopped: it runs once the stopped turn ends.
+		a.stopped = false
 		a.queue = append(a.queue, q)
 		m.mu.Unlock()
+		if !busy {
+			// That turn may have ended since Busy said otherwise, with
+			// nothing left to pick this message up.
+			m.next(threadID)
+		}
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	a := &activeThread{cancel: cancel}
-	a.prompter = newThreadPrompter(m, threadID)
+	a := &activeThread{current: &q}
 	m.active[threadID] = a
 	m.mu.Unlock()
-	go m.loop(ctx, threadID, q, a)
-}
-
-// loop runs turns for a thread until its queue is empty.
-func (m *Threads) loop(ctx context.Context, threadID string, first queued, a *activeThread) {
-	defer a.cancel()
-	next := &first
-	for next != nil {
-		m.runTurn(ctx, threadID, next.text, a)
-		m.mu.Lock()
-		next = nil
-		if !a.stopped && ctx.Err() == nil && len(a.queue) > 0 {
-			q := a.queue[0]
-			a.queue = a.queue[1:]
-			next = &q
-		}
-		if next == nil {
-			delete(m.active, threadID)
-		}
-		m.mu.Unlock()
-	}
+	go m.begin(threadID, a)
 }
 
 var needsInputRe = regexp.MustCompile(`(?m)^\s*NEEDS_INPUT:\s*(.+)$`)
 
-func (m *Threads) runTurn(ctx context.Context, threadID, prompt string, a *activeThread) {
+// begin waits for a slot in the project, then starts a's current message
+// as a turn.
+func (m *Threads) begin(threadID string, a *activeThread) {
 	t, err := m.store.GetThread(threadID)
 	if err != nil {
+		m.drop(threadID)
 		return
 	}
 	p, err := m.store.GetProject(t.ProjectID)
 	if err != nil {
+		m.drop(threadID)
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m.mu.Lock()
+	a.cancel = cancel
+	m.mu.Unlock()
 	slot := m.slot(p.ID)
 	select {
 	case slot <- struct{}{}:
@@ -352,71 +441,163 @@ func (m *Threads) runTurn(ctx context.Context, threadID, prompt string, a *activ
 		select {
 		case slot <- struct{}{}:
 		case <-ctx.Done():
+			m.giveUp(threadID, a)
 			return
 		}
 	}
-	defer func() { <-slot }()
 
-	t, _ = m.update(threadID, func(t *db.Thread) {
-		t.Status, t.WaitReason = db.ThreadWorking, ""
-	})
-	if t == nil {
+	m.mu.Lock()
+	if a.stopped {
+		m.mu.Unlock()
+		<-slot
+		m.giveUp(threadID, a)
 		return
 	}
+	a.slot = slot
+	prompt := a.current.text
+	m.mu.Unlock()
 
 	env, defModel := m.env.ThreadEnv(ctx)
 	model := p.ThreadModel
 	if model == "" {
 		model = defModel
 	}
-	mode := p.ThreadPermissionMode
-	if mode == "" {
-		mode = DefaultPermissionMode
-	}
-	spec := TurnSpec{
-		Dir:                t.Worktree,
-		Prompt:             prompt,
-		SessionID:          t.SessionID,
-		Resume:             t.Turns > 0,
+	m.mu.Lock()
+	m.turns[threadID] = &turnTally{launchModel: model}
+	m.mu.Unlock()
+	opts := agentboot.ExecutionOptions{
 		Model:              model,
-		PermissionMode:     mode,
+		PermissionMode:     permissionMode(p),
 		AppendSystemPrompt: threadSystemPrompt(m.layout, p, t),
 		SettingsPath:       m.layout.SettingsFile(p.ID, t.ID),
 		Env:                env,
 	}
-	res, runErr := m.runner.RunTurn(ctx, spec, a.prompter, func(ev RunnerEvent) {
-		m.addEvent(t, &db.ThreadEvent{Kind: ev.Kind, Content: ev.Content, Payload: jsonString(ev.Payload)})
-	})
-	a.prompter.cancelAll()
+	started := m.engine.Start(m.sessionOf(threadID), t.Worktree, prompt, t.Turns > 0, func(context.Context) agentboot.ExecutionOptions { return opts })
+	if !started {
+		// Claude started a turn of its own in the meantime: this message
+		// waits for it (turnEnded picks it up).
+		m.mu.Lock()
+		a.queue = append([]queued{*a.current}, a.queue...)
+		a.current, a.slot = nil, nil
+		m.mu.Unlock()
+		<-slot
+		m.next(threadID)
+	}
+}
 
+// drop forgets a thread's in-flight state after it gave up before a turn.
+func (m *Threads) drop(threadID string) {
+	m.mu.Lock()
+	delete(m.active, threadID)
+	m.mu.Unlock()
+}
+
+// giveUp drops a's current message after Stop caught it before its turn,
+// and moves on to anything sent since.
+func (m *Threads) giveUp(threadID string, a *activeThread) {
+	m.mu.Lock()
+	a.current = nil
+	m.mu.Unlock()
+	m.next(threadID)
+}
+
+// turnEnded settles a finished turn: the thread's status and counters, its
+// report to the coordinator, and the next queued message.
+func (m *Threads) turnEnded(threadID string, end engine.TurnEnd) {
+	m.prompter(threadID).cancelAll()
+
+	m.mu.Lock()
+	a := m.active[threadID]
+	var slot chan struct{}
+	if a != nil && !end.Unsolicited {
+		slot, a.slot = a.slot, nil
+		if end.NotSent && a.current != nil {
+			// Claude took the turn first; the message goes after it.
+			a.queue = append([]queued{*a.current}, a.queue...)
+		}
+		a.current = nil
+	}
+	tally := m.turns[threadID]
+	delete(m.turns, threadID)
+	m.mu.Unlock()
+	if slot != nil {
+		<-slot
+	}
+
+	if !end.NotSent {
+		m.settle(threadID, end, tally)
+	}
+
+	m.next(threadID)
+}
+
+// next starts the thread's next queued message, unless a turn is in
+// flight (its end calls next again), or forgets the thread when nothing is
+// left.
+func (m *Threads) next(threadID string) {
+	m.mu.Lock()
+	a := m.active[threadID]
+	if a == nil || a.current != nil {
+		m.mu.Unlock()
+		return
+	}
+	if a.stopped || len(a.queue) == 0 {
+		delete(m.active, threadID)
+		m.mu.Unlock()
+		return
+	}
+	m.mu.Unlock()
+	if m.engine.Busy(m.sessionOf(threadID)) {
+		return
+	}
+	m.mu.Lock()
+	if a.current != nil || len(a.queue) == 0 {
+		m.mu.Unlock()
+		return
+	}
+	q := a.queue[0]
+	a.queue = a.queue[1:]
+	a.current = &q
+	m.mu.Unlock()
+	go m.begin(threadID, a)
+}
+
+// settle records a finished turn on the thread and reports it.
+func (m *Threads) settle(threadID string, end engine.TurnEnd, tally *turnTally) {
+	if tally == nil {
+		tally = &turnTally{}
+	}
+	t, err := m.store.GetThread(threadID)
+	if err != nil {
+		return
+	}
 	stats := BranchStats{}
 	if t.RepoPath != "" {
 		stats = Stats(context.Background(), t.Worktree, t.BaseBranch)
 	}
-
-	m.mu.Lock()
-	stopped := a.stopped
-	m.mu.Unlock()
-
-	report := Report{Kind: ReportFinished, Text: strings.TrimSpace(res.Text)}
+	report := Report{Kind: ReportFinished, Text: strings.TrimSpace(tally.text)}
 	t, _ = m.update(threadID, func(t *db.Thread) {
 		t.Turns++
-		t.InputTokens += res.InputTokens
-		t.OutputTokens += res.OutputTokens
-		if res.Model != "" {
-			t.Model = res.Model
+		t.InputTokens += tally.inputTokens
+		t.OutputTokens += tally.outputTokens
+		if tally.model != "" {
+			t.Model = tally.model
 		} else if t.Model == "" {
-			t.Model = model
+			t.Model = tally.launchModel
 		}
 		t.CommitsAhead, t.FilesChanged, t.Uncommitted = stats.CommitsAhead, stats.FilesChanged, stats.Uncommitted
+		if t.Status == db.ThreadResolved {
+			// Resolved while the turn was ending: that decision stands.
+			return
+		}
 		t.WaitReason = ""
 		switch {
-		case stopped || errors.Is(ctx.Err(), context.Canceled):
+		case end.Stopped:
 			t.Status = db.ThreadIdle
 			report.Kind = ""
-		case runErr != nil:
-			t.Status, t.WaitReason = db.ThreadWaiting, "Failed: "+runErr.Error()
-			report.Kind, report.Text = ReportFailed, runErr.Error()
+		case end.Err != nil:
+			t.Status, t.WaitReason = db.ThreadWaiting, "Failed: "+end.Err.Error()
+			report.Kind, report.Text = ReportFailed, end.Err.Error()
 		default:
 			if mm := needsInputRe.FindStringSubmatch(report.Text); mm != nil {
 				t.Status, t.WaitReason = db.ThreadWaiting, strings.TrimSpace(mm[1])
@@ -431,20 +612,20 @@ func (m *Threads) runTurn(ctx context.Context, threadID, prompt string, a *activ
 			t.LastReport = report.Text
 		}
 	})
-	if t == nil {
+	if t == nil || t.Status == db.ThreadResolved {
 		return
 	}
 	switch {
 	case report.Kind == "":
 		m.addEvent(t, &db.ThreadEvent{Kind: db.EvSystem, Content: "Stopped."})
-	case runErr != nil:
-		m.addEvent(t, &db.ThreadEvent{Kind: db.EvError, Content: runErr.Error()})
+	case end.Err != nil:
+		m.addEvent(t, &db.ThreadEvent{Kind: db.EvError, Content: end.Err.Error()})
 	default:
 		m.addEvent(t, &db.ThreadEvent{Kind: db.EvReport, Content: report.Text, Payload: jsonString(map[string]any{
 			"status": t.Status, "commits_ahead": stats.CommitsAhead, "files_changed": stats.FilesChanged, "uncommitted": stats.Uncommitted,
 		})})
 	}
-	_ = m.store.TouchProject(p.ID)
+	_ = m.store.TouchProject(t.ProjectID)
 	if report.Kind != "" && m.OnReport != nil {
 		report.Thread = *t
 		m.OnReport(report)
@@ -452,23 +633,31 @@ func (m *Threads) runTurn(ctx context.Context, threadID, prompt string, a *activ
 }
 
 // Stop interrupts a thread's running turn and drops its queued messages.
-func (m *Threads) Stop(threadID string) {
+// Its resident process, and the background work in it, survive.
+func (m *Threads) Stop(threadID string) { m.stop(threadID) }
+
+// stop is Stop, returning a channel closed once the stopped turn has
+// exited (nil when no turn was running).
+func (m *Threads) stop(threadID string) <-chan struct{} {
 	m.mu.Lock()
-	a, ok := m.active[threadID]
-	if ok {
+	if a, ok := m.active[threadID]; ok {
 		a.stopped = true
 		a.queue = nil
-		a.cancel()
+		if a.cancel != nil {
+			a.cancel()
+		}
 	}
 	m.mu.Unlock()
+	done, _ := m.engine.Stop(m.sessionOf(threadID))
+	return done
 }
 
-// Running reports whether a thread has a turn in flight.
+// Running reports whether a thread has a turn in flight or waiting.
 func (m *Threads) Running(threadID string) bool {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	_, ok := m.active[threadID]
-	return ok
+	m.mu.Unlock()
+	return ok || m.engine.Busy(m.sessionOf(threadID))
 }
 
 // StopProject interrupts every running thread of a project (pause, archive,
@@ -485,18 +674,20 @@ func (m *Threads) StopProject(projectID string) {
 
 // Respond answers a pending approval or question in a thread.
 func (m *Threads) Respond(threadID, requestID string, ans Answer) error {
-	m.mu.Lock()
-	a, ok := m.active[threadID]
-	m.mu.Unlock()
-	if !ok {
-		return ErrNoPrompt
-	}
-	return a.prompter.resolve(requestID, ans)
+	return m.prompter(threadID).resolve(requestID, ans)
 }
 
 // Resolve marks a thread done (it stays readable and can be reopened).
 func (m *Threads) Resolve(threadID string) (*db.Thread, error) {
-	m.Stop(threadID)
+	if done := m.stop(threadID); done != nil {
+		// Let the turn take its interrupt before its process is closed.
+		select {
+		case <-done:
+		case <-time.After(agentboot.SessionCloseTimeout):
+		}
+	}
+	// A resolved thread's process has nothing left to do.
+	m.engine.Evict(m.sessionOf(threadID))
 	return m.update(threadID, func(t *db.Thread) {
 		now := time.Now()
 		t.Status, t.WaitReason, t.ResolvedAt = db.ThreadResolved, "", &now

@@ -38,9 +38,9 @@ type Service struct {
 }
 
 // NewService wires the runtime. Call Start once the server is up.
-func NewService(store *db.Store, layout Layout, runner Runner, host Host) *Service {
+func NewService(store *db.Store, layout Layout, agents Agents, host Host) *Service {
 	hub := NewHub()
-	threads := NewThreads(store, layout, hub, runner, host)
+	threads := NewThreads(store, layout, hub, agents, host)
 	return &Service{
 		Store: store, Layout: layout, Hub: hub, Threads: threads,
 		Coordinator: NewCoordinator(store, layout, hub, threads, host),
@@ -48,7 +48,8 @@ func NewService(store *db.Store, layout Layout, runner Runner, host Host) *Servi
 	}
 }
 
-// Start recovers interrupted threads and runs housekeeping until ctx ends.
+// Start recovers interrupted threads and runs housekeeping until ctx ends,
+// then stops every thread's turn and process.
 func (s *Service) Start(ctx context.Context) {
 	s.Threads.Recover()
 	go func() {
@@ -58,6 +59,9 @@ func (s *Service) Start(ctx context.Context) {
 			s.Threads.AutoResolve(7 * 24 * time.Hour)
 			select {
 			case <-ctx.Done():
+				shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				s.Threads.Shutdown(shutdown)
+				cancel()
 				return
 			case <-tick.C:
 			}

@@ -10,7 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
-	github.com/tingly-dev/tingly-box/agentboot v0.0.0-20261011040203-b33ded7babf4
+	github.com/tingly-dev/tingly-box/agentboot v0.0.0-20261013153420-00217288276e
 	github.com/tingly-dev/tingly-box/swagger v0.0.0-20261010131608-19e97ed89d68
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2

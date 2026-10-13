@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tingly-dev/tingly-box/agentboot"
+	"github.com/tingly-dev/tingly-box/agentboot/engine/enginetest"
 	"github.com/tingly-dev/tingly-project/internal/db"
 	"github.com/tingly-dev/tingly-project/llm"
 )
@@ -95,11 +95,13 @@ func countKind(msgs []db.ProjectMessage, kind string) int {
 }
 
 func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
-	f := newFixture(t, func(ctx context.Context, spec TurnSpec, p agentboot.Prompter, sink func(RunnerEvent)) (TurnResult, error) {
-		if strings.Contains(spec.Prompt, "bug") {
-			return TurnResult{Text: "Found two causes.\nNEEDS_INPUT: Keep the legacy flag?"}, nil
+	f := newFixture(t, func(turn *enginetest.Turn) error {
+		if strings.Contains(turn.Prompt, "bug") {
+			turn.Say("Found two causes.\nNEEDS_INPUT: Keep the legacy flag?", 1, 1)
+			return nil
 		}
-		return TurnResult{Text: "Docs updated."}, nil
+		turn.Say("Docs updated.", 1, 1)
+		return nil
 	})
 	ai := &fakeLLM{fn: func(req llm.Request) llm.Result {
 		last := lastUserText(req)
@@ -166,8 +168,9 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 }
 
 func TestProposeThenStartSuggestions(t *testing.T) {
-	f := newFixture(t, func(ctx context.Context, spec TurnSpec, p agentboot.Prompter, sink func(RunnerEvent)) (TurnResult, error) {
-		return TurnResult{Text: "ok"}, nil
+	f := newFixture(t, func(turn *enginetest.Turn) error {
+		turn.Say("ok", 1, 1)
+		return nil
 	})
 	ai := &fakeLLM{fn: func(req llm.Request) llm.Result {
 		if hasToolResults(req) {

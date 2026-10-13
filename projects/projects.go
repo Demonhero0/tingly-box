@@ -15,6 +15,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/tingly-dev/tingly-box/swagger"
 	"github.com/tingly-dev/tingly-project/internal/config"
@@ -92,7 +93,11 @@ func (a *App) Start(ctx context.Context) {
 	a.start.Do(func() { a.svc.Start(ctx) })
 }
 
-// Close closes the database.
+// Close stops every thread's turn and Claude Code process, then closes the
+// database.
 func (a *App) Close() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	a.svc.Threads.Shutdown(ctx)
 	return a.store.Close()
 }

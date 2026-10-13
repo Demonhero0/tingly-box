@@ -19,7 +19,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tingly-dev/tingly-box/agentboot"
+	"github.com/tingly-dev/tingly-box/agentboot/engine/enginetest"
 	"github.com/tingly-dev/tingly-project/internal/db"
 	"github.com/tingly-dev/tingly-project/internal/project"
 )
@@ -142,13 +142,13 @@ func types(events []map[string]any) []string {
 	return out
 }
 
-func newServer(t *testing.T, runner project.Runner) (*db.Store, client) {
+func newServer(t *testing.T, agents *project.Agents) (*db.Store, client) {
 	store, err := db.Open(":memory:")
 	require.NoError(t, err)
 	t.Cleanup(func() { store.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	srv := httptest.NewServer(New(ctx, Deps{Store: store, Layout: project.Layout{Root: t.TempDir()}, Runner: runner}))
+	srv := httptest.NewServer(New(ctx, Deps{Store: store, Layout: project.Layout{Root: t.TempDir()}, Agents: agents}))
 	t.Cleanup(srv.Close)
 	return store, client{t: t, base: srv.URL + "/api/v1"}
 }
@@ -207,20 +207,23 @@ func TestSendWithoutConnectionKeepsNothing(t *testing.T) {
 	assert.Zero(t, n, "the user's message is not saved when the turn cannot start")
 }
 
-// commitRunner is a thread runner that commits one file per turn.
-type commitRunner struct{}
-
-func (commitRunner) RunTurn(ctx context.Context, spec project.TurnSpec, _ agentboot.Prompter, sink func(project.RunnerEvent)) (project.TurnResult, error) {
-	sink(project.RunnerEvent{Kind: db.EvAssistant, Content: "Fixing it."})
-	if err := os.WriteFile(filepath.Join(spec.Dir, "fix.txt"), []byte("fixed\n"), 0o644); err != nil {
-		return project.TurnResult{}, err
-	}
-	for _, args := range [][]string{{"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "fix"}} {
-		if out, err := exec.Command("git", append([]string{"-C", spec.Dir}, args...)...).CombinedOutput(); err != nil {
-			return project.TurnResult{}, fmt.Errorf("%v: %s", err, out)
+// commitAgents run each thread turn by committing one file.
+func commitAgents() *project.Agents {
+	a := &enginetest.Agent{Script: func(turn *enginetest.Turn) error {
+		dir := turn.Opts.ProjectPath
+		turn.Say("Fixing it.", 60, 10)
+		if err := os.WriteFile(filepath.Join(dir, "fix.txt"), []byte("fixed\n"), 0o644); err != nil {
+			return err
 		}
-	}
-	return project.TurnResult{Text: "Fixed the login bug; committed fix.txt.", InputTokens: 100, OutputTokens: 20}, nil
+		for _, args := range [][]string{{"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "fix"}} {
+			if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+				return fmt.Errorf("%v: %s", err, out)
+			}
+		}
+		turn.Say("Fixed the login bug; committed fix.txt.", 40, 10)
+		return nil
+	}}
+	return &project.Agents{Service: a.Service()}
 }
 
 func gitRepo(t *testing.T) string {
@@ -247,7 +250,7 @@ func TestProjectEndToEnd(t *testing.T) {
 	}}
 	upstream := httptest.NewServer(http.HandlerFunc(fake.handler))
 	defer upstream.Close()
-	store, c := newServer(t, commitRunner{})
+	store, c := newServer(t, commitAgents())
 	require.Equal(t, 200, c.do("PUT", "/settings", map[string]any{"api_style": "anthropic", "base_url": upstream.URL, "default_model": "fake-model"}, nil))
 
 	repo := gitRepo(t)

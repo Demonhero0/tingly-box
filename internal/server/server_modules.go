@@ -14,19 +14,19 @@ import (
 type Deps struct {
 	Store  *db.Store
 	Layout project.Layout
-	// Runner runs thread turns; nil uses the Claude Code CLI.
-	Runner project.Runner
+	// Agents run thread turns; nil uses the Claude Code CLI.
+	Agents *project.Agents
 }
 
 // ProjectModules builds the Projects modules (projects and their threads)
 // on host. The standalone app and an embedding host (package projects) both
 // mount exactly this set, under the same /projects paths.
 func ProjectModules(d Deps, host project.Host) ([]module.Module, *project.Service) {
-	runner := d.Runner
-	if runner == nil {
-		runner = project.NewClaudeRunner()
+	agents := project.ClaudeAgents()
+	if d.Agents != nil {
+		agents = *d.Agents
 	}
-	svc := project.NewService(d.Store, d.Layout, runner, host)
+	svc := project.NewService(d.Store, d.Layout, agents, host)
 	return []module.Module{
 		projectmod.NewHandler(svc),
 		thread.NewHandler(svc),
