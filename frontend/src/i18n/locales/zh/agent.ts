@@ -1,0 +1,477 @@
+// Agent / scenario pages and per-client config
+export default {
+  "agentStatus": {
+    "connected": "已接入",
+    "lastRequest": "最近请求 {{ago}}",
+    "today_other": "今日 {{count}} 次",
+    "errorRate": "错误率 {{rate}}",
+    "noRequestsYet": "尚未收到请求",
+    "noRequestsFinishSetup": "尚未收到请求 · 先完成下面的接入",
+    "stale_other": "配置已过期 · {{count}} 处差异",
+    "requests": "请求记录",
+    "usage": "用量",
+    "log": "日志",
+    "logTooltip": "打开此 Agent 的日志（AI 请求与系统日志）",
+    "usageTooltip": "打开仪表盘，并按此 Agent 过滤"
+  },
+  "agentAccess": {
+    "title": "接入",
+    "expand": "展开接入信息",
+    "collapse": "收起接入信息"
+  },
+  "agentActivity": {
+    "requests": "请求",
+    "openDashboard": "在仪表盘中查看",
+    "refresh": "刷新",
+    "ok": "成功",
+    "error": "错误",
+    "empty": "这个 Agent 还没有发过请求。收到第一个请求后，最近请求会显示在这里。",
+    "loadFailed": "无法加载该 Agent 的请求。"
+  },
+  "agentSetup": {
+    "profile": {
+      "title": "开始使用这个 Profile",
+      "step1": "连接 AI 服务",
+      "step1Done": "已连接",
+      "connect": "连接 AI",
+      "step2": "用这个 Profile 启动 Claude Code",
+      "step2Hint": "在终端运行下面的命令，即可用该 Profile 的配置启动 Claude Code。",
+      "step2Done": "已收到首个请求",
+      "copy": "复制命令",
+      "inherit": "Profile 默认继承主配置和模型路由；只需在「Profile Overrides」里改你要变的部分。",
+      "close": "知道了"
+    },
+    "hide": "隐藏",
+    "restartTooltip": "重新运行快速开始",
+    "autoSkipped": "已跳过：已经配置了模型",
+    "quickStart": "快速开始",
+    "done": "已完成",
+    "expand": "展开",
+    "collapse": "收起",
+    "resetProgress": "重置进度",
+    "hint": {
+      "connectProvider": "先连接一个 AI 提供商",
+      "selectModel": "选择一个模型以继续",
+      "install": "在本机安装 {{agent}}",
+      "apply": "一键{{action}}即可完成",
+    },
+    "provider": {
+      "label": "连接 AI 提供商",
+      "countOne": "1 个提供商",
+      "count": "{{count}} 个提供商",
+      "connect": "连接 AI",
+      "addMore": "+ 连接",
+      "tooltip": "连接一个 AI 提供商（如 OpenAI、Anthropic、DeepSeek）后即可开始使用 {{agent}}。",
+    },
+    "model": {
+      "label": "选择模型",
+      "configured": "已配置",
+      "skipped": "已跳过",
+      "skip": "跳过",
+      "choose": "选择模型",
+      "change": "更换",
+      "tooltip": "在下方的模型规则中选择 {{agent}} 使用的模型。",
+    },
+    "install": {
+      "label": "安装 {{agent}}",
+      "detected": "最近请求 {{time}}",
+      "installed": "已安装",
+      "confirm": "我已安装",
+      "confirmTooltip": "运行下方的安装命令，装好 {{agent}} 后在此确认。",
+      "description": "在本机安装 {{agent}} —— 复制并运行下面的命令。",
+      "npmOfficial": "npm 官方源",
+      "npmMirror": "npm 镜像源",
+      "copy": "复制",
+      "copied": "已复制！",
+    },
+    "apply": {
+      "label": "自动配置",
+      "applied": "已应用",
+      "button": "自动配置",
+      "success": "配置已应用！",
+      "viewConfig": "配置",
+      "viewConfigAdvanced": "{{label}}（高级）",
+      "skip": "跳过",
+      "tooltip": "一键将代理配置写入 {{agent}} 的设置文件。",
+      "failed": "应用失败",
+    },
+  },
+  "scenarioPage": {
+    "slotMode": "模型模式",
+    "setupGuide": "配置指南",
+    "config": "配置",
+    "autoConfig": "自动配置",
+    "quickStart": "快速开始",
+    "unknownError": "未知错误",
+    "codex": {
+      "configTitle": "Codex 配置",
+      "applyFailed": "应用 Codex 配置失败",
+    },
+    "opencode": {
+      "configTitle": "OpenCode 配置",
+      "applyFailed": "应用 OpenCode 配置失败",
+      "previewFailed": "加载配置预览失败：{{reason}}",
+      "previewFailedGeneric": "加载配置预览失败",
+    },
+    "sharingKeys": "Team 密钥",
+    "modelRules": "模型规则",
+    "embedModelRules": "向量模型规则",
+    "decisionsModelRules": "决策模型规则",
+    "imageGenModelRules": "图像模型规则",
+    "tooltip": {
+      "claude_code": "命令行 AI 开发助手，可用于编码实现、测试与 git 操作",
+      "claude_desktop": "为 Claude Desktop 桌面应用提供 API 代理",
+      "codex": "通过 Tingly Box 代理使用 OpenAI Codex 编码助手",
+      "opencode": "支持自带密钥（BYOK）的 OpenCode AI 开发环境",
+      "xcode": "通过 Tingly Box 代理，在 Xcode 中用于 iOS/macOS 开发的 AI 编码助手",
+      "vscode": "自带密钥：通过 Tingly Box 代理，在 VS Code Copilot 中使用你自己的 API Key",
+      "cursor": "通过 Tingly Box 代理接入 Cursor，默认开启 Cursor 兼容处理。Cursor 是从其云端服务器发起请求的，因此这里的地址必须是公网可访问的 HTTPS 地址，不能是 localhost。",
+      "pi": "通过 Tingly Box 代理使用 pi 编码 Agent",
+      "dsh": "通过 Tingly Box 代理使用 DeepSeek Harness (dsh) 智能体框架",
+      "imagegen": "通过 Tingly Box 代理进行 AI 图像生成与编辑，支持多种模型",
+    },
+    "vscode": {
+      "installDescription": "从 VS Code 或应用市场安装 Tingly Box 扩展。",
+      "installInVSCode": "在 VS Code 中安装",
+      "viewMarketplace": "查看应用市场",
+      "applyStepLabel": "按 VS Code 指引配置",
+      "applyStepDescription": "在 VS Code 中打开 Tingly Box 扩展，按其内置的设置指引操作。",
+      "openGuide": "打开指引",
+      "configTitle": "配置 VS Code",
+      "modalDescription": "安装 Tingly Box 扩展，然后按 VS Code 内的设置指引操作。扩展会自动为你处理所需的端点和 API 密钥配置。",
+    },
+    "pi": {
+      "installDescription": "在本机安装 pi —— 具体安装步骤请参考仓库说明。",
+      "viewRepo": "在 GitHub 上查看",
+      "applyStepLabel": "配置 Pi",
+      "applyStepDescription": "把 pi 的 provider base URL 和 API Key 配置为上方的值 —— 具体配置项名称请参考 pi 的文档。",
+      "openGuide": "查看配置",
+      "configTitle": "配置 Pi",
+      "modalDescription": "把 pi 的 provider base URL 和 API Key 配置为本页面上方显示的值，具体配置项请参考下方仓库中的说明。",
+    },
+    "dsh": {
+      "openWebUi": "打开 Web UI",
+      "installDescription": "在本机运行 `npx @deepseek-ai/dsh web`（需要 Node.js），Web UI 默认地址为 http://127.0.0.1:3080。出于安全考虑 Tingly Box 不会代为启动 dsh，运行后可用下方按钮一键跳转。注意：dsh 处于开发者预览阶段，配置可能变化。",
+      "viewRepo": "在 GitHub 上查看",
+      "applyStepLabel": "配置 DSH",
+      "applyStepDescription": "把 dsh 模型 provider 插件的 base URL 和 API Key 配置为上方的值 —— 具体插件配置请参考 dsh 文档。",
+      "openGuide": "查看配置",
+      "configTitle": "配置 DSH",
+      "modalDescription": "把 dsh 的模型 provider 插件指向本页面上方显示的 base URL 和 API Key，具体插件配置请参考下方仓库中的说明。",
+      "applyFailed": "应用配置失败"
+    },
+  },
+  "scenarioOverview": {
+    "title": "智能应用",
+    "subtitle": "选择要配置的场景，未使用的可以隐藏以保持侧边栏整洁。",
+    "showInSidebar": "在侧边栏显示",
+    "hideFromSidebar": "从侧边栏隐藏",
+    "hidden": "已隐藏",
+    "notConfigured": "未配置",
+    "ruleCountOne": "1 条规则",
+    "ruleCount": "{{count}} 条规则",
+    "editTooltip": "显示或隐藏 Agent",
+    "powerUps": {
+      "title": "增强能力",
+      "subtitle": "可选能力。开启后出现在左侧导航栏，关闭则隐藏。",
+      "experimental": "实验",
+      "experimentalTooltip": "实验性功能",
+      "beta": "Beta",
+      "betaTooltip": "Beta 功能——可用，仍在完善",
+      "remoteDesc": "在 IM 里驱动你的智能应用——连接机器人，用于远程控制和消息通知。"
+    },
+    // Scenario descriptions intentionally omitted — falls back to English. Do not add Chinese translations here.
+    "descriptions": {}
+  },
+  "clientConfigStatus": {
+    "applied": "已应用",
+    "appliedTooltip": "{{path}} 已通过 Tingly Box 路由，使用的就是本页显示的模型。",
+    "outdated_other": "配置已过期（{{count}} 处不同）",
+    "outdatedTooltip": "{{path}} 里还是上次 Auto Config 写入的值：",
+    "notApplied": "未应用",
+    "notAppliedTooltip": "本机的 {{path}} 还没有通过 Tingly Box 路由。",
+    "reapply": "重新应用",
+    "apply": "Auto Config"
+  },
+  "claudeCode": {
+    "configModes": {
+      "unified": {
+        "label": "统一模型",
+        "description": "为所有 Claude Code 请求配置同一个模型"
+      },
+      "separate": {
+        "label": "分离模型",
+        "description": "为 Claude Code 的不同场景（如子代理、摘要、默认等）分别配置模型"
+      }
+    },
+    "modeChange": {
+      "title": "切换配置模式？",
+      "body": "即将从 {{from}} 切换到 {{to}} 模式。",
+      "hint": "切换模式后，需要重新将配置应用到 Claude Code 才能生效。",
+      "cancel": "取消",
+      "confirm": "确认",
+      "success": "配置模式已切换为{{mode}}，请重新应用配置到 Claude Code。",
+      "failed": "保存配置模式失败",
+      "applyFailed": "应用配置失败"
+    },
+    "configPath": "将环境配置添加到 Claude Code 配置文件",
+    "copyConfig": "配置",
+    "oneClickScript": "一键脚本",
+    "jsonConfig": "JSON 配置",
+    "step1": "1. 配置模型",
+    "step2": "2. 跳过入门 - 让 Claude Code 直接可用",
+    "step3": "3. 状态行集成（可选）",
+    "unifiedConfig": "统一配置",
+    "separateConfig": "分离配置",
+    "switchToSeparate": "切换到分离",
+    "switchToUnified": "切换到统一",
+    "quickApply": "自动配置",
+    "quickApplyWithStatusLine": "自动配置和状态行",
+    "statusLine": {
+      "description": "安装状态行集成以在您的终端中显示实时请求信息。",
+      "jsonDescription": "配置状态行集成以在您的终端提示符中显示实时请求信息。",
+      "addToSettingsJson": "将 statusLine 部分添加到 ~/.claude/settings.json（与 env 部分一起）：",
+      "manualSetup": "或手动下载并安装状态行脚本：",
+      "downloadLink": "下载状态行脚本"
+    },
+    "modal": {
+      "title": "Claude Code 配置指南",
+      "subtitle": "按照以下步骤配置 Claude Code 以使用 Tingly Box 作为您的 AI 代理",
+      "dontRemindAgain": "不再提醒"
+    },
+    "profile": {
+      "renameProfile": "重命名方案",
+      "deleteProfile": "删除方案",
+      "quickStart": "启动",
+      "commandGlobal": "全局",
+      "settingsFile": "设置",
+      "settingsFileWarning": "这是生成的运行配置；手动修改会被配置方案覆盖和模型规则重新生成。",
+      "resolvingSettingsFile": "正在计算生成文件位置…",
+      "settingsGenerated": "已生成",
+      "settingsNotGenerated": "尚未生成",
+      "copySettingsFile": "复制设置文件路径",
+      "switchToGlobal": "切换到全局命令",
+      "switchToNpm": "切换到 npm 命令",
+      "copyCommand": "复制命令",
+      "clickToCopy": "点击复制命令",
+      "renameTitle": "重命名方案",
+      "profileName": "方案名称",
+      "save": "保存",
+      "deleteTitle": "删除方案",
+      "deleteConfirm": "确定要删除方案 {{name}} 吗？",
+      "deleteWarning": "这将删除该方案及其所有关联的规则和标志。此操作无法撤销。",
+      "profileRenamed": "方案已重命名",
+      "profileDeleted": "方案已删除",
+      "renameFailed": "重命名方案失败",
+      "deleteFailed": "删除方案失败",
+      "mode": "模式",
+      "unified": "统一",
+      "separate": "分离"
+    },
+    "defaultModeLabel": "默认权限模式"
+  },
+  "codexConfig": {
+    "title": "配置 Codex",
+    "subtitle": "通过 `~/.codex/config.toml` 和 `~/.codex/auth.json` 配置 Codex 使用 Tingly Box",
+    "resetTooltip": "将模型与推理设置重置为默认值",
+    "tabQuick": "快速配置",
+    "tabManual": "手动配置",
+    "applySuccess": "Codex 配置已应用到 ~/.codex",
+    "applyFailed": "应用配置失败",
+    "selectOAuthProvider": "请选择要导出的 Codex OAuth 账号。",
+    "authMode": {
+      "title": "认证方式",
+      "apikey": {
+        "label": "Tingly Box 网关",
+        "captionPrefix": "codex 通过 Tingly Box 路由。网关密钥写入"
+      },
+      "hybrid": {
+        "label": "Tingly Box 网关 + 保留官方 ChatGPT 登录",
+        "caption": "通过 Tingly Box 路由，但网关密钥移入 config.toml，使 auth.json 中的 ChatGPT 登录保持不变——Codex App 仍能识别你的账号（远程控制、插件、账号展示）。"
+      },
+      "chatgpt": {
+        "label": "直连 OpenAI",
+        "caption": "codex 使用你的官方 ChatGPT 登录直接与 OpenAI 通信，不经过网关。"
+      }
+    },
+    "oauthAccount": {
+      "title": "ChatGPT 账号",
+      "tooltipHybrid": "网关令牌会写入 config.toml 的 provider 区块（experimental_bearer_token）。选择一个已保存的 Codex 登录以（重新）写入 auth.json，或保持「保留现有」以不修改该文件。",
+      "tooltipChatgpt": "将 OAuth 令牌导出到 ~/.codex/auth.json，并从 config.toml 中移除 tingly 网关密钥，使 codex CLI 直接与 OpenAI 通信。此后 Tingly Box 将不再管理令牌刷新——由 codex CLI 自行负责令牌生命周期。如果导出的文件中缺少 id_token，请通过 OAuth 页面重新认证后再次应用。",
+      "noProvider": "暂无 Codex OAuth 账号——请先登录",
+      "selectProvider": "选择一个 Codex OAuth 账号",
+      "keepExisting": "保留现有 auth.json（不修改）"
+    }
+  },
+  "openCodeConfig": {
+    "title": "配置 OpenCode",
+    "subtitle": "将 OpenCode 设置为通过 Tingly Box 作为 AI 模型代理",
+    "configLocation": "配置位置：",
+    "configurationTitle": "配置"
+  },
+  "dshConfig": {
+    "title": "配置 DeepSeek Harness",
+    "subtitle": "通过 `$DSH_HOME/settings.yaml` 和 `$DSH_HOME/.credentials.yaml` 配置 dsh 使用 Tingly Box",
+    "resetTooltip": "将模型能力设置重置为默认值",
+    "tabQuick": "快速配置",
+    "tabManual": "手动配置",
+    "applySuccess": "DeepSeek Harness 配置已应用到 $DSH_HOME",
+    "applyFailed": "应用配置失败",
+    "modelsPreviewNote": "写入 settings.yaml 的模型 id：{{models}}"
+  },
+  "prompt": {
+    "menu": "提示词",
+    "user": {
+      "title": "用户录制",
+      "subtitle": "浏览和管理您的 IDE 录制",
+      "filters": "筛选",
+      "searchPlaceholder": "搜索录制...",
+      "userFilter": "用户",
+      "allUsers": "所有用户",
+      "projectFilter": "项目",
+      "allProjects": "所有项目",
+      "typeFilter": "类型",
+      "allTypes": "所有类型",
+      "recordingsFound": "找到 {{count}} 条录制",
+      "recordingsFor": "{{date}} 的录制",
+      "noRecordings": "此日期没有找到录制",
+      "actions": {
+        "play": "播放",
+        "viewDetails": "查看详情",
+        "delete": "删除"
+      },
+      "types": {
+        "code-review": "代码审查",
+        "debug": "调试",
+        "refactor": "重构",
+        "test": "测试",
+        "custom": "自定义"
+      }
+    },
+    "skill": {
+      "title": "技能",
+      "subtitle": "从您的 IDE 目录管理技能",
+      "addPath": "添加路径",
+      "autoDiscover": "自动发现",
+      "refreshAll": "全部刷新",
+      "adapterConfig": "适配器配置",
+      "locations": "位置",
+      "selectLocation": "选择位置以查看技能",
+      "noLocations": "未添加技能位置",
+      "noSkills": "此位置没有找到技能",
+      "skillsCount": "{{count}} 个技能",
+      "searchPlaceholder": "搜索技能...",
+      "ideFilter": "IDE 来源",
+      "allIdes": "所有 IDE",
+      "openAll": "全部打开",
+      "openFolder": "打开文件夹",
+      "actions": {
+        "refresh": "刷新",
+        "remove": "移除",
+        "open": "打开"
+      },
+      "ides": {
+        "claude-code": "Claude Code",
+        "opencode": "OpenCode",
+        "vscode": "VS Code",
+        "cursor": "Cursor",
+        "codex": "Codex",
+        "antigravity": "Antigravity",
+        "amp": "Amp",
+        "kilo-code": "Kilo Code",
+        "roo-code": "Roo Code",
+        "goose": "Goose",
+        "gemini-cli": "Gemini CLI",
+        "github-copilot": "GitHub Copilot",
+        "clawdbot": "Clawdbot",
+        "droid": "Droid",
+        "windsurf": "Windsurf",
+        "custom": "自定义"
+      },
+      "dialog": {
+        "title": "添加技能路径",
+        "nameLabel": "显示名称",
+        "namePlaceholder": "例如：我的 Claude Code 技能",
+        "pathLabel": "路径",
+        "pathPlaceholder": "/path/to/skills",
+        "ideSourceLabel": "IDE 来源",
+        "cancel": "取消",
+        "add": "添加"
+      },
+      "discoveryDialog": {
+        "title": "发现 IDE 技能",
+        "description": "扫描您的主目录以查找支持的 IDE 并导入其技能。",
+        "scanning": "正在扫描已安装的 IDE...",
+        "foundIdes": "找到 {{count}} 个 IDE",
+        "foundWithSkills": "找到 {{ides}} 个 IDE，共 {{skills}} 个技能",
+        "noIdesFound": "未找到支持的 IDE。手动添加技能路径。",
+        "selectToImport": "选择要导入技能的 IDE",
+        "selectAll": "全选",
+        "deselectAll": "取消全选",
+        "importSelected": "导入选中的（{{count}}）",
+        "importButton": "导入选中的"
+      },
+      "detailDialog": {
+        "title": "技能详情",
+        "path": "路径",
+        "fileType": "文件类型",
+        "size": "大小",
+        "modified": "最后修改时间",
+        "contentHash": "内容哈希",
+        "description": "描述",
+        "preview": "预览",
+        "openInEditor": "在编辑器中打开",
+        "unknownSize": "未知",
+        "unknownDate": "未知",
+        "loadError": "加载技能内容失败"
+      }
+    },
+    "command": {
+      "title": "命令",
+      "comingSoon": "命令管理功能即将推出..."
+    }
+  },
+  "mcp": {
+    "pageTitle": "MCP 工具",
+    "info": "配置 MCP（模型上下文协议）工具以启用网页搜索和网页获取功能。MCP 服务器作为本地 stdio 子进程运行或连接到远程 HTTP 端点。",
+    "connection": {
+      "title": "连接设置",
+      "endpoint": "MCP 服务器端点",
+      "endpointPlaceholder": "http://localhost:3000",
+      "endpointHelp": "MCP 服务器的 HTTP 端点（例如 npx @modelcontextprotocol/server-filesystem）",
+      "command": "命令",
+      "commandPlaceholder": "python3",
+      "scriptPath": "脚本路径",
+      "scriptPathPlaceholder": "builtin",
+      "scriptPathHelp": "MCP 服务器脚本的路径（或 Go 工具的 'builtin'）",
+      "workingDir": "工作目录",
+      "timeout": "请求超时（秒）",
+      "timeoutHelp": "MCP 工具调用的超时时间",
+      "transportHttp": "使用 HTTP 传输（取消选中以使用 stdio）",
+      "transportStdio": "使用 Stdio 传输"
+    },
+    "tools": {
+      "title": "工具配置",
+      "description": "选择要启用的 MCP 工具：",
+      "webSearch": "网页搜索",
+      "webSearchDesc": "使用 Serper API 搜索网页。需要 SERPER_API_KEY 环境变量。",
+      "webFetch": "网页获取",
+      "webFetchDesc": "通过 Jina Reader 获取 URL 并转换为 markdown。可选 JINA_API_KEY。"
+    },
+    "proxy": {
+      "title": "代理设置",
+      "useGlobal": "使用全局代理配置",
+      "useGlobalHelp": "启用后，MCP 服务器将从系统继承 HTTP_PROXY、HTTPS_PROXY 和 NO_PROXY 环境变量。"
+    },
+    "actions": {
+      "save": "保存配置",
+      "reset": "重置为默认值",
+      "reload": "重新加载",
+      "docs": "MCP 协议文档",
+      "saving": "保存中...",
+      "savedSuccess": "MCP 配置保存成功",
+      "savedError": "保存 MCP 配置失败"
+    },
+    "currentConfig": "当前配置"
+  }
+};

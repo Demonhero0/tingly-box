@@ -1,0 +1,506 @@
+// Agent / scenario pages and per-client config
+export default {
+  "agentStatus": {
+    "connected": "Подключено",
+    "lastRequest": "Последний запрос: {{ago}}",
+    "today_one": "{{count}} запрос сегодня",
+    "today_few": "{{count}} запроса сегодня",
+    "today_many": "{{count}} запросов сегодня",
+    "today_other": "{{count}} запросов сегодня",
+    "errorRate": "Доля ошибок {{rate}}",
+    "noRequestsYet": "Запросов пока нет",
+    "noRequestsFinishSetup": "Запросов пока нет · завершите подключение ниже",
+    "stale_one": "Конфигурация устарела · {{count}} отличие",
+    "stale_few": "Конфигурация устарела · {{count}} отличия",
+    "stale_many": "Конфигурация устарела · {{count}} отличий",
+    "stale_other": "Конфигурация устарела · {{count}} отличия",
+    "requests": "Запросы",
+    "usage": "Использование",
+    "log": "Журнал",
+    "logTooltip": "Открыть журналы этого агента (запросы к ИИ и системный журнал)",
+    "usageTooltip": "Открыть панель, отфильтрованную по этому агенту"
+  },
+  "agentAccess": {
+    "title": "Подключение",
+    "expand": "Показать параметры подключения",
+    "collapse": "Скрыть параметры подключения"
+  },
+  "agentActivity": {
+    "requests": "Запросы",
+    "openDashboard": "Открыть в панели",
+    "refresh": "Обновить",
+    "ok": "OK",
+    "error": "Ошибка",
+    "empty": "Этот агент ещё не отправлял запросов. После первого запроса здесь появятся последние запросы.",
+    "loadFailed": "Не удалось загрузить запросы этого агента."
+  },
+  "agentSetup": {
+    "profile": {
+      "title": "Начало работы с этим профилем",
+      "step1": "Подключите AI-провайдера",
+      "step1Done": "Подключено",
+      "connect": "Подключить AI",
+      "step2": "Запустите Claude Code с этим профилем",
+      "step2Hint": "Выполните команду в терминале — Claude Code запустится с настройками профиля.",
+      "step2Done": "Первый запрос получен",
+      "copy": "Копировать команду",
+      "inherit": "Профиль наследует основную конфигурацию и маршрутизацию; меняйте только нужное в Profile Overrides.",
+      "close": "Готово"
+    },
+    "hide": "Скрыть",
+    "restartTooltip": "Запустить быстрый старт заново",
+    "autoSkipped": "Пропущено: модель уже задана",
+    "quickStart": "Быстрый старт",
+    "done": "Готово",
+    "expand": "Развернуть",
+    "collapse": "Свернуть",
+    "resetProgress": "Сбросить прогресс",
+    "hint": {
+      "connectProvider": "Подключите провайдера ИИ, чтобы начать",
+      "selectModel": "Выберите модель, чтобы продолжить",
+      "install": "Установите {{agent}} на свой компьютер",
+      "apply": "Завершите настройку одним нажатием: {{action}}"
+    },
+    "provider": {
+      "label": "Подключить провайдера ИИ",
+      "countOne": "1 провайдер",
+      "count": "Провайдеров: {{count}}",
+      "connect": "Подключить ИИ",
+      "addMore": "+ Подключить",
+      "tooltip": "Подключите провайдера ИИ (например, OpenAI, Anthropic, DeepSeek), чтобы начать работу с {{agent}}."
+    },
+    "model": {
+      "label": "Выберите модель",
+      "configured": "Настроено",
+      "skipped": "Пропущено",
+      "skip": "Пропустить",
+      "choose": "Выбрать модель",
+      "change": "Изменить",
+      "tooltip": "Выберите ниже, в разделе «Правила моделей», какую модель будет использовать {{agent}}."
+    },
+    "install": {
+      "label": "Установить {{agent}}",
+      "detected": "Последний запрос {{time}}",
+      "installed": "Установлено",
+      "confirm": "Я установил",
+      "confirmTooltip": "Выполните команду ниже, а затем подтвердите здесь, что {{agent}} установлен.",
+      "description": "Установите {{agent}} на свой компьютер — скопируйте и выполните команду ниже.",
+      "npmOfficial": "официальный npm",
+      "npmMirror": "зеркало npm",
+      "copy": "Копировать",
+      "copied": "Скопировано!"
+    },
+    "apply": {
+      "label": "Автонастройка",
+      "applied": "Применено",
+      "button": "Автонастройка",
+      "success": "Конфигурация применена!",
+      "viewConfig": "Конфиг",
+      "viewConfigAdvanced": "{{label}} (дополнительно)",
+      "skip": "Пропустить",
+      "tooltip": "Записать настройки прокси в файл конфигурации {{agent}} одним нажатием.",
+      "failed": "Не удалось применить"
+    }
+  },
+  "scenarioPage": {
+    "slotMode": "Режим моделей",
+    "setupGuide": "Инструкция",
+    "config": "Конфиг",
+    "autoConfig": "Автонастройка",
+    "quickStart": "Быстрый старт",
+    "unknownError": "Неизвестная ошибка",
+    "codex": {
+      "configTitle": "Конфигурация Codex",
+      "applyFailed": "Не удалось применить конфигурацию Codex"
+    },
+    "opencode": {
+      "configTitle": "Конфигурация OpenCode",
+      "applyFailed": "Не удалось применить конфигурацию OpenCode",
+      "previewFailed": "Не удалось загрузить предпросмотр конфигурации: {{reason}}",
+      "previewFailedGeneric": "Не удалось загрузить предпросмотр конфигурации"
+    },
+    "sharingKeys": "Ключи команд",
+    "modelRules": "Правила моделей",
+    "embedModelRules": "Правила моделей эмбеддингов",
+    "decisionsModelRules": "Правила моделей решений",
+    "imageGenModelRules": "Правила моделей изображений",
+    "tooltip": {
+      "claude_code": "CLI-агент разработки на базе ИИ: реализация, тесты и операции с Git",
+      "claude_desktop": "Направьте стороннюю инференцию Claude Desktop через ваших провайдеров",
+      "codex": "Ассистент программирования OpenAI Codex через прокси Tingly Box",
+      "opencode": "Среда разработки OpenCode с поддержкой собственных ключей",
+      "xcode": "Ассистент программирования в Xcode через прокси Tingly Box для разработки под iOS/macOS",
+      "vscode": "Свои ключи: используйте собственные API-ключи в VS Code Copilot через прокси Tingly Box",
+      "cursor": "Редактор кода Cursor через прокси Tingly Box с включённой по умолчанию совместимостью с Cursor. Cursor обращается к этому адресу со своих облачных серверов, поэтому он должен быть публично доступен по HTTPS, а не localhost.",
+      "pi": "Агент программирования Pi через прокси Tingly Box",
+      "dsh": "Агентная оболочка DeepSeek Harness (dsh) через прокси Tingly Box",
+      "imagegen": "Генерация и редактирование изображений через прокси Tingly Box с поддержкой нескольких моделей"
+    },
+    "vscode": {
+      "installDescription": "Установите расширение Tingly Box из VS Code или Marketplace.",
+      "installInVSCode": "Установить в VS Code",
+      "viewMarketplace": "Открыть Marketplace",
+      "applyStepLabel": "Следуйте руководству VS Code",
+      "applyStepDescription": "Откройте расширение Tingly Box в VS Code и следуйте встроенному руководству по настройке.",
+      "openGuide": "Открыть руководство",
+      "configTitle": "Настройка VS Code",
+      "modalDescription": "Установите расширение Tingly Box, затем следуйте руководству по настройке внутри VS Code. Расширение само пропишет нужный эндпоинт и API-ключ.",
+    },
+    "pi": {
+      "installDescription": "Установите pi на свой компьютер — инструкции по настройке смотрите в репозитории.",
+      "viewRepo": "Открыть на GitHub",
+      "applyStepLabel": "Настроить Pi",
+      "applyStepDescription": "Укажите в pi base URL провайдера и API-ключ из значений выше — точные названия параметров смотрите в документации pi.",
+      "openGuide": "Посмотреть конфиг",
+      "configTitle": "Настройка Pi",
+      "modalDescription": "Укажите в pi base URL провайдера и API-ключ, показанные на этой странице, а точные параметры конфигурации смотрите в репозитории ниже."
+    },
+    "dsh": {
+      "openWebUi": "Открыть веб-интерфейс",
+      "installDescription": "Запустите DeepSeek Harness локально командой `npx @deepseek-ai/dsh web` (нужен Node.js) — веб-интерфейс поднимется на http://127.0.0.1:3080. Tingly Box не запускает dsh за вас; кнопка ниже открывает уже работающий интерфейс. Обратите внимание: dsh находится в стадии предварительной версии, и его конфигурация может измениться.",
+      "viewRepo": "Открыть на GitHub",
+      "applyStepLabel": "Настроить DSH",
+      "applyStepDescription": "Укажите в плагине провайдера моделей dsh base URL и API-ключ из значений выше — точные параметры плагина смотрите в документации dsh.",
+      "openGuide": "Посмотреть конфиг",
+      "configTitle": "Настройка DSH",
+      "modalDescription": "Укажите в плагине провайдера моделей dsh base URL и API-ключ, показанные на этой странице, а параметры плагина смотрите в репозитории ниже.",
+      "applyFailed": "Не удалось применить конфигурацию"
+    }
+  },
+  "scenarioOverview": {
+    "title": "Агент",
+    "subtitle": "Выберите сценарий для настройки. Скройте те, которыми не пользуетесь, чтобы боковая панель осталась опрятной.",
+    "showInSidebar": "Показывать в боковой панели",
+    "hideFromSidebar": "Скрыть из боковой панели",
+    "hidden": "Скрыт",
+    "notConfigured": "Не настроен",
+    "ruleCountOne": "1 правило",
+    "ruleCount": "Правил: {{count}}",
+    "editTooltip": "Показать или скрыть агентов",
+    "powerUps": {
+      "title": "Усиления",
+      "subtitle": "Дополнительные возможности. Включите — и они появятся на панели навигации слева, выключите — скроются.",
+      "experimental": "Эксп.",
+      "experimentalTooltip": "Экспериментальная функция",
+      "beta": "Бета",
+      "betaTooltip": "Бета — работает, но ещё развивается",
+      "remoteDesc": "Управляйте агентами из мессенджеров — подключите ботов для удалённого управления и уведомлений."
+    },
+    // Полные названия продуктов для карточек обзора, где короткая подпись в навигации неоднозначна.
+    "titles": {
+      "dsh": "DeepSeek Harness",
+    },
+    "descriptions": {
+      "claude_code": "Направьте Claude Code через свои профили и модели под конкретные задачи.",
+      "claude_desktop": "Используйте своих провайдеров как шлюз сторонней инференции для Claude Desktop.",
+      "codex": "Настройте Codex CLI на работу с вашими ключами провайдеров.",
+      "opencode": "Открытый агент программирования, работающий на вашем провайдере.",
+      "xcode": "Подключите свою модель к интеллектуальным подсказкам Xcode.",
+      "vscode": "Работа VS Code Copilot Chat через Tingly Box.",
+      "cursor": "Подключите свою модель к Cursor со встроенной совместимостью.",
+      "pi": "Направьте агент программирования pi через вашего провайдера.",
+      "dsh": "Направьте агент программирования dsh через вашего провайдера.",
+      "openai": "Готовый эндпоинт, совместимый с OpenAI SDK.",
+      "anthropic": "Готовый эндпоинт, совместимый с Anthropic SDK.",
+      "embed": "Направьте запросы эмбеддингов вашему провайдеру.",
+      "decisions": "Направьте запросы решений вашему провайдеру.",
+      "imagegen": "Генерация и редактирование изображений через Tingly Box.",
+      "custom": "Своё название модели в запросе — универсальный сценарий на все случаи. По умолчанию скрыт.",
+      "team": "Общее централизованное развёртывание моделей для всей команды."
+    }
+  },
+  "clientConfigStatus": {
+    "applied": "Применено",
+    "appliedTooltip": "{{path}} направляет запросы через Tingly Box с моделями, показанными на этой странице.",
+    "outdated_one": "Конфигурация устарела ({{count}} отличие)",
+    "outdated_few": "Конфигурация устарела ({{count}} отличия)",
+    "outdated_many": "Конфигурация устарела ({{count}} отличий)",
+    "outdated_other": "Конфигурация устарела ({{count}} отличия)",
+    "outdatedTooltip": "В {{path}} остались значения из последнего Auto Config:",
+    "notApplied": "Не применено",
+    "notAppliedTooltip": "{{path}} на этом компьютере пока не направляет запросы через Tingly Box.",
+    "reapply": "Применить снова",
+    "apply": "Auto Config"
+  },
+  "claudeCode": {
+    "configModes": {
+      "unified": {
+        "label": "Единая модель",
+        "description": "Одна модель для всех запросов Claude Code"
+      },
+      "separate": {
+        "label": "Раздельные модели",
+        "description": "Разные модели под задачи Claude Code: субагент, сводка, основная и другие"
+      }
+    },
+    "modeChange": {
+      "title": "Сменить режим конфигурации?",
+      "body": "Вы переключаетесь с режима «{{from}}» на «{{to}}».",
+      "hint": "После смены режима нужно заново применить конфигурацию к Claude Code, чтобы изменения вступили в силу.",
+      "cancel": "Отмена",
+      "confirm": "Подтвердить",
+      "success": "Режим конфигурации изменён на «{{mode}}». Примените конфигурацию к Claude Code заново.",
+      "failed": "Не удалось сохранить режим конфигурации",
+      "applyFailed": "Не удалось применить конфигурацию"
+    },
+    "configPath": "Добавьте переменные окружения в файл конфигурации Claude Code",
+    "copyConfig": "Конфиг",
+    "oneClickScript": "Скрипт в один клик",
+    "jsonConfig": "Конфиг JSON",
+    "step1": "1. Настройте модель",
+    "step2": "2. Пропустите онбординг — чтобы Claude Code работал сразу",
+    "step3": "3. Строка состояния (необязательно)",
+    "unifiedConfig": "Единая конфигурация",
+    "separateConfig": "Раздельная конфигурация",
+    "switchToSeparate": "Переключить на раздельный",
+    "switchToUnified": "Переключить на единый",
+    "quickApply": "Автонастройка",
+    "quickApplyWithStatusLine": "Автонастройка и строка состояния",
+    "statusLine": {
+      "description": "Установите интеграцию строки состояния, чтобы видеть информацию о запросах в терминале в реальном времени.",
+      "jsonDescription": "Настройте интеграцию строки состояния, чтобы показывать информацию о запросах в приглашении терминала в реальном времени.",
+      "addToSettingsJson": "Добавьте секцию statusLine в ~/.claude/settings.json (рядом с секцией env):",
+      "manualSetup": "Либо скачайте и установите скрипт строки состояния вручную:",
+      "downloadLink": "Скачать скрипт строки состояния"
+    },
+    "modal": {
+      "title": "Руководство по настройке Claude Code",
+      "subtitle": "Выполните эти шаги, чтобы Claude Code работал через прокси Tingly Box",
+      "dontRemindAgain": "Больше не напоминать"
+    },
+    "profile": {
+      "renameProfile": "Переименовать профиль",
+      "deleteProfile": "Удалить профиль",
+      "quickStart": "Запуск",
+      "commandGlobal": "Глобально",
+      "settingsFile": "Настройки",
+      "settingsFileWarning": "Сгенерированные рабочие настройки. Ручные правки перезаписываются переопределениями профиля и правилами моделей.",
+      "resolvingSettingsFile": "Определяем путь к сгенерированным настройкам…",
+      "settingsGenerated": "Сгенерированы",
+      "settingsNotGenerated": "Ещё не сгенерированы",
+      "copySettingsFile": "Копировать путь к файлу настроек",
+      "switchToGlobal": "Переключить на глобальную команду",
+      "switchToNpm": "Переключить на команду npm",
+      "copyCommand": "Копировать команду",
+      "clickToCopy": "Нажмите, чтобы скопировать команду",
+      "renameTitle": "Переименовать профиль",
+      "profileName": "Название профиля",
+      "save": "Сохранить",
+      "deleteTitle": "Удалить профиль",
+      "deleteConfirm": "Удалить профиль {{name}}?",
+      "deleteWarning": "Профиль будет удалён вместе со всеми связанными правилами и флагами. Действие нельзя отменить.",
+      "profileRenamed": "Профиль переименован",
+      "profileDeleted": "Профиль удалён",
+      "renameFailed": "Не удалось переименовать профиль",
+      "deleteFailed": "Не удалось удалить профиль",
+      "mode": "Режим",
+      "unified": "Единый",
+      "separate": "Раздельный"
+    },
+    "defaultModeLabel": "Режим по умолчанию"
+  },
+  "codexConfig": {
+    "title": "Настройка Codex",
+    "subtitle": "Настройте Codex на работу через Tingly Box с помощью `~/.codex/config.toml` и `~/.codex/auth.json`",
+    "resetTooltip": "Сбросить модель и рассуждения к значениям по умолчанию",
+    "tabQuick": "Быстрая настройка",
+    "tabManual": "Вручную",
+    "applySuccess": "Конфигурация Codex записана в ~/.codex",
+    "applyFailed": "Не удалось применить конфигурацию",
+    "selectOAuthProvider": "Выберите OAuth-провайдера Codex для экспорта.",
+    "authMode": {
+      "title": "Аутентификация",
+      "apikey": {
+        "label": "Шлюз Tingly Box",
+        "captionPrefix": "codex работает через Tingly Box. Ключ шлюза записывается в"
+      },
+      "hybrid": {
+        "label": "Шлюз Tingly Box + сохранить официальный вход ChatGPT",
+        "caption": "Запросы идут через Tingly Box, но ключ шлюза переносится в config.toml, поэтому вход в ChatGPT в auth.json остаётся нетронутым — приложение Codex по-прежнему видит вашу учётную запись (удалённое управление, плагины, отображение аккаунта)."
+      },
+      "chatgpt": {
+        "label": "Напрямую в OpenAI",
+        "caption": "codex обращается к OpenAI напрямую, используя ваш официальный вход ChatGPT. Без шлюза."
+      }
+    },
+    "oauthAccount": {
+      "title": "Учётная запись ChatGPT",
+      "tooltipHybrid": "Токен шлюза записывается в блок провайдера в config.toml (experimental_bearer_token). Выберите сохранённый вход Codex, чтобы (пере)записать его в auth.json, или оставьте «Оставить как есть», чтобы не трогать файл.",
+      "tooltipChatgpt": "Экспортирует OAuth-токены в ~/.codex/auth.json и удаляет ключи шлюза tingly из config.toml, чтобы codex CLI обращался к OpenAI напрямую. После этого Tingly Box не будет обновлять токены — за их жизненный цикл отвечает codex CLI. Если в экспортированном файле нет id_token, авторизуйтесь заново на странице OAuth и примените настройки ещё раз.",
+      "noProvider": "Нет OAuth-провайдера Codex — сначала войдите",
+      "selectProvider": "Выберите OAuth-провайдера Codex",
+      "keepExisting": "Оставить текущий auth.json (не изменять)"
+    }
+  },
+  "openCodeConfig": {
+    "title": "Настройка OpenCode",
+    "subtitle": "Настройте OpenCode на использование Tingly Box как прокси для моделей ИИ",
+    "configLocation": "Расположение конфига:",
+    "configurationTitle": "Конфигурация"
+  },
+  "dshConfig": {
+    "title": "Настройка DeepSeek Harness",
+    "subtitle": "Настройте dsh на работу через Tingly Box с помощью `$DSH_HOME/settings.yaml` и `$DSH_HOME/.credentials.yaml`",
+    "resetTooltip": "Сбросить возможности моделей к значениям по умолчанию",
+    "tabQuick": "Быстрая настройка",
+    "tabManual": "Вручную",
+    "applySuccess": "Конфигурация DeepSeek Harness записана в $DSH_HOME",
+    "applyFailed": "Не удалось применить конфигурацию",
+    "modelsPreviewNote": "Идентификаторы моделей, записанные в settings.yaml: {{models}}"
+  },
+  "prompt": {
+    "menu": "Промпт",
+    "user": {
+      "title": "Записи пользователя",
+      "subtitle": "Просмотр и управление записями из вашей IDE",
+      "filters": "Фильтры",
+      "searchPlaceholder": "Поиск по записям...",
+      "userFilter": "Пользователь",
+      "allUsers": "Все пользователи",
+      "projectFilter": "Проект",
+      "allProjects": "Все проекты",
+      "typeFilter": "Тип",
+      "allTypes": "Все типы",
+      "recordingsFound": "Найдено записей: {{count}}",
+      "recordingsFor": "Записи за {{date}}",
+      "noRecordings": "За эту дату записей нет",
+      "actions": {
+        "play": "Воспроизвести",
+        "viewDetails": "Подробнее",
+        "delete": "Удалить"
+      },
+      "types": {
+        "code-review": "Ревью кода",
+        "debug": "Отладка",
+        "refactor": "Рефакторинг",
+        "test": "Тесты",
+        "custom": "Другое"
+      }
+    },
+    "skill": {
+      "title": "Навыки",
+      "subtitle": "Управление навыками из каталогов вашей IDE",
+      "addPath": "Добавить путь",
+      "autoDiscover": "Найти автоматически",
+      "refreshAll": "Обновить все",
+      "adapterConfig": "Настройка адаптера",
+      "locations": "Расположения",
+      "selectLocation": "Выберите расположение, чтобы увидеть навыки",
+      "noLocations": "Расположения навыков не добавлены",
+      "noSkills": "В этом расположении навыков нет",
+      "skillsCount": "Навыков: {{count}}",
+      "searchPlaceholder": "Поиск навыков...",
+      "ideFilter": "Источник (IDE)",
+      "allIdes": "Все IDE",
+      "openAll": "Открыть все",
+      "openFolder": "Открыть папку",
+      "actions": {
+        "refresh": "Обновить",
+        "remove": "Убрать",
+        "open": "Открыть"
+      },
+      "ides": {
+        "claude-code": "Claude Code",
+        "opencode": "OpenCode",
+        "vscode": "VS Code",
+        "cursor": "Cursor",
+        "codex": "Codex",
+        "antigravity": "Antigravity",
+        "amp": "Amp",
+        "kilo-code": "Kilo Code",
+        "roo-code": "Roo Code",
+        "goose": "Goose",
+        "gemini-cli": "Gemini CLI",
+        "github-copilot": "GitHub Copilot",
+        "clawdbot": "Clawdbot",
+        "droid": "Droid",
+        "windsurf": "Windsurf",
+        "custom": "Свой"
+      },
+      "dialog": {
+        "title": "Добавить путь к навыкам",
+        "nameLabel": "Отображаемое имя",
+        "namePlaceholder": "например, Мои навыки Claude Code",
+        "pathLabel": "Путь",
+        "pathPlaceholder": "/path/to/skills",
+        "ideSourceLabel": "Источник (IDE)",
+        "cancel": "Отмена",
+        "add": "Добавить"
+      },
+      "discoveryDialog": {
+        "title": "Поиск навыков в IDE",
+        "description": "Просканировать домашний каталог на наличие поддерживаемых IDE и импортировать их навыки.",
+        "scanning": "Ищем установленные IDE...",
+        "foundIdes": "Найдено IDE: {{count}}",
+        "foundWithSkills": "Найдено IDE: {{ides}}, навыков: {{skills}}",
+        "noIdesFound": "Поддерживаемые IDE не найдены. Добавьте пути к навыкам вручную.",
+        "selectToImport": "Выберите IDE, из которых импортировать навыки",
+        "selectAll": "Выбрать все",
+        "deselectAll": "Снять выбор",
+        "importSelected": "Импортировать выбранные ({{count}})",
+        "importButton": "Импортировать выбранные"
+      },
+      "detailDialog": {
+        "title": "Сведения о навыке",
+        "path": "Путь",
+        "fileType": "Тип файла",
+        "size": "Размер",
+        "modified": "Изменён",
+        "contentHash": "Хеш содержимого",
+        "description": "Описание",
+        "preview": "Предпросмотр",
+        "openInEditor": "Открыть в редакторе",
+        "unknownSize": "Неизвестно",
+        "unknownDate": "Неизвестно",
+        "loadError": "Не удалось загрузить содержимое навыка"
+      }
+    },
+    "command": {
+      "title": "Команды",
+      "comingSoon": "Управление командами появится в ближайшее время..."
+    }
+  },
+  "mcp": {
+    "pageTitle": "Инструменты MCP",
+    "info": "Настройте инструменты MCP (Model Context Protocol), чтобы включить веб-поиск и загрузку веб-страниц. Сервер MCP запускается как локальный stdio-подпроцесс или подключается к удалённому HTTP-эндпоинту.",
+    "connection": {
+      "title": "Настройки подключения",
+      "endpoint": "Эндпоинт сервера MCP",
+      "endpointPlaceholder": "http://localhost:3000",
+      "endpointHelp": "HTTP-эндпоинт сервера MCP (например, npx @modelcontextprotocol/server-filesystem)",
+      "command": "Команда",
+      "commandPlaceholder": "python3",
+      "scriptPath": "Путь к скрипту",
+      "scriptPathPlaceholder": "builtin",
+      "scriptPathHelp": "Путь к скрипту сервера MCP (или «builtin» для встроенных инструментов на Go)",
+      "workingDir": "Рабочий каталог",
+      "timeout": "Таймаут запроса (секунды)",
+      "timeoutHelp": "Таймаут вызовов инструментов MCP",
+      "transportHttp": "Использовать транспорт HTTP (снимите галочку для stdio)",
+      "transportStdio": "Использовать транспорт stdio"
+    },
+    "tools": {
+      "title": "Настройка инструментов",
+      "description": "Выберите, какие инструменты MCP включить:",
+      "webSearch": "Веб-поиск",
+      "webSearchDesc": "Поиск по веб-страницам через Serper API. Требуется переменная окружения SERPER_API_KEY.",
+      "webFetch": "Загрузка страниц",
+      "webFetchDesc": "Загрузка URL и преобразование в markdown через Jina Reader. JINA_API_KEY — по желанию."
+    },
+    "proxy": {
+      "title": "Настройки прокси",
+      "useGlobal": "Использовать глобальные настройки прокси",
+      "useGlobalHelp": "Если включено, сервер MCP унаследует системные переменные окружения HTTP_PROXY, HTTPS_PROXY и NO_PROXY."
+    },
+    "actions": {
+      "save": "Сохранить конфигурацию",
+      "reset": "Сбросить к значениям по умолчанию",
+      "reload": "Перезагрузить",
+      "docs": "Документация протокола MCP",
+      "saving": "Сохранение...",
+      "savedSuccess": "Конфигурация MCP сохранена",
+      "savedError": "Не удалось сохранить конфигурацию MCP"
+    },
+    "currentConfig": "Текущая конфигурация"
+  }
+};

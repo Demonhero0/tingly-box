@@ -1,0 +1,500 @@
+// Agent / scenario pages and per-client config
+export default {
+  "agentStatus": {
+    "connected": "Connected",
+    "lastRequest": "Last request {{ago}}",
+    "today_one": "{{count}} request today",
+    "today_other": "{{count}} requests today",
+    "errorRate": "{{rate}} error rate",
+    "noRequestsYet": "No requests yet",
+    "noRequestsFinishSetup": "No requests yet · finish the setup below",
+    "stale_one": "Config out of date · {{count}} difference",
+    "stale_other": "Config out of date · {{count}} differences",
+    "requests": "Requests",
+    "usage": "Usage",
+    "log": "Log",
+    "logTooltip": "Open this agent's logs (AI requests and system log)",
+    "usageTooltip": "Open the Dashboard filtered to this agent"
+  },
+  "agentAccess": {
+    "title": "Connection",
+    "expand": "Show connection details",
+    "collapse": "Hide connection details"
+  },
+  "agentActivity": {
+    "requests": "Requests",
+    "openDashboard": "Open in Dashboard",
+    "refresh": "Refresh",
+    "ok": "OK",
+    "error": "Error",
+    "empty": "No requests from this agent yet. Once it sends one, the latest requests show up here.",
+    "loadFailed": "Couldn't load this agent's requests."
+  },
+  "agentSetup": {
+    "profile": {
+      "title": "Get started with this profile",
+      "step1": "Connect an AI provider",
+      "step1Done": "Connected",
+      "connect": "Connect AI",
+      "step2": "Start Claude Code with this profile",
+      "step2Hint": "Run this in a terminal. It launches Claude Code on this profile's settings.",
+      "step2Done": "First request received",
+      "copy": "Copy command",
+      "inherit": "The profile inherits the main configuration and model routing; change only what you need under Profile Overrides.",
+      "close": "Done"
+    },
+    "hide": "Hide",
+    "restartTooltip": "Run Quick Start again",
+    "autoSkipped": "Skipped — a model is already set",
+    "quickStart": "Quick Start",
+    "done": "Done",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "resetProgress": "Reset progress",
+    "hint": {
+      "connectProvider": "Connect an AI provider to get started",
+      "selectModel": "Choose a model to continue",
+      "install": "Install {{agent}} on your machine",
+      "apply": "One-click {{action}} to finish"
+    },
+    "provider": {
+      "label": "Connect AI Provider",
+      "countOne": "1 provider",
+      "count": "{{count}} providers",
+      "connect": "Connect AI",
+      "addMore": "+ Connect",
+      "tooltip": "Connect an AI provider (e.g. OpenAI, Anthropic, DeepSeek) to start using {{agent}}."
+    },
+    "model": {
+      "label": "Select a Model",
+      "configured": "Configured",
+      "skipped": "Skipped",
+      "skip": "Skip",
+      "choose": "Choose Model",
+      "change": "Change",
+      "tooltip": "Choose which model {{agent}} will use in the Model Rules section below."
+    },
+    "install": {
+      "label": "Install {{agent}}",
+      "detected": "Last request {{time}}",
+      "installed": "Installed",
+      "confirm": "I've installed it",
+      "confirmTooltip": "Run the install command below, then confirm here once {{agent}} is installed.",
+      "description": "Install {{agent}} on your local machine — copy and run the command below.",
+      "npmOfficial": "npm official",
+      "npmMirror": "npm mirror",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "apply": {
+      "label": "Auto Config",
+      "applied": "Applied",
+      "button": "Auto Config",
+      "success": "Config applied!",
+      "viewConfig": "Config",
+      "viewConfigAdvanced": "{{label}} (Advanced)",
+      "skip": "Skip",
+      "tooltip": "One click to write the proxy configuration to {{agent}}'s settings file.",
+      "failed": "Apply failed"
+    }
+  },
+  "scenarioPage": {
+    "slotMode": "Model mode",
+    "setupGuide": "Setup Guide",
+    "config": "Config",
+    "autoConfig": "Auto Config",
+    "quickStart": "Quick Start",
+    "unknownError": "Unknown error",
+    "codex": {
+      "configTitle": "Codex Configuration",
+      "applyFailed": "Failed to apply Codex config"
+    },
+    "opencode": {
+      "configTitle": "OpenCode Configuration",
+      "applyFailed": "Failed to apply OpenCode config",
+      "previewFailed": "Failed to load config preview: {{reason}}",
+      "previewFailedGeneric": "Failed to load config preview"
+    },
+    "sharingKeys": "Team Keys",
+    "modelRules": "Model Rules",
+    "embedModelRules": "Embedding Model Rules",
+    "decisionsModelRules": "Decisions Model Rules",
+    "imageGenModelRules": "Image Model Rules",
+    "tooltip": {
+      "claude_code": "AI-powered CLI development agent for implementation, testing, and git operations",
+      "claude_desktop": "Route Claude Desktop's third-party inference through your configured providers",
+      "codex": "OpenAI Codex AI coding assistant with Tingly Box proxy",
+      "opencode": "OpenCode AI development environment with BYOK support",
+      "xcode": "Xcode AI coding assistant through Tingly Box proxy for iOS/macOS development",
+      "vscode": "Bring Your Own Key: Use your own API keys with VS Code Copilot through Tingly Box proxy",
+      "cursor": "Cursor AI code editor through Tingly Box proxy, with Cursor compatibility handling enabled by default. Cursor calls this URL from its own cloud, so it must be a publicly reachable HTTPS address — not localhost.",
+      "pi": "Pi coding agent through Tingly Box proxy",
+      "dsh": "DeepSeek Harness (dsh) agent harness through Tingly Box proxy",
+      "imagegen": "AI-powered image generation and editing through Tingly Box proxy with multiple model support"
+    },
+    "vscode": {
+      "installDescription": "Install the Tingly Box extension from VS Code or the Marketplace.",
+      "installInVSCode": "Install in VS Code",
+      "viewMarketplace": "View Marketplace",
+      "applyStepLabel": "Follow VS Code Guide",
+      "applyStepDescription": "Open the Tingly Box extension in VS Code and follow its built-in setup guide.",
+      "openGuide": "Open Guide",
+      "configTitle": "Configure VS Code",
+      "modalDescription": "Install the Tingly Box extension, then follow the setup guide inside VS Code. The extension handles the required endpoint and API key configuration for you.",
+    },
+    "pi": {
+      "installDescription": "Install pi on your local machine — see the repo for setup instructions.",
+      "viewRepo": "View on GitHub",
+      "applyStepLabel": "Configure Pi",
+      "applyStepDescription": "Point pi's provider base URL and API key at the values above — see pi's docs for the exact config option names.",
+      "openGuide": "View Config",
+      "configTitle": "Configure Pi",
+      "modalDescription": "Point pi's provider base URL and API key at the values shown on this page, then check the repo below for pi's exact configuration options."
+    },
+    "dsh": {
+      "openWebUi": "Open Web UI",
+      "installDescription": "Run DeepSeek Harness locally with `npx @deepseek-ai/dsh web` (requires Node.js) — the Web UI serves at http://127.0.0.1:3080. Tingly Box does not launch dsh for you; use the button below to jump to it once it's running. Note: dsh is in developer preview and its config may change.",
+      "viewRepo": "View on GitHub",
+      "applyStepLabel": "Configure DSH",
+      "applyStepDescription": "Point dsh's model provider plugin base URL and API key at the values above — see the dsh docs for the exact plugin config.",
+      "openGuide": "View Config",
+      "configTitle": "Configure DSH",
+      "modalDescription": "Point dsh's model provider plugin at the base URL and API key shown on this page, then check the repo below for dsh's plugin configuration options.",
+      "applyFailed": "Failed to apply configuration"
+    }
+  },
+  "scenarioOverview": {
+    "title": "Agent",
+    "subtitle": "Pick a scenario to configure. Hide the ones you don't use to keep the sidebar tidy.",
+    "showInSidebar": "Show in sidebar",
+    "hideFromSidebar": "Hide from sidebar",
+    "hidden": "Hidden",
+    "notConfigured": "Not configured",
+    "ruleCountOne": "1 rule",
+    "ruleCount": "{{count}} rules",
+    "editTooltip": "Show or hide agents",
+    "powerUps": {
+      "title": "Power-ups",
+      "subtitle": "Optional capabilities. Turn one on to add it to the navigation bar on the left; turn it off to hide it.",
+      "experimental": "Exp.",
+      "experimentalTooltip": "Experimental feature",
+      "beta": "Beta",
+      "betaTooltip": "Beta — usable, still evolving",
+      "remoteDesc": "Drive your agents from IM — connect bots for remote control and notifications."
+    },
+    // Full product names for overview cards where the short nav label is ambiguous.
+    "titles": {
+      "dsh": "DeepSeek Harness",
+    },
+    "descriptions": {
+      "claude_code": "Route Claude Code with custom profiles and per-task models.",
+      "claude_desktop": "Use your own providers as Claude Desktop's third-party inference gateway.",
+      "codex": "Configure Codex CLI through your provider keys.",
+      "opencode": "Open-source coding agent powered by your provider.",
+      "xcode": "Bring your model into Xcode's coding intelligence.",
+      "vscode": "Power VS Code Copilot Chat through Tingly Box.",
+      "cursor": "Bring your model into Cursor with compatibility handling built in.",
+      "pi": "Route the pi coding agent through your provider.",
+      "dsh": "Route the dsh coding agent through your provider.",
+      "openai": "Drop-in OpenAI-compatible SDK endpoint.",
+      "anthropic": "Drop-in Anthropic-compatible SDK endpoint.",
+      "embed": "Route embedding requests to your provider.",
+      "decisions": "Route decision requests to your provider.",
+      "imagegen": "Route image generation and editing through Tingly Box.",
+      "custom": "Bring your own request model name — a generic catch-all scenario. Hidden by default.",
+      "team": "Shared central model deployment for your whole team."
+    }
+  },
+  "clientConfigStatus": {
+    "applied": "Applied",
+    "appliedTooltip": "{{path}} routes through Tingly Box with the models shown on this page.",
+    "outdated_one": "Config out of date ({{count}} difference)",
+    "outdated_other": "Config out of date ({{count}} differences)",
+    "outdatedTooltip": "{{path}} still has the values from the last Auto Config:",
+    "notApplied": "Not applied",
+    "notAppliedTooltip": "{{path}} on this machine doesn't route through Tingly Box yet.",
+    "reapply": "Reapply",
+    "apply": "Auto Config"
+  },
+  "claudeCode": {
+    "configModes": {
+      "unified": {
+        "label": "Unified Model",
+        "description": "Config unified model for all claude code requests"
+      },
+      "separate": {
+        "label": "Separate Model",
+        "description": "Config different models for claude code scenario, like subagent, summary, default, ..."
+      }
+    },
+    "modeChange": {
+      "title": "Change Configuration Mode?",
+      "body": "You are about to switch from {{from}} to {{to}} mode.",
+      "hint": "After changing the mode, you will need to reapply the configuration to Claude Code for the changes to take effect.",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "success": "Configuration mode changed to {{mode}}. Please reapply the configuration to Claude Code.",
+      "failed": "Failed to save configuration mode",
+      "applyFailed": "Failed to apply configurations"
+    },
+    "configPath": "Add env config to Claude Code config file",
+    "copyConfig": "Config",
+    "oneClickScript": "One-Click Script",
+    "jsonConfig": "JSON Config",
+    "step1": "1. Configure Model",
+    "step2": "2. Skip Onboarding - Make Claude Code directly usable",
+    "step3": "3. Status Line Integration (Optional)",
+    "unifiedConfig": "Unified Configuration",
+    "separateConfig": "Separate Configuration",
+    "switchToSeparate": "Switch to Separate",
+    "switchToUnified": "Switch to Unified",
+    "quickApply": "Auto Config",
+    "quickApplyWithStatusLine": "Auto Config & Status Line",
+    "statusLine": {
+      "description": "Install status line integration to show real-time request information in your terminal.",
+      "jsonDescription": "Configure the status line integration to display real-time request information in your terminal prompt.",
+      "addToSettingsJson": "Add the statusLine section to your ~/.claude/settings.json (alongside the env section):",
+      "manualSetup": "Or manually download and install the status line script:",
+      "downloadLink": "Download Status Line Script"
+    },
+    "modal": {
+      "title": "Claude Code Configuration Guide",
+      "subtitle": "Follow these steps to configure Claude Code to use Tingly Box as your AI proxy",
+      "dontRemindAgain": "Do not remind again"
+    },
+    "profile": {
+      "renameProfile": "Rename profile",
+      "deleteProfile": "Delete profile",
+      "quickStart": "Start",
+      "commandGlobal": "Global",
+      "settingsFile": "Settings",
+      "settingsFileWarning": "Generated runtime settings. Manual edits are overwritten by Profile Overrides and Model Rules.",
+      "resolvingSettingsFile": "Resolving generated settings path…",
+      "settingsGenerated": "Generated",
+      "settingsNotGenerated": "Not generated yet",
+      "copySettingsFile": "Copy settings file path",
+      "switchToGlobal": "Switch to global command",
+      "switchToNpm": "Switch to npm command",
+      "copyCommand": "Copy command",
+      "clickToCopy": "Click to copy command",
+      "renameTitle": "Rename Profile",
+      "profileName": "Profile Name",
+      "save": "Save",
+      "deleteTitle": "Delete Profile",
+      "deleteConfirm": "Are you sure you want to delete profile {{name}}?",
+      "deleteWarning": "This will remove the profile and all its associated rules and flags. This action cannot be undone.",
+      "profileRenamed": "Profile renamed",
+      "profileDeleted": "Profile deleted",
+      "renameFailed": "Failed to rename profile",
+      "deleteFailed": "Failed to delete profile",
+      "mode": "Mode",
+      "unified": "Unified",
+      "separate": "Separate"
+    },
+    "defaultModeLabel": "Default Mode"
+  },
+  "codexConfig": {
+    "title": "Configure Codex",
+    "subtitle": "Configure Codex to use Tingly Box through `~/.codex/config.toml` and `~/.codex/auth.json`",
+    "resetTooltip": "Reset model & reasoning to defaults",
+    "tabQuick": "Quick Config",
+    "tabManual": "Manual",
+    "applySuccess": "Codex configuration applied to ~/.codex",
+    "applyFailed": "Failed to apply configuration",
+    "selectOAuthProvider": "Select a Codex OAuth provider to export.",
+    "authMode": {
+      "title": "Authentication",
+      "apikey": {
+        "label": "Tingly Box gateway",
+        "captionPrefix": "codex routes through Tingly Box. Gateway key written to"
+      },
+      "hybrid": {
+        "label": "Tingly Box gateway + keep official ChatGPT login",
+        "caption": "Routes through Tingly Box, but the gateway key moves into config.toml so your ChatGPT login in auth.json stays intact — Codex App still recognizes your account (remote control, plugins, account display)."
+      },
+      "chatgpt": {
+        "label": "Direct to OpenAI",
+        "caption": "codex talks to OpenAI directly using your official ChatGPT login. No gateway."
+      }
+    },
+    "oauthAccount": {
+      "title": "ChatGPT account",
+      "tooltipHybrid": "The gateway token is written into config.toml's provider block (experimental_bearer_token). Pick a stored Codex login to (re)write it into auth.json, or leave it as \u201cKeep existing\u201d to not touch the file.",
+      "tooltipChatgpt": "Exports the OAuth tokens to ~/.codex/auth.json and removes the tingly gateway keys from config.toml so codex CLI talks directly to OpenAI. Tingly Box will not manage token refresh after this — codex CLI owns the token lifecycle. If id_token is missing in the exported file, re-authenticate via the OAuth page and apply again.",
+      "noProvider": "No Codex OAuth provider — log in first",
+      "selectProvider": "Select a Codex OAuth provider",
+      "keepExisting": "Keep existing auth.json (don\u2019t modify)"
+    }
+  },
+  "openCodeConfig": {
+    "title": "Configure OpenCode",
+    "subtitle": "Set up OpenCode to use Tingly Box as your AI model proxy",
+    "configLocation": "Config Location:",
+    "configurationTitle": "Configuration"
+  },
+  "dshConfig": {
+    "title": "Configure DeepSeek Harness",
+    "subtitle": "Configure dsh to use Tingly Box through `$DSH_HOME/settings.yaml` and `$DSH_HOME/.credentials.yaml`",
+    "resetTooltip": "Reset model capabilities to defaults",
+    "tabQuick": "Quick Config",
+    "tabManual": "Manual",
+    "applySuccess": "DeepSeek Harness configuration applied to $DSH_HOME",
+    "applyFailed": "Failed to apply configuration",
+    "modelsPreviewNote": "Model ids written to settings.yaml: {{models}}"
+  },
+  "prompt": {
+    "menu": "Prompt",
+    "user": {
+      "title": "User Recordings",
+      "subtitle": "Browse and manage your IDE recordings",
+      "filters": "Filters",
+      "searchPlaceholder": "Search recordings...",
+      "userFilter": "User",
+      "allUsers": "All Users",
+      "projectFilter": "Project",
+      "allProjects": "All Projects",
+      "typeFilter": "Type",
+      "allTypes": "All Types",
+      "recordingsFound": "{{count}} recording(s) found",
+      "recordingsFor": "Recordings for {{date}}",
+      "noRecordings": "No recordings found for this date",
+      "actions": {
+        "play": "Play",
+        "viewDetails": "View Details",
+        "delete": "Delete"
+      },
+      "types": {
+        "code-review": "Code Review",
+        "debug": "Debug",
+        "refactor": "Refactor",
+        "test": "Test",
+        "custom": "Custom"
+      }
+    },
+    "skill": {
+      "title": "Skills",
+      "subtitle": "Manage skills from your IDE directories",
+      "addPath": "Add Path",
+      "autoDiscover": "Auto-Discover",
+      "refreshAll": "Refresh All",
+      "adapterConfig": "Adapter Configuration",
+      "locations": "Locations",
+      "selectLocation": "Select a location to view skills",
+      "noLocations": "No skill locations added",
+      "noSkills": "No skills found in this location",
+      "skillsCount": "{{count}} skills",
+      "searchPlaceholder": "Search skills...",
+      "ideFilter": "IDE Source",
+      "allIdes": "All IDEs",
+      "openAll": "Open All",
+      "openFolder": "Open Folder",
+      "actions": {
+        "refresh": "Refresh",
+        "remove": "Remove",
+        "open": "Open"
+      },
+      "ides": {
+        "claude-code": "Claude Code",
+        "opencode": "OpenCode",
+        "vscode": "VS Code",
+        "cursor": "Cursor",
+        "codex": "Codex",
+        "antigravity": "Antigravity",
+        "amp": "Amp",
+        "kilo-code": "Kilo Code",
+        "roo-code": "Roo Code",
+        "goose": "Goose",
+        "gemini-cli": "Gemini CLI",
+        "github-copilot": "GitHub Copilot",
+        "clawdbot": "Clawdbot",
+        "droid": "Droid",
+        "windsurf": "Windsurf",
+        "custom": "Custom"
+      },
+      "dialog": {
+        "title": "Add Skill Path",
+        "nameLabel": "Display Name",
+        "namePlaceholder": "e.g., My Claude Code Skills",
+        "pathLabel": "Path",
+        "pathPlaceholder": "/path/to/skills",
+        "ideSourceLabel": "IDE Source",
+        "cancel": "Cancel",
+        "add": "Add"
+      },
+      "discoveryDialog": {
+        "title": "Discover IDE Skills",
+        "description": "Scan your home directory for supported IDEs and import their skills.",
+        "scanning": "Scanning for installed IDEs...",
+        "foundIdes": "Found {{count}} IDE(s)",
+        "foundWithSkills": "Found {{ides}} IDE(s) with {{skills}} skill(s)",
+        "noIdesFound": "No supported IDEs found. Add skill paths manually.",
+        "selectToImport": "Select IDEs to import skills from",
+        "selectAll": "Select All",
+        "deselectAll": "Deselect All",
+        "importSelected": "Import Selected ({{count}})",
+        "importButton": "Import Selected"
+      },
+      "detailDialog": {
+        "title": "Skill Details",
+        "path": "Path",
+        "fileType": "File Type",
+        "size": "Size",
+        "modified": "Last Modified",
+        "contentHash": "Content Hash",
+        "description": "Description",
+        "preview": "Preview",
+        "openInEditor": "Open in Editor",
+        "unknownSize": "Unknown",
+        "unknownDate": "Unknown",
+        "loadError": "Failed to load skill content"
+      }
+    },
+    "command": {
+      "title": "Commands",
+      "comingSoon": "Command management feature coming soon..."
+    }
+  },
+  "mcp": {
+    "pageTitle": "MCP Tools",
+    "info": "Configure MCP (Model Context Protocol) tools to enable web search and web fetch capabilities. The MCP server runs as a local stdio subprocess or connects to a remote HTTP endpoint.",
+    "connection": {
+      "title": "Connection Settings",
+      "endpoint": "MCP Server Endpoint",
+      "endpointPlaceholder": "http://localhost:3000",
+      "endpointHelp": "HTTP endpoint for the MCP server (e.g., npx @modelcontextprotocol/server-filesystem)",
+      "command": "Command",
+      "commandPlaceholder": "python3",
+      "scriptPath": "Script Path",
+      "scriptPathPlaceholder": "builtin",
+      "scriptPathHelp": "Path to the MCP server script (or 'builtin' for Go tools)",
+      "workingDir": "Working directory",
+      "timeout": "Request Timeout (seconds)",
+      "timeoutHelp": "Timeout for MCP tool calls",
+      "transportHttp": "Use HTTP Transport (uncheck for stdio)",
+      "transportStdio": "Use Stdio Transport"
+    },
+    "tools": {
+      "title": "Tool Configuration",
+      "description": "Select which MCP tools to enable:",
+      "webSearch": "Web Search",
+      "webSearchDesc": "Search web pages with Serper API. Requires SERPER_API_KEY environment variable.",
+      "webFetch": "Web Fetch",
+      "webFetchDesc": "Fetch and convert URLs to markdown via Jina Reader. Optional JINA_API_KEY."
+    },
+    "proxy": {
+      "title": "Proxy Settings",
+      "useGlobal": "Use Global Proxy Configuration",
+      "useGlobalHelp": "When enabled, the MCP server will inherit HTTP_PROXY, HTTPS_PROXY, and NO_PROXY environment variables from the system."
+    },
+    "actions": {
+      "save": "Save Configuration",
+      "reset": "Reset to Default",
+      "reload": "Reload",
+      "docs": "MCP Protocol Docs",
+      "saving": "Saving...",
+      "savedSuccess": "MCP configuration saved successfully",
+      "savedError": "Failed to save MCP configuration"
+    },
+    "currentConfig": "Current Configuration"
+  }
+};

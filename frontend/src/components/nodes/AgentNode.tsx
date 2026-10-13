@@ -14,7 +14,7 @@ interface AgentInfo {
 }
 
 // Bilingual content is intentionally co-located here rather than in the
-// i18n locale files (zh.ts / en.ts). These strings are graph-node popover
+// i18n locale files (locales/<lang>/). These strings are graph-node popover
 // copy that is tightly coupled to the AgentNode component; externalising
 // them would scatter context-specific copy across the global translation
 // namespace without benefit. Do NOT migrate these strings to the locale

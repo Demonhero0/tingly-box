@@ -150,6 +150,7 @@
 | [ui-flow-analysis.md](./ui-flow-analysis.md) | UI 动线分析 — 发现、人工打标反馈与实现结论 | 第 1 轮已落地；其余项见正文 |
 | [refactor-frontend-2026-09.md](./refactor-frontend-2026-09.md) | Frontend Refactor 2026-09 — Plan & Survey Reports (merged) | 已完成的历史审计与交付记录 |
 | [icon-hierarchy.md](./icon-hierarchy.md) | Icon Hierarchy | 设计说明；局部实施状态见正文 |
+| [i18n.md](./i18n.md) | 前端 i18n 文案按功能大类分文件 | 现行契约 |
 | [theme.md](./theme.md) | Theme system notes | 设计说明；局部实施状态见正文 |
 | [gui-host-bridge.md](./gui-host-bridge.md) | Host bridge: one frontend for the browser tab and the desktop window | 设计说明；局部实施状态见正文 |
 | [gui-packaging.md](./gui-packaging.md) | Desktop GUI packaging | 设计说明；局部实施状态见正文 |

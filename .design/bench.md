@@ -490,7 +490,7 @@ Scope / Routing 也始终挂载，它们是传输配置，和 body 怎么拼出�
 - 页面 `React.lazy(() => import('./pages/bench/BenchPage'))`（frontend/CLAUDE.md
   的 code-splitting 铁律）；**不从 page 文件导出任何共享状态**——picker 数据、共享轴原语
   都放独立模块。
-- i18n：`en.ts` / `zh.ts` 的 `bench.*` 命名空间；复用 `probe.*` 已有的轴文案
+- i18n：`locales/{en,zh}/bench.ts`（`bench.*` 命名空间）；复用 `probe.*` 已有的轴文案
   （同一概念同一词）。
 - **无深链入口**：`/bench` 不接受任何查询参数，也没有别的页面能跳转过来
   预填 target——Bench 完全独立，只能通过自己的一级导航进入，然后在页面内用

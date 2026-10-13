@@ -245,4 +245,4 @@ retain dual URLs; Google style remains excluded. There is no experimental flag g
 | `frontend/src/components/ProviderFormDialog.tsx` | Dual checkbox with tooltip |
 | `frontend/src/components/provider-form-dialog/ProtocolSlot.tsx` | Protocol checkboxes; respects `dualLocked` (covers both OAuth and edit-mode lock) |
 | `frontend/src/pages/CredentialPage.tsx` | `buildAddProviderPayload` (split vs dual), `buildEditProviderPayload` |
-| `frontend/src/i18n/locales/en.ts` | `providerDialog.dual.*` strings |
+| `frontend/src/i18n/locales/en/providerDialog.ts` | `providerDialog.dual.*` strings |

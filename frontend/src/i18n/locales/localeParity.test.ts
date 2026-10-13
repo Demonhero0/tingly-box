@@ -7,7 +7,7 @@ type Bundle = Record<string, unknown>;
 
 // i18next resolves a plural key by appending an Intl.PluralRules category
 // suffix. English needs two (_one/_other), Russian four (_one/_few/_many/
-// _other) and Chinese none — so a key like `activeUsers_one` in en.ts has no
+// _other) and Chinese none — so a key like `activeUsers_one` in en/ has no
 // single counterpart in the other bundles. Compare on the stem instead.
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
 
@@ -31,7 +31,7 @@ describe('locale bundles', () => {
     const zhKeys = flatten(zh as Bundle);
     const ruKeys = flatten(ru as Bundle);
 
-    // en.ts is the fallback bundle, so every key it defines must exist in the
+    // en/ is the fallback bundle, so every key it defines must exist in the
     // other locales or those users silently drop back to English.
     it('ru covers every key in en', () => {
         expect(missingFrom(enKeys, ruKeys)).toEqual([]);
@@ -41,7 +41,7 @@ describe('locale bundles', () => {
     // copy inline as t(..., { defaultValue }) and are only overridden in the
     // non-English bundles; keep ru from falling behind zh on those. There is no
     // en -> zh assertion in return: zh deliberately omits
-    // scenarioOverview.descriptions so those fall back to English (see zh.ts).
+    // scenarioOverview.descriptions so those fall back to English (see zh/agent.ts).
     it('ru covers every key in zh', () => {
         expect(missingFrom(zhKeys, ruKeys)).toEqual([]);
     });
