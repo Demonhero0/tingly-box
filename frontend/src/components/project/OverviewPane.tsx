@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Button, Chip, Collapse, IconButton, LinearProgress, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { CopyIconButton } from '@tingly/ui';
 import { api, apiFetch, unwrap, type LibraryFile, type Thread } from '@/client';
 import { Delete, Description, Download, ExpandMore, UploadFile } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
 import { formatBytes, timeAgo } from '@/utils/format';
-import { STATUS_ORDER, ThreadStatusChip } from './threadStatus';
+import { STATUS_ORDER, StatusHeading, ThreadSubtitle } from './threadStatus';
 
 const mono = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } as const;
 
 function ThreadRow({ thread, onOpen }: { thread: Thread; onOpen: (id: string) => void }) {
-    const { t, i18n } = useTranslation();
+    const { i18n } = useTranslation();
     return (
         <Box
             role="button"
@@ -23,13 +24,7 @@ function ThreadRow({ thread, onOpen }: { thread: Thread; onOpen: (id: string) =>
                 <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: 'text.primary' }}>{thread.title}</Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>{timeAgo(thread.updated_at, i18n.language)}</Typography>
             </Box>
-            <Typography variant="caption" color={thread.status === 'waiting' ? 'warning.main' : 'text.secondary'} noWrap component="div">
-                {thread.status === 'waiting' && thread.wait_reason
-                    ? thread.wait_reason
-                    : thread.branch
-                        ? <Box component="span" sx={{ ...mono }}>{thread.branch}{thread.commits_ahead > 0 ? ` · ${t('thread.commits', { count: thread.commits_ahead })}` : ''}</Box>
-                        : (thread.last_report || '').split('\n')[0] || t('thread.noRepo')}
-            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap component="div"><ThreadSubtitle thread={thread} /></Typography>
         </Box>
     );
 }
@@ -53,8 +48,7 @@ function ThreadGroups({ threads, onOpen }: { threads: Thread[]; onOpen: (id: str
                             onClick={collapsible ? () => setShowResolved((v) => !v) : undefined}
                             sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5 }}
                         >
-                            <ThreadStatusChip thread={{ status }} />
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{list.length}</Typography>
+                            <StatusHeading status={status} count={list.length} />
                             {collapsible && <ExpandMore sx={{ fontSize: 16, color: 'text.secondary', transform: showResolved ? 'rotate(180deg)' : 'none' }} />}
                         </Box>
                         <Collapse in={!collapsible || showResolved}>
@@ -124,7 +118,17 @@ function Library({ projectId, refreshKey }: { projectId: string; refreshKey: num
                 <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>{t('library.intro')}</Typography>
                 <Button size="small" startIcon={<UploadFile />} onClick={() => input.current?.click()}>{t('library.add')}</Button>
             </Box>
-            {dir && <Typography variant="caption" sx={{ ...mono, display: 'block', color: 'text.disabled', mb: 1, wordBreak: 'break-all' }}>{dir}</Typography>}
+            {dir && (
+                // One line, clipped at the start so the project's own folder stays in view.
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <Tooltip title={dir}>
+                        <Typography variant="caption" noWrap sx={{ ...mono, flex: 1, minWidth: 0, color: 'text.disabled', direction: 'rtl', textAlign: 'left' }}>
+                            <bdi>{dir}</bdi>
+                        </Typography>
+                    </Tooltip>
+                    <CopyIconButton value={dir} label={t('library.copyPath')} copiedLabel={t('common.copied')} iconSize={14} />
+                </Box>
+            )}
             {uploading && <LinearProgress sx={{ mb: 1 }} />}
             <input ref={input} type="file" multiple hidden onChange={(e) => e.target.files && void upload(e.target.files)} />
             {files?.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>{t('library.empty')}</Typography>}

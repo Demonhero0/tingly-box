@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-    Alert, Box, Button, ButtonGroup, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton,
-    Paper, Skeleton, TextField, Tooltip, Typography,
+    Alert, Box, Button, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton,
+    Paper, Skeleton, TextField, Typography,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError, unwrap, type Diff, type Thread, type ThreadEvent } from '@/client';
 import { Composer } from '@/components/Composer';
 import { Markdown } from '@/components/Markdown';
-import { ArrowBack, Branch, Build, Check, ContentCopy, DiffIcon, ExpandMore, Merge, Question, Stop, Terminal } from '@/components/icons';
+import { CopyIconButton } from '@tingly/ui';
+import { ArrowBack, Block, Branch, Build, Check, DiffIcon, ExpandMore, Merge, Question, Stop, Terminal } from '@/components/icons';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { useNotify } from '@/hooks/useNotify';
 import { formatTokens, timeAgo } from '@/utils/format';
-import { ThreadStatusChip } from './threadStatus';
+import { InlineCode, ThreadStatusChip } from './threadStatus';
 
 const mono = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } as const;
 
@@ -43,18 +44,19 @@ function toolSummary(input: Record<string, unknown> | null): string {
     return '';
 }
 
-function CopyText({ text, label }: { text: string; label: string }) {
-    const { copied, copy } = useCopyFeedback();
+/** How a settled permission request ended, as a short tag on its tool call. */
+function RequestOutcome({ pl }: { pl: RequestPayload }) {
+    const { t } = useTranslation();
+    const ok = pl.state === 'allowed' || pl.state === 'answered';
     return (
-        <Tooltip title={copied ? '✓' : label}>
-            <IconButton size="small" onClick={() => copy(text)} aria-label={label}>
-                {copied ? <Check sx={{ fontSize: 15 }} color="success" /> : <ContentCopy sx={{ fontSize: 15 }} />}
-            </IconButton>
-        </Tooltip>
+        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, flexShrink: 0, fontSize: 12, color: ok ? 'success.main' : pl.state === 'denied' ? 'error.main' : 'text.disabled' }}>
+            {ok ? <Check sx={{ fontSize: 13 }} /> : <Block sx={{ fontSize: 13 }} />}
+            {t(`thread.req.${pl.state}`)}{pl.scope === 'thread' ? ` · ${t('thread.req.forThread')}` : ''}
+        </Box>
     );
 }
 
-function ToolRow({ ev, result }: { ev: ThreadEvent; result?: ThreadEvent }) {
+function ToolRow({ ev, result, approval }: { ev: ThreadEvent; result?: ThreadEvent; approval?: RequestPayload }) {
     const [open, setOpen] = useState(false);
     const input = parse<Record<string, unknown>>(ev.payload);
     const summary = toolSummary(input);
@@ -70,6 +72,7 @@ function ToolRow({ ev, result }: { ev: ThreadEvent; result?: ThreadEvent }) {
                 <Build sx={{ fontSize: 14 }} />
                 <Box component="span" sx={{ fontWeight: 600 }}>{ev.content}</Box>
                 <Box component="span" sx={{ ...mono, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{summary}</Box>
+                {approval && <RequestOutcome pl={approval} />}
                 <ExpandMore sx={{ fontSize: 14, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
             </Box>
             <Collapse in={open} unmountOnExit>
@@ -101,35 +104,53 @@ function RequestCard({ ev, projectId, threadId, active }: { ev: ThreadEvent; pro
         }
     };
     const isAsk = ev.kind === 'ask';
-    return (
-        <Paper variant="outlined" sx={{ my: 1.25, p: 1.5, borderRadius: 2.5, borderColor: pending ? 'warning.main' : 'divider' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
-                {isAsk ? <Question sx={{ fontSize: 16 }} color="warning" /> : <Terminal sx={{ fontSize: 16 }} color="warning" />}
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>{isAsk ? t('thread.question') : t('thread.approval')}</Typography>
-                <Box sx={{ flex: 1 }} />
-                {!pending && <Chip size="small" label={t(`thread.req.${pl.state}`) + (pl.scope === 'thread' ? ` · ${t('thread.req.forThread')}` : '')} />}
-            </Box>
-            <Typography sx={{ ...(isAsk ? {} : mono), fontSize: 13.5, color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{ev.content}</Typography>
-            {pl.answer && !pending && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>↳ {pl.answer}</Typography>}
-            {pending && (
-                <Box sx={{ mt: 1.25 }}>
-                    {isAsk ? (
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                            <TextField size="small" fullWidth autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={t('thread.answerPlaceholder')}
-                                onKeyDown={(e) => e.key === 'Enter' && answer.trim() && void respond(true)} />
-                            <Button variant="contained" disabled={busy || !answer.trim()} onClick={() => void respond(true)}>{t('thread.answer')}</Button>
-                        </Box>
-                    ) : (
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <ButtonGroup variant="contained" size="small" disabled={busy}>
-                                <Button onClick={() => void respond(true, 'once')}>{t('thread.allowOnce')}</Button>
-                                <Button onClick={() => void respond(true, 'thread')}>{t('thread.allowThread', { tool: pl.tool })}</Button>
-                            </ButtonGroup>
-                            <Button size="small" color="inherit" disabled={busy} onClick={() => void respond(false)}>{t('thread.deny')}</Button>
-                        </Box>
-                    )}
+    // The literal command when there is one: that is what the user approves.
+    const command = typeof pl.input?.command === 'string' ? pl.input.command : '';
+
+    if (!pending) {
+        // Settled: one quiet line, so the thread reads as a log again. A
+        // request left pending by a turn that ended can no longer be answered.
+        const settled = pl.state === 'pending' ? { ...pl, state: 'expired' as const } : pl;
+        return (
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.5, fontSize: 13, color: 'text.secondary' }}>
+                {isAsk ? <Question sx={{ fontSize: 14, mt: 0.25 }} /> : <Terminal sx={{ fontSize: 14, mt: 0.25 }} />}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ ...(isAsk ? {} : mono), fontSize: isAsk ? 13 : 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{command || ev.content}</Box>
+                    {pl.answer && <Box sx={{ color: 'text.primary' }}>↳ {pl.answer}</Box>}
                 </Box>
+                <RequestOutcome pl={settled} />
+            </Box>
+        );
+    }
+
+    return (
+        <Paper variant="outlined" sx={{ my: 1.25, p: 1.5, borderRadius: 2.5, borderColor: 'warning.main' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                {isAsk ? <Question sx={{ fontSize: 16 }} color="warning" /> : <Terminal sx={{ fontSize: 16 }} color="warning" />}
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {isAsk ? t('thread.question') : t('thread.approvalTool', { tool: pl.tool || t('thread.approvalAny') })}
+                </Typography>
+            </Box>
+            {command ? (
+                <Box component="pre" sx={{ ...mono, fontSize: 12.5, m: 0, p: 1, bgcolor: 'action.hover', borderRadius: 1.5, color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 200, overflow: 'auto' }}>{command}</Box>
+            ) : (
+                <Typography sx={{ fontSize: 13.5, color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><InlineCode text={ev.content} /></Typography>
             )}
+            <Box sx={{ mt: 1.25 }}>
+                {isAsk ? (
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <TextField size="small" fullWidth autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={t('thread.answerPlaceholder')}
+                            onKeyDown={(e) => e.key === 'Enter' && answer.trim() && void respond(true)} />
+                        <Button variant="contained" disabled={busy || !answer.trim()} onClick={() => void respond(true)}>{t('thread.answer')}</Button>
+                    </Box>
+                ) : (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Button variant="contained" size="small" disabled={busy} onClick={() => void respond(true, 'once')}>{t('thread.allowOnce')}</Button>
+                        <Button variant="outlined" size="small" disabled={busy} onClick={() => void respond(true, 'thread')}>{t('thread.allowThread', { tool: pl.tool })}</Button>
+                        <Button size="small" color="inherit" disabled={busy} onClick={() => void respond(false)}>{t('thread.deny')}</Button>
+                    </Box>
+                )}
+            </Box>
         </Paper>
     );
 }
@@ -212,6 +233,22 @@ function DiffDialog({ thread, open, onClose }: { thread: Thread; open: boolean; 
     );
 }
 
+/** Facts about a thread on one line, separated by dots; empty ones drop out. */
+function MetaLine({ items }: { items: React.ReactNode[] }) {
+    const shown = items.filter(Boolean);
+    if (shown.length === 0) return null;
+    return (
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 0.75, mt: 0.25, color: 'text.secondary', fontSize: 12.5 }}>
+            {shown.map((x, i) => (
+                <Box key={i} component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                    {i > 0 && <Box component="span" sx={{ color: 'text.disabled' }}>·</Box>}
+                    {x}
+                </Box>
+            ))}
+        </Box>
+    );
+}
+
 interface Props {
     projectId: string;
     threadId: string;
@@ -269,6 +306,20 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
             }
         }
     });
+    // A settled approval right after its own tool call becomes a tag on that
+    // call instead of a second line repeating the same command.
+    const approvals = new Map<number, RequestPayload>();
+    const absorbed = new Set<string>();
+    list.forEach((e, i) => {
+        const next = list[i + 1];
+        if (e.kind !== 'tool_use' || next?.kind !== 'approval') return;
+        const pl = parse<RequestPayload>(next.payload);
+        if (pl && pl.tool === e.content && !(pl.state === 'pending' && running)) {
+            approvals.set(i, pl.state === 'pending' ? { ...pl, state: 'expired' } : pl);
+            absorbed.add(next.id);
+        }
+    });
+    const pendingRequest = running && list.some((e) => (e.kind === 'approval' || e.kind === 'ask') && parse<RequestPayload>(e.payload)?.state === 'pending');
     const canReview = !!thread.branch && thread.commits_ahead > 0 && !thread.merged_at;
 
     return (
@@ -279,23 +330,24 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                     <Typography variant="h5" noWrap sx={{ flex: 1, minWidth: 0 }}>{thread.title}</Typography>
                     <ThreadStatusChip thread={thread} />
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.75, color: 'text.secondary', fontSize: 12.5, flexWrap: 'wrap' }}>
-                    {thread.branch ? (
-                        <>
-                            <Branch sx={{ fontSize: 14 }} />
-                            <Box component="span" sx={{ ...mono }}>{thread.branch}</Box>
-                            <Box component="span">· {t('thread.fromBase', { base: thread.base_branch })}</Box>
-                            {thread.commits_ahead > 0 && <Box component="span">· {t('thread.commits', { count: thread.commits_ahead })} · {t('thread.files', { count: thread.files_changed })}</Box>}
-                            {thread.uncommitted && <Box component="span" sx={{ color: 'warning.main' }}>· {t('thread.uncommitted')}</Box>}
-                        </>
-                    ) : (
-                        <Box component="span">{t('thread.noRepo')}</Box>
-                    )}
-                    <CopyText text={`cd ${thread.worktree}`} label={t('thread.copyCd')} />
-                    <Box component="span" sx={{ flex: 1 }} />
-                    {thread.model && <Box component="span" sx={{ ...mono }}>{thread.model}</Box>}
-                    {(thread.input_tokens > 0 || thread.output_tokens > 0) && <Box component="span">· {formatTokens(thread.input_tokens)} in / {formatTokens(thread.output_tokens)} out</Box>}
-                </Box>
+                {thread.branch ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, color: 'text.secondary', fontSize: 12.5, minWidth: 0 }}>
+                        <Branch sx={{ fontSize: 14, flexShrink: 0 }} />
+                        <Box component="span" sx={{ ...mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{thread.branch}</Box>
+                        <Box component="span" sx={{ flexShrink: 0 }}>{t('thread.fromBase', { base: thread.base_branch })}</Box>
+                        <CopyIconButton value={`cd ${thread.worktree}`} label={t('thread.copyCd')} copiedLabel={t('common.copied')} iconSize={14} />
+                    </Box>
+                ) : (
+                    <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>{t('thread.noRepo')}</Typography>
+                )}
+                <MetaLine items={[
+                    thread.merged_at
+                        ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: 'success.main' }}><Merge sx={{ fontSize: 13 }} />{t('thread.mergedInto', { base: thread.base_branch })}</Box>
+                        : thread.commits_ahead > 0 && <>{t('thread.commits', { count: thread.commits_ahead })} · {t('thread.files', { count: thread.files_changed })}</>,
+                    thread.uncommitted && <Box component="span" sx={{ color: 'warning.main' }}>{t('thread.uncommitted')}</Box>,
+                    thread.model && <Box component="span" sx={{ ...mono }}>{thread.model}</Box>,
+                    (thread.input_tokens > 0 || thread.output_tokens > 0) && <>{formatTokens(thread.input_tokens)} in / {formatTokens(thread.output_tokens)} out</>,
+                ]} />
                 <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     {canReview && <Button size="small" variant="contained" startIcon={<DiffIcon />} onClick={() => setDiffOpen(true)}>{t('thread.review')}</Button>}
                     {running && <Button size="small" variant="outlined" color="inherit" startIcon={<Stop />} onClick={() => void act('/api/v1/projects/{id}/threads/{tid}/stop')}>{t('thread.stop')}</Button>}
@@ -330,11 +382,12 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                             if (repeated.has(e.id)) return null;
                             return <Box key={e.id} sx={{ my: 1, fontSize: 14 }}><Markdown text={e.content} /></Box>;
                         case 'tool_use':
-                            return <ToolRow key={e.id} ev={e} result={results.get(i)} />;
+                            return <ToolRow key={e.id} ev={e} result={results.get(i)} approval={approvals.get(i)} />;
                         case 'tool_result':
                             return null;
                         case 'approval':
                         case 'ask':
+                            if (absorbed.has(e.id)) return null;
                             return <RequestCard key={e.id} ev={e} projectId={projectId} threadId={threadId} active={running} />;
                         case 'report': {
                             const pl = parse<{ commits_ahead?: number; files_changed?: number }>(e.payload);
@@ -351,9 +404,10 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                             return <Typography key={e.id} variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', my: 1 }}>{e.content}</Typography>;
                     }
                 })}
-                {running && (
+                {/* A pending request card is already the call to action. */}
+                {running && !pendingRequest && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', fontSize: 13, py: 1 }}>
-                        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'info.main', animation: 'pulse 1.2s infinite', '@keyframes pulse': { '0%, 100%': { opacity: 0.3 }, '50%': { opacity: 1 } } }} />
+                        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: thread.status === 'waiting' ? 'warning.main' : 'info.main', animation: 'pulse 1.2s infinite', '@keyframes pulse': { '0%, 100%': { opacity: 0.3 }, '50%': { opacity: 1 } } }} />
                         {thread.status === 'waiting' ? t('thread.waitingOnYou') : t('thread.working')}
                     </Box>
                 )}

@@ -15,11 +15,21 @@ export function formatBytes(n: number): string {
     return `${n} B`;
 }
 
+/** Intl rejects some tags browsers report (a POSIX "en-US@posix", say) and
+ * would take the page down with it; fall back to the runtime default. */
+function relativeFormat(locale: string): Intl.RelativeTimeFormat {
+    try {
+        return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    } catch {
+        return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    }
+}
+
 /** Relative time ("3 min ago") using the browser's locale. */
 export function timeAgo(iso: string | undefined, locale: string): string {
     if (!iso) return '';
     const diff = (new Date(iso).getTime() - Date.now()) / 1000;
-    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    const rtf = relativeFormat(locale);
     const abs = Math.abs(diff);
     if (abs < 60) return rtf.format(Math.round(diff), 'second');
     if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');

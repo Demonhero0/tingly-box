@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 import type { ProjectMessage, Thread } from '@/client';
 import { Composer } from '@/components/Composer';
 import { Markdown } from '@/components/Markdown';
-import { Branch, PlayArrow } from '@/components/icons';
-import { ThreadStatusChip } from './threadStatus';
+import { PlayArrow } from '@/components/icons';
+import { ThreadStatusChip, ThreadSubtitle } from './threadStatus';
 
 const COLUMN = { maxWidth: 760, mx: 'auto', width: '100%', px: { xs: 2, md: 3 } } as const;
 
@@ -21,7 +21,6 @@ function parse<T>(payload?: string): T | null {
 
 /** A thread as a card: title + live status, click to open. */
 export function ThreadCard({ thread, onOpen }: { thread: Thread; onOpen: (id: string) => void }) {
-    const { t } = useTranslation();
     return (
         <Paper
             variant="outlined"
@@ -33,13 +32,7 @@ export function ThreadCard({ thread, onOpen }: { thread: Thread; onOpen: (id: st
         >
             <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, color: 'text.primary' }}>{thread.title}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap component="div">
-                    {thread.status === 'waiting' && thread.wait_reason
-                        ? thread.wait_reason
-                        : thread.branch
-                            ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}><Branch sx={{ fontSize: 13 }} />{thread.branch}{thread.commits_ahead > 0 ? ` · ${t('thread.commits', { count: thread.commits_ahead })}` : ''}</Box>
-                            : t('thread.noRepo')}
-                </Typography>
+                <Typography variant="caption" color="text.secondary" noWrap component="div"><ThreadSubtitle thread={thread} /></Typography>
             </Box>
             <ThreadStatusChip thread={thread} />
         </Paper>

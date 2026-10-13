@@ -20,7 +20,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 open={!!state}
                 autoHideDuration={state?.severity === 'error' ? 8000 : 3500}
                 onClose={(_, reason) => reason !== 'clickaway' && setState(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
                 {state ? (
                     <Alert severity={state.severity} variant="filled" onClose={() => setState(null)} sx={{ maxWidth: 560 }}>

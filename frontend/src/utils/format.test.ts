@@ -1,4 +1,4 @@
-import { formatBytes, formatTokens } from './format';
+import { formatBytes, formatTokens, timeAgo } from './format';
 import { estimateTokens } from './tokens';
 
 test('formatTokens shows concrete compact values', () => {
@@ -19,4 +19,10 @@ test('estimateTokens matches the backend estimate', () => {
     expect(estimateTokens('abcd')).toBe(1);
     expect(estimateTokens('abcde')).toBe(2);
     expect(estimateTokens('你好世界')).toBe(4);
+});
+
+test('timeAgo survives a locale tag Intl rejects', () => {
+    const iso = new Date(Date.now() - 120_000).toISOString();
+    expect(() => timeAgo(iso, 'en-US@posix')).not.toThrow();
+    expect(timeAgo(iso, 'en-US')).toBe('2 minutes ago');
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Box, Button, Drawer, IconButton, Skeleton, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,7 @@ import { api, unwrap, type Project, type ProjectMessage, type Thread, type Threa
 import { ConversationPane } from '@/components/project/ConversationPane';
 import { OverviewPane } from '@/components/project/OverviewPane';
 import { ProjectSettingsDialog, type SettingsTab } from '@/components/project/ProjectSettingsDialog';
+import { PANE_DEFAULT, PaneResizer, clampPane } from '@/components/project/PaneResizer';
 import { ThreadPanel } from '@/components/project/ThreadPanel';
 import { OverviewPane as OverviewIcon, Pause, Settings, Star, StarBorder } from '@/components/icons';
 import { useNotify } from '@/hooks/useNotify';
@@ -13,7 +14,6 @@ import { useProjectEvents, type ProjectEvent } from '@/hooks/useProjectEvents';
 import { useProjectsHost } from '@/host/ProjectsHost';
 import { readLocal, writeLocal } from '@/utils/storage';
 
-const PANE_WIDTH = 440;
 
 function upsert<T extends { id: string }>(list: T[], item: T): T[] {
     const i = list.findIndex((x) => x.id === item.id);
@@ -41,6 +41,8 @@ export default function ProjectPage() {
     const [error, setError] = useState<string | null>(null);
     const [threadEvents, setThreadEvents] = useState<ThreadEvent[] | null>(null);
     const [paneOpen, setPaneOpen] = useState(() => readLocal('overviewOpen') !== '0');
+    const [paneWidth, setPaneWidth] = useState(() => clampPane(Number(readLocal('paneWidth')) || PANE_DEFAULT));
+    const row = useRef<HTMLDivElement>(null);
     // On narrow screens the pane is a drawer, closed until asked for.
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -78,6 +80,15 @@ export default function ProjectPage() {
         setMessages(null);
         void load();
     }, [load]);
+
+    // Keep the conversation usable when the window shrinks; the saved width
+    // comes back once there is room again.
+    useEffect(() => {
+        const fit = () => setPaneWidth(clampPane(Number(readLocal('paneWidth')) || PANE_DEFAULT, row.current?.clientWidth));
+        fit();
+        window.addEventListener('resize', fit);
+        return () => window.removeEventListener('resize', fit);
+    }, []);
 
     useEffect(() => {
         setThreadEvents(null);
@@ -211,7 +222,7 @@ export default function ProjectPage() {
                 )}
             </Box>
 
-            <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
+            <Box ref={row} sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
                 {messages === null ? (
                     <Box sx={{ flex: 1, p: 3 }}><Skeleton variant="rounded" height={80} /></Box>
                 ) : (
@@ -245,11 +256,14 @@ export default function ProjectPage() {
                 )}
                 {narrow ? (
                     <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-                        slotProps={{ paper: { sx: { width: { xs: '100%', sm: PANE_WIDTH } } } }}>
+                        slotProps={{ paper: { sx: { width: { xs: '100%', sm: PANE_DEFAULT } } } }}>
                         {pane}
                     </Drawer>
                 ) : paneOpen && (
-                    <Box sx={{ width: PANE_WIDTH, flexShrink: 0, borderLeft: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: 0 }}>{pane}</Box>
+                    <Box sx={{ position: 'relative', width: paneWidth, flexShrink: 0, borderLeft: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: 0 }}>
+                        <PaneResizer width={paneWidth} onWidth={setPaneWidth} onCommit={(w) => writeLocal('paneWidth', String(w))} />
+                        {pane}
+                    </Box>
                 )}
             </Box>
 
