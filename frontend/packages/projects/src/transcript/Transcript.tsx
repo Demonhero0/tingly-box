@@ -1,15 +1,15 @@
-import {Block, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Robot} from '@/components/icons';
-import type {MessageInfo} from '@/services/deskApi';
+import {Block, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Robot} from '@tingly/ui/icons';
 import {Box, Button, Chip, CircularProgress, Collapse, Paper, Stack, TextField, Alert, Typography} from '@mui/material';
 import type {TFunction} from 'i18next';
 import {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import type {ActivityStep, TaskState, TranscriptBlock} from './deskUtils';
-import {agentReport, agentStatus, formatTokens, toolSummary} from './deskUtils';
+import {getReadableAccent} from '@tingly/ui/theme/status';
+import {fontMono, fontSizes} from '@tingly/ui/theme/fonts';
+import type {CodeBlockComponent, DraftStorage} from './context';
+import {TranscriptHostProvider, useDraft} from './context';
+import type {ActivityStep, TaskState, TranscriptBlock, TranscriptEntry} from './model';
+import {agentReport, agentStatus, formatTokens, toolSummary} from './model';
 import Markdown from './Markdown';
-import {getReadableAccent} from '@/theme/status';
-import { fontMono, fontSizes } from '@/theme/fonts';
-import {useDeskStorage} from './useDeskStorage';
 
 interface TranscriptProps {
     blocks: TranscriptBlock[];
@@ -18,6 +18,10 @@ interface TranscriptProps {
     // Opens every activity row; each row can still be toggled on its own.
     expandAll?: boolean;
     onRespond: (requestId: string, approved: boolean, answer: string) => Promise<boolean>;
+    // Where request-card drafts live; in memory unless the host passes a store.
+    drafts?: DraftStorage;
+    // Renders fenced code in replies; plain monospace unless the host passes one.
+    codeBlock?: CodeBlockComponent;
 }
 
 const mono = {fontFamily: fontMono, fontSize: fontSizes.md};
@@ -30,7 +34,7 @@ const conversationText = {
     color: 'text.primary', fontSize: '0.9375rem', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
 } as const;
 
-const UserBubble = ({message}: {message: MessageInfo}) => (
+const UserBubble = ({message}: {message: TranscriptEntry}) => (
     <Box sx={{display: 'flex', justifyContent: 'flex-end'}}>
         <Box sx={{maxWidth: '80%', bgcolor: 'action.hover', px: 2, py: 1.25, borderRadius: 3}}>
             <Typography variant="body1" sx={conversationText}>{message.content}</Typography>
@@ -38,7 +42,7 @@ const UserBubble = ({message}: {message: MessageInfo}) => (
     </Box>
 );
 
-const AssistantText = ({message}: {message: MessageInfo}) => <Markdown content={message.content}/>;
+const AssistantText = ({message}: {message: TranscriptEntry}) => <Markdown content={message.content}/>;
 
 const formatDuration = (ms: number): string => {
     const sec = Math.round(ms / 1000);
@@ -46,10 +50,10 @@ const formatDuration = (ms: number): string => {
 };
 
 const statusLabel = (t: TFunction, status: TaskState['status']) => ({
-    running: t('desk.taskRunning', {defaultValue: 'running'}),
-    completed: t('desk.taskDone', {defaultValue: 'done'}),
-    stopped: t('desk.taskStopped', {defaultValue: 'stopped'}),
-    failed: t('desk.taskFailed', {defaultValue: 'failed'}),
+    running: t('projects.transcript.taskRunning', {defaultValue: 'running'}),
+    completed: t('projects.transcript.taskDone', {defaultValue: 'done'}),
+    stopped: t('projects.transcript.taskStopped', {defaultValue: 'stopped'}),
+    failed: t('projects.transcript.taskFailed', {defaultValue: 'failed'}),
 }[status]);
 
 // TaskTag marks a call that runs in the background, with its state: the
@@ -62,7 +66,7 @@ const TaskTag = ({task}: {task: TaskState}) => {
             variant="outlined"
             color={task.status === 'failed' ? 'error' : 'default'}
             icon={task.status === 'running' ? <CircularProgress size={10} sx={{ml: '6px !important'}}/> : undefined}
-            label={`${t('desk.background', {defaultValue: 'background'})} · ${statusLabel(t, task.status)}`}
+            label={`${t('projects.transcript.background', {defaultValue: 'background'})} · ${statusLabel(t, task.status)}`}
             sx={{height: 20, flexShrink: 0, color: (theme) => task.status === 'failed' ? getReadableAccent(theme, 'error') : undefined, borderColor: (theme) => task.status === 'failed' ? getReadableAccent(theme, 'error') : undefined, '& .MuiChip-label': {px: 0.75, fontSize: fontSizes.xs}}}
         />
     );
@@ -118,8 +122,8 @@ const ActivityRow = ({steps, live, expandAll}: {steps: ActivityStep[]; live: boo
     const failed = tools.filter((s) => s.type === 'tool' && s.isError).length;
 
     const label = tools.length === 0
-        ? t('desk.thought', {defaultValue: 'Thought'})
-        : t('desk.usedTools', {defaultValue: tools.length === 1 ? 'Used 1 tool' : 'Used {{count}} tools', count: tools.length});
+        ? t('projects.transcript.thought', {defaultValue: 'Thought'})
+        : t('projects.transcript.usedTools', {defaultValue: tools.length === 1 ? 'Used 1 tool' : 'Used {{count}} tools', count: tools.length});
 
     return (
         <Box data-call-ids={tools.map((s) => (s.type === 'tool' ? s.id : '')).join(' ')} sx={{borderRadius: 1}}>
@@ -137,7 +141,7 @@ const ActivityRow = ({steps, live, expandAll}: {steps: ActivityStep[]; live: boo
                     test it goes on to fix), so only the count is marked. */}
                 {failed > 0 && (
                     <Typography variant="body2" sx={{color: (theme) => getReadableAccent(theme, 'error')}}>
-                        · {t('desk.failedCount', {defaultValue: '{{count}} failed', count: failed})}
+                        · {t('projects.transcript.failedCount', {defaultValue: '{{count}} failed', count: failed})}
                     </Typography>
                 )}
                 {open ? <ExpandMore sx={{fontSize: 16}}/> : <ChevronRight sx={{fontSize: 16}}/>}
@@ -167,7 +171,7 @@ const RequestCard = ({block, pending, onRespond}: {
 }) => {
     const {t} = useTranslation();
     const {message, response} = block;
-    const [request, setRequest, currentRequest] = useDeskStorage(`desk.requestDraft:${message.request_id ?? ''}`, decodeApproval);
+    const [request, setRequest, currentRequest] = useDraft(`requestDraft:${message.request_id ?? ''}`, decodeApproval);
     const answer = request.answer;
     const setAnswer = (text: string) => setRequest((previous) => ({...previous, answer: text}));
     const busy = request.status === 'sending';
@@ -193,8 +197,8 @@ const RequestCard = ({block, pending, onRespond}: {
 
     if (!pending) {
         const outcome = response
-            ? (isAsk ? response.content || t('desk.noAnswer', {defaultValue: '(no answer)'}) : response.content)
-            : t('desk.unanswered', {defaultValue: 'not answered'});
+            ? (isAsk ? response.content || t('projects.transcript.noAnswer', {defaultValue: '(no answer)'}) : response.content)
+            : t('projects.transcript.unanswered', {defaultValue: 'not answered'});
         return (
             <Typography data-request-id={message.request_id} variant="body2" color="text.secondary" noWrap>
                 {isAsk ? message.content : `${message.content}${summary ? ` · ${summary}` : ''}`} → {outcome}
@@ -207,7 +211,7 @@ const RequestCard = ({block, pending, onRespond}: {
             <Typography variant="body2" sx={{fontWeight: 600, mb: 0.75, color: 'text.primary', fontSize: '0.875rem'}}>
                 {isAsk
                     ? message.content
-                    : t('desk.approvalTitle', {defaultValue: 'Allow {{tool}}?', tool: message.content})}
+                    : t('projects.transcript.approvalTitle', {defaultValue: 'Allow {{tool}}?', tool: message.content})}
             </Typography>
             {summary && (
                 <Box component="pre" sx={{...mono, m: 0, mb: 1, p: 1, borderRadius: 1, bgcolor: 'action.hover', whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
@@ -221,27 +225,27 @@ const RequestCard = ({block, pending, onRespond}: {
                     multiline
                     maxRows={8}
                     disabled={busy || submitted}
-                    slotProps={{htmlInput: {'aria-label': t('desk.answerPlaceholder', {defaultValue: 'Your answer'})}}}
+                    slotProps={{htmlInput: {'aria-label': t('projects.transcript.answerPlaceholder', {defaultValue: 'Your answer'})}}}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) {
                             event.preventDefault();
                             void respond(true);
                         }
                     }}
-                    placeholder={t('desk.answerPlaceholder', {defaultValue: 'Your answer'})}
+                    placeholder={t('projects.transcript.answerPlaceholder', {defaultValue: 'Your answer'})}
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
                     sx={{mb: 1}}
                 />
             )}
-            {failed && <Alert severity="error" sx={{mb: 1}}>{t('desk.responseRetry', {defaultValue: 'Response was not accepted. Your answer is kept; try again.'})}</Alert>}
-            {submitted && <Typography role="status" variant="caption">{t('desk.responseSubmitted', {defaultValue: 'Response sent — waiting for the agent…'})}</Typography>}
+            {failed && <Alert severity="error" sx={{mb: 1}}>{t('projects.transcript.responseRetry', {defaultValue: 'Response was not accepted. Your answer is kept; try again.'})}</Alert>}
+            {submitted && <Typography role="status" variant="caption">{t('projects.transcript.responseSubmitted', {defaultValue: 'Response sent — waiting for the agent…'})}</Typography>}
             <Stack direction="row" spacing={1}>
                 <Button size="small" variant="contained" startIcon={<Check/>} disabled={busy || submitted || (isAsk && !answer.trim())} onClick={() => respond(true)}>
-                    {isAsk ? t('desk.answer', {defaultValue: 'Answer'}) : t('desk.approve', {defaultValue: 'Allow'})}
+                    {isAsk ? t('projects.transcript.answer', {defaultValue: 'Answer'}) : t('projects.transcript.approve', {defaultValue: 'Allow'})}
                 </Button>
                 <Button size="small" variant="outlined" color="inherit" startIcon={<Close/>} disabled={busy || submitted} onClick={() => respond(false)}>
-                    {isAsk ? t('desk.decline', {defaultValue: 'Decline'}) : t('desk.deny', {defaultValue: 'Deny'})}
+                    {isAsk ? t('projects.transcript.decline', {defaultValue: 'Decline'}) : t('projects.transcript.deny', {defaultValue: 'Deny'})}
                 </Button>
             </Stack>
         </Paper>
@@ -322,8 +326,8 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
     const usage = task?.usage;
     const meta = usage
         ? [
-            t('desk.toolCount', {defaultValue: usage.tool_uses === 1 ? '1 tool' : '{{count}} tools', count: usage.tool_uses}),
-            `${formatTokens(usage.total_tokens)} ${t('desk.tokens', {defaultValue: 'tokens'})}`,
+            t('projects.transcript.toolCount', {defaultValue: usage.tool_uses === 1 ? '1 tool' : '{{count}} tools', count: usage.tool_uses}),
+            `${formatTokens(usage.total_tokens)} ${t('projects.transcript.tokens', {defaultValue: 'tokens'})}`,
             formatDuration(usage.duration_ms),
         ].join(' · ')
         : '';
@@ -346,7 +350,7 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
                 <Stack direction="row" spacing={1} sx={{alignItems: 'center', minWidth: 0}}>
                     <Robot sx={{fontSize: 18, color: 'text.secondary', flexShrink: 0}}/>
                     <Typography variant="body2" noWrap sx={{fontWeight: 600, color: 'text.primary', minWidth: 0}}>
-                        {input.description || t('desk.subagent', {defaultValue: 'Subagent'})}
+                        {input.description || t('projects.transcript.subagent', {defaultValue: 'Subagent'})}
                     </Typography>
                     {(task?.subagentType || input.subagent_type) && (
                         <Typography variant="caption" sx={{color: 'text.secondary', flexShrink: 0}}>
@@ -354,7 +358,7 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
                         </Typography>
                     )}
                     {task?.background && (
-                        <Chip size="small" variant="outlined" label={t('desk.background', {defaultValue: 'background'})} sx={{height: 18, '& .MuiChip-label': {px: 0.75, fontSize: fontSizes.xs}}}/>
+                        <Chip size="small" variant="outlined" label={t('projects.transcript.background', {defaultValue: 'background'})} sx={{height: 18, '& .MuiChip-label': {px: 0.75, fontSize: fontSizes.xs}}}/>
                     )}
                     <Box sx={{flex: 1}}/>
                     <Stack direction="row" spacing={0.5} sx={{alignItems: 'center', flexShrink: 0}} title={statusLabel(t, status)}>
@@ -372,7 +376,7 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
                 <Stack spacing={1.5} sx={{px: 1.5, pb: 1.5, pt: 0.5, borderTop: 1, borderColor: 'divider'}}>
                     {input.prompt && (
                         <Box>
-                            <Typography variant="caption" sx={{color: 'text.secondary'}}>{t('desk.agentPrompt', {defaultValue: 'Asked to'})}</Typography>
+                            <Typography variant="caption" sx={{color: 'text.secondary'}}>{t('projects.transcript.agentPrompt', {defaultValue: 'Asked to'})}</Typography>
                             <Typography variant="body2" sx={{color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 160, overflow: 'auto'}}>
                                 {input.prompt}
                             </Typography>
@@ -388,12 +392,12 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
                     />
                     {report && (
                         <Box>
-                            <Typography variant="caption" sx={{color: 'text.secondary'}}>{t('desk.agentReport', {defaultValue: 'Report'})}</Typography>
+                            <Typography variant="caption" sx={{color: 'text.secondary'}}>{t('projects.transcript.agentReport', {defaultValue: 'Report'})}</Typography>
                             <Markdown content={report}/>
                         </Box>
                     )}
                     {running && block.children.length === 0 && (
-                        <Typography variant="body2" sx={{color: 'text.secondary'}}>{t('desk.working', {defaultValue: 'Working…'})}</Typography>
+                        <Typography variant="body2" sx={{color: 'text.secondary'}}>{t('projects.transcript.working', {defaultValue: 'Working…'})}</Typography>
                     )}
                 </Stack>
             </Collapse>
@@ -401,7 +405,7 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
     );
 };
 
-const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRespond}: TranscriptProps) => {
+const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRespond, drafts, codeBlock}: TranscriptProps) => {
     const {t} = useTranslation();
     const last = blocks[blocks.length - 1];
     // The spinner rides on the last activity row while a turn runs; if the
@@ -409,15 +413,17 @@ const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRes
     const showWorking = working && !pendingRequestId && last?.type !== 'activity';
 
     return (
+        <TranscriptHostProvider drafts={drafts} codeBlock={codeBlock}>
         <Stack spacing={2.5}>
             <BlockList anchored blocks={blocks} pendingRequestId={pendingRequestId} working={working} expandAll={expandAll} onRespond={onRespond}/>
             {showWorking && (
                 <Stack direction="row" spacing={1} sx={{alignItems: 'center', color: 'text.secondary'}}>
                     <CircularProgress size={12}/>
-                    <Typography variant="body2">{t('desk.working', {defaultValue: 'Working…'})}</Typography>
+                    <Typography variant="body2">{t('projects.transcript.working', {defaultValue: 'Working…'})}</Typography>
                 </Stack>
             )}
         </Stack>
+        </TranscriptHostProvider>
     );
 };
 

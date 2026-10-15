@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import type {MessageInfo} from '@/services/deskApi';
-import {buildTranscript} from './deskUtils';
+import type {TranscriptEntry} from './model';
+import {buildTranscript} from './model';
 import {matchesFilter, plainLine, trajectoryRows, trajectorySummary} from './trajectoryRows';
 
-const msg = (m: Partial<MessageInfo>): MessageInfo => ({content: '', timestamp: '2026-01-01T00:00:00Z', ...m} as MessageInfo);
+const msg = (m: Partial<TranscriptEntry>): TranscriptEntry => ({content: '', timestamp: '2026-01-01T00:00:00Z', ...m});
 
-const rowsOf = (messages: MessageInfo[], live = false) => trajectoryRows(buildTranscript(messages), live);
+const rowsOf = (messages: TranscriptEntry[], live = false) => trajectoryRows(buildTranscript(messages), live);
 
 describe('trajectoryRows', () => {
     it('puts one action per row and leaves thinking out', () => {

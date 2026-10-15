@@ -6,7 +6,8 @@ import {Box, Button, CircularProgress, Collapse, Stack, Typography} from '@mui/m
 import {useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import type {BackgroundTask} from './deskUtils';
-import {formatTokens, timeAgo} from './deskUtils';
+import {formatTokens} from '@tingly/projects/transcript';
+import {timeAgo} from './deskUtils';
 import {getReadableAccent} from '@/theme/status';
 import { fontMono, fontSizes } from '@/theme/fonts';
 

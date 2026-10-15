@@ -11,7 +11,7 @@ const stores = new Map<string, Store>();
 
 // One store per tab/key, including across route unmounts. A late acceptance
 // must update the same state the newly mounted composer is editing.
-function getStore(key: string, decode: (value: unknown) => unknown): Store {
+export function deskStore(key: string, decode: (value: unknown) => unknown): Store {
     const existing = stores.get(key);
     if (existing) return existing;
     let raw: string | null | undefined;
@@ -58,7 +58,7 @@ function getStore(key: string, decode: (value: unknown) => unknown): Store {
 }
 
 export function useDeskStorage<T>(key: string, decode: (value: unknown) => T) {
-    const store = getStore(key, decode);
+    const store = deskStore(key, decode);
     const value = useSyncExternalStore(store.subscribe, store.snapshot) as T;
     const update = useCallback((change: SetStateAction<T>) => {
         store.update((previous) => typeof change === 'function' ? (change as (value: T) => T)(previous as T) : change);

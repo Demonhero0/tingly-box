@@ -1,15 +1,20 @@
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import type {DraftStorage} from './context';
+import {createMemoryDraftStorage} from './context';
 import Transcript from './Transcript';
-import type {TranscriptBlock} from './deskUtils';
+import type {TranscriptBlock} from './model';
 
 vi.mock('react-i18next', () => ({useTranslation: () => ({t: (_key: string, opts: {defaultValue: string}) => opts.defaultValue})}));
-afterEach(() => {cleanup(); sessionStorage.clear();});
+// A fresh store per test; within one, it outlives unmounts like the host's does.
+let drafts: DraftStorage;
+beforeEach(() => {drafts = createMemoryDraftStorage();});
+afterEach(cleanup);
 const request = (id = 'r1', kind = 'approval_request'): TranscriptBlock => ({type: 'request', message: {
     content: 'Bash', kind, request_id: id, payload: {command: 'first line\nsecond line'}, timestamp: '2026-10-04T00:00:00Z',
 }});
 const show = (respond: (id: string, approved: boolean, answer: string) => Promise<boolean>, block = request()) =>
-    render(<Transcript blocks={[block]} pendingRequestId={block.type === 'request' ? block.message.request_id : undefined} working onRespond={respond}/>);
+    render(<Transcript blocks={[block]} pendingRequestId={block.type === 'request' ? block.message.request_id : undefined} working onRespond={respond} drafts={drafts}/>);
 
 describe('Desk pending requests', () => {
     it('shows full approval input and never resubmits an accepted decision while polling catches up', async () => {
@@ -43,14 +48,14 @@ describe('Desk pending requests', () => {
         expect(screen.getByRole('textbox', {name: 'Your answer'})).toHaveValue('Keep this answer');
         await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Answer'})));
         expect(respond).toHaveBeenLastCalledWith('question', true, 'Keep this answer');
-        expect(JSON.parse(sessionStorage.getItem('desk.requestDraft:question')!).answer).toBe('');
+        expect(drafts.read('requestDraft:question', (saved) => saved)).toMatchObject({answer: ''});
     });
 
     it('does not carry a submitted decision into a new request in the same transcript slot', async () => {
         const respond = vi.fn().mockResolvedValue(true);
         const view = show(respond);
         await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Allow'})));
-        view.rerender(<Transcript blocks={[request('r2')]} pendingRequestId="r2" working onRespond={respond}/>);
+        view.rerender(<Transcript blocks={[request('r2')]} pendingRequestId="r2" working onRespond={respond} drafts={drafts}/>);
         expect(screen.getByRole('button', {name: 'Allow'})).toBeEnabled();
     });
 });

@@ -1,5 +1,5 @@
-import type {TaskState, ToolStep, TranscriptBlock} from './deskUtils';
-import {agentStatus, toolSummary} from './deskUtils';
+import type {TaskState, ToolStep, TranscriptBlock} from './model';
+import {agentStatus, toolSummary} from './model';
 
 // The trajectory is the transcript read for review: the same blocks the chat
 // renders, one line per thing the agent did, so "what did it do" doesn't mean

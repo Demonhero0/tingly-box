@@ -9,6 +9,7 @@ import agent from './agent';
 import remote from './remote';
 import image from './image';
 import desk from './desk';
+import projects from './projects';
 
 export default {
     ...app,
@@ -20,4 +21,5 @@ export default {
     ...remote,
     ...image,
     ...desk,
+    ...projects,
 };
