@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tingly-dev/tingly-box/swagger"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/apierr"
 	"github.com/tingly-dev/tingly-box/projects/llm"
+	"github.com/tingly-dev/tingly-box/swagger"
 )
 
 // SettingsResponse is the connection as shown to the UI. The API key itself

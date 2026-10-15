@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tingly-dev/tingly-box/swagger"
 	"github.com/tingly-dev/tingly-box/projects/internal/db"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/apierr"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/settings"
+	"github.com/tingly-dev/tingly-box/swagger"
 )
 
 // ConversationListResponse lists conversations.
