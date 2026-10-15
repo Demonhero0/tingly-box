@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {TranscriptEntry} from './model';
-import {agentReport, buildTranscript, formatTokens, pendingRequestId, toolSummary} from './model';
+import {agentReport, approvalSubject, buildTranscript, formatTokens, pendingRequestId, requestOutcome, toolSummary} from './model';
 
 const msg = (m: Partial<TranscriptEntry>): TranscriptEntry => ({content: '', timestamp: '2026-01-01T00:00:00Z', ...m});
 
@@ -147,5 +147,59 @@ describe('formatTokens', () => {
         expect(formatTokens(950)).toBe('950');
         expect(formatTokens(12_345)).toBe('12.3k');
         expect(formatTokens(1_234_567)).toBe('1.2M');
+    });
+});
+
+describe('approvals that belong to a call', () => {
+    it('links an approval to the call right before it, by the same tool', () => {
+        const blocks = buildTranscript([
+            msg({kind: 'tool_use', content: 'Bash', request_id: 't1', payload: {command: 'go test'}}),
+            msg({kind: 'usage', payload: {input_tokens: 1, output_tokens: 1, cache_read_tokens: 0, cache_write_tokens: 0, context_tokens: 1}}),
+            msg({kind: 'approval_request', content: 'Bash', request_id: 'r1', payload: {command: 'go test'}}),
+            msg({kind: 'approval_response', content: 'approved', request_id: 'r1'}),
+            msg({kind: 'tool_result', content: 'ok', request_id: 't1'}),
+        ]);
+        const [activity, request] = blocks;
+        if (activity.type !== 'activity' || activity.steps[0].type !== 'tool' || request.type !== 'request') throw new Error('unexpected blocks');
+        expect(request.toolId).toBe('t1');
+        expect(activity.steps[0].request).toBe(request);
+    });
+
+    it('leaves an approval alone when the call before it is another tool or already ran', () => {
+        const blocks = buildTranscript([
+            msg({kind: 'tool_use', content: 'Read', request_id: 't1'}),
+            msg({kind: 'approval_request', content: 'Bash', request_id: 'r1'}),
+            msg({kind: 'tool_use', content: 'Bash', request_id: 't2'}),
+            msg({kind: 'tool_result', content: 'ok', request_id: 't2'}),
+            msg({kind: 'approval_request', content: 'Bash', request_id: 'r2'}),
+            msg({kind: 'ask_request', content: 'Which branch?', request_id: 'q1'}),
+        ]);
+        expect(blocks.filter((b) => b.type === 'request').map((b) => b.type === 'request' && b.toolId)).toEqual([undefined, undefined, undefined]);
+    });
+});
+
+describe('requestOutcome', () => {
+    const request = (kind: string, answer?: string) => buildTranscript([
+        msg({kind, content: 'Bash', request_id: 'r1'}),
+        ...(answer === undefined ? [] : [msg({kind: kind.replace('request', 'response'), content: answer, request_id: 'r1'})]),
+    ])[0] as Extract<ReturnType<typeof buildTranscript>[number], {type: 'request'}>;
+
+    it('reads the engine\'s answer', () => {
+        expect(requestOutcome(request('approval_request', 'approved'), false)).toBe('allowed');
+        expect(requestOutcome(request('approval_request', 'denied'), false)).toBe('denied');
+        expect(requestOutcome(request('ask_request', 'main'), false)).toBe('answered');
+        expect(requestOutcome(request('ask_request', ''), false)).toBe('declined');
+        expect(requestOutcome(request('approval_request'), false)).toBe('unanswered');
+        expect(requestOutcome(request('approval_request'), true)).toBe('pending');
+    });
+});
+
+describe('approvalSubject', () => {
+    it('is the concrete thing being approved', () => {
+        expect(approvalSubject('Bash', {command: 'rm -rf dist\nls', description: 'Clean'})).toEqual({kind: 'command', text: 'rm -rf dist\nls'});
+        expect(approvalSubject('Edit', {file_path: '/a/b.go', old_string: 'x'})).toEqual({kind: 'path', text: '/a/b.go'});
+        expect(approvalSubject('NotebookEdit', {notebook_path: '/a/n.ipynb'})).toEqual({kind: 'path', text: '/a/n.ipynb'});
+        expect(approvalSubject('WebFetch', {url: 'https://x.y', prompt: 'read it'})).toEqual({kind: 'url', text: 'https://x.y'});
+        expect(approvalSubject('Grep', {pattern: 'TODO'})).toEqual({kind: 'summary', text: 'TODO'});
     });
 });

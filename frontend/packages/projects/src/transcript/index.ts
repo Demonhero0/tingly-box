@@ -4,10 +4,10 @@
 // API. Strings live under projects.transcript.* in the host's i18n bundles.
 
 export type {
-    ActivityStep, TaskEvent, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry,
+    ActivityStep, ApprovalSubject, RequestBlock, RequestOutcome, TaskEvent, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry,
 } from './model';
 export {
-    agentReport, agentStatus, buildTranscript, foldTasks, formatTokens, isAgentTool, pendingRequestId, toolSummary,
+    agentReport, agentStatus, approvalSubject, buildTranscript, foldTasks, formatTokens, isAgentTool, pendingRequestId, requestOutcome, toolSummary,
 } from './model';
 
 export type {TrajectoryAnchor, TrajectoryFilter, TrajectoryKind, TrajectoryRow, TrajectorySummary} from './trajectoryRows';

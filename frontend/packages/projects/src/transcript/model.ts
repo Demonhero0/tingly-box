@@ -44,6 +44,9 @@ export interface ToolStep {
     isError: boolean;
     // Set when the call started a background task (a backgrounded command).
     task?: TaskState;
+    // The approval asked for right before this call ran: once settled, the
+    // call's row says how it ended instead of a second line repeating it.
+    request?: RequestBlock;
 }
 
 // TaskEvent is the payload of a "task" transcript entry (internal/desk/
@@ -102,9 +105,12 @@ export type TranscriptBlock =
     // A subagent run: the Agent call, what the subagent did (its own
     // blocks), and its task state. The final report is its last reply.
     | {type: 'agent'; call: ToolStep; children: TranscriptBlock[]; task?: TaskState}
-    | {type: 'request'; message: TranscriptEntry; response?: TranscriptEntry}
+    // toolId is the call an approval was asked for (see ToolStep.request).
+    | {type: 'request'; message: TranscriptEntry; response?: TranscriptEntry; toolId?: string}
     | {type: 'error'; message: TranscriptEntry}
     | {type: 'system'; message: TranscriptEntry};
+
+export type RequestBlock = Extract<TranscriptBlock, {type: 'request'}>;
 
 // Emitted once per turn by the backend's converter (internal/desk/convert.go)
 // to record the Claude session id; it answers nothing the user asks, so the
@@ -196,11 +202,14 @@ export const buildTranscript = (messages: TranscriptEntry[]): TranscriptBlock[] 
 
 const buildBlocks = (messages: TranscriptEntry[], byParent: Map<string, TranscriptEntry[]>, tasks: Map<string, TaskState>): TranscriptBlock[] => {
     const blocks: TranscriptBlock[] = [];
-    const requests = new Map<string, Extract<TranscriptBlock, {type: 'request'}>>();
+    const requests = new Map<string, RequestBlock>();
     let activity: Extract<TranscriptBlock, {type: 'activity'}> | null = null;
     // Across blocks: an approval between a call and its result starts a new
     // activity row, and the result still belongs to the call before it.
     const tools = new Map<string, ToolStep>();
+    // The entry before this one, among those that show: an approval right
+    // after the call it gates belongs to that call.
+    let previous: TranscriptEntry | undefined;
 
     const currentActivity = () => {
         if (!activity) {
@@ -211,6 +220,8 @@ const buildBlocks = (messages: TranscriptEntry[], byParent: Map<string, Transcri
     };
 
     for (const m of messages) {
+        const before = previous;
+        if (m.kind !== 'usage' && m.kind !== 'task') previous = m;
         switch (m.kind) {
             case 'thinking':
                 currentActivity().steps.push({type: 'thinking', text: m.content});
@@ -259,8 +270,15 @@ const buildBlocks = (messages: TranscriptEntry[], byParent: Map<string, Transcri
         switch (m.kind) {
             case 'approval_request':
             case 'ask_request': {
-                const block: Extract<TranscriptBlock, {type: 'request'}> = {type: 'request', message: m};
+                const block: RequestBlock = {type: 'request', message: m};
                 if (m.request_id) requests.set(m.request_id, block);
+                // Claude Code asks right after announcing the call, so the
+                // call just before, by the same tool and not yet run, is it.
+                const tool = m.kind === 'approval_request' && before?.kind === 'tool_use' && before.request_id ? tools.get(before.request_id) : undefined;
+                if (tool && tool.name === m.content && tool.result === undefined && !tool.request) {
+                    tool.request = block;
+                    block.toolId = tool.id;
+                }
                 blocks.push(block);
                 break;
             }
@@ -294,6 +312,55 @@ export const agentReport = (block: Extract<TranscriptBlock, {type: 'agent'}>): s
         if (c.type === 'assistant' && c.message.content.trim()) return c.message.content;
     }
     return block.task?.summary;
+};
+
+// RequestOutcome is how a request ended, or that it still waits.
+export type RequestOutcome = 'pending' | 'allowed' | 'denied' | 'answered' | 'declined' | 'unanswered';
+
+// requestOutcome reads the answer the engine wrote (an approval's is
+// "approved" or "denied"; a question's is the answer, empty when declined).
+// pending is whether this is the request the live turn waits on.
+export const requestOutcome = (block: RequestBlock, pending: boolean): RequestOutcome => {
+    if (pending) return 'pending';
+    const {message, response} = block;
+    if (!response) return 'unanswered';
+    if (message.kind === 'ask_request') return response.content.trim() ? 'answered' : 'declined';
+    return response.content === 'approved' ? 'allowed' : 'denied';
+};
+
+const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+
+export interface ApprovalSubject {
+    // command: a shell command, shown whole; path / url: the file or page
+    // the call touches; summary: the one field that best says what it does.
+    kind: 'command' | 'path' | 'url' | 'summary';
+    text: string;
+}
+
+// approvalSubject is the concrete thing an approval is about — what the user
+// is actually saying yes to — instead of the tool's raw input.
+export const approvalSubject = (tool: string, input: unknown): ApprovalSubject => {
+    const record = input != null && typeof input === 'object' ? input as Record<string, unknown> : {};
+    const field = (...keys: string[]) => {
+        for (const key of keys) {
+            const v = record[key];
+            if (typeof v === 'string' && v.trim() !== '') return v.trim();
+        }
+        return '';
+    };
+    if (tool === 'Bash') {
+        const command = field('command');
+        if (command) return {kind: 'command', text: command};
+    }
+    if (EDIT_TOOLS.has(tool)) {
+        const path = field('file_path', 'notebook_path', 'path');
+        if (path) return {kind: 'path', text: path};
+    }
+    if (tool === 'WebFetch') {
+        const url = field('url');
+        if (url) return {kind: 'url', text: url};
+    }
+    return {kind: 'summary', text: toolSummary(input)};
 };
 
 // A request is answerable only while its turn is live and nothing has

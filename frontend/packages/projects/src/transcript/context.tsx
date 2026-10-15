@@ -55,9 +55,9 @@ export const TranscriptHostProvider = ({drafts, codeBlock, children}: {drafts?: 
 
 export const useTranscriptHost = (): TranscriptHost => useContext(HostContext);
 
-// useDraft reads and writes one draft in the host's storage: the decoded
-// value, a setter, and a ref that always reads the latest stored value (so a
-// handler can check what was sent without waiting for a render).
+// useDraft reads and writes one draft in the host's storage: the value, a
+// setter, and a reader for the latest stored value (so a handler can check
+// what was already sent without waiting for a render).
 export function useDraft<T>(key: string, decode: (value: unknown) => T) {
     const {drafts} = useTranscriptHost();
     const subscribe = useCallback((listener: () => void) => drafts.subscribe(key, listener), [drafts, key]);
@@ -66,6 +66,5 @@ export function useDraft<T>(key: string, decode: (value: unknown) => T) {
     const update = useCallback((change: SetStateAction<T>) => {
         drafts.write(key, typeof change === 'function' ? (change as (value: T) => T)(read()) : change);
     }, [drafts, key, read]);
-    const current = useMemo(() => ({get current() {return read();}}), [read]);
-    return [value, update, current] as const;
+    return [value, update, read] as const;
 }

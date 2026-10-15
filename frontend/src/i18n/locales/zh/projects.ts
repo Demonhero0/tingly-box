@@ -9,11 +9,21 @@ export default {
       "approvalTitle": "允许 {{tool}}？",
       "approve": "允许",
       "background": "后台",
+      "callFailed": "失败",
       "decline": "拒绝",
       "deny": "不允许",
+      "details": "详情",
+      "input": "输入",
       "noAnswer": "（未回答）",
+      "outcomeAllowed": "已允许",
+      "outcomeAnswered": "已回答",
+      "outcomeDeclined": "已拒绝回答",
+      "outcomeDenied": "已拒绝",
+      "outcomeNotAnswered": "未回答",
+      "output": "输出",
       "responseRetry": "回复未被接受，已保留回答，请重试。",
       "responseSubmitted": "回复已发送，等待代理继续…",
+      "result": "结果",
       "subagent": "子代理",
       "taskDone": "已完成",
       "taskFailed": "失败",
@@ -44,10 +54,7 @@ export default {
       "trajectoryWaiting": "等待你处理",
       "unanswered": "未回答",
       "viewTrajectory": "轨迹",
-      "working": "处理中…",
-      "usedTools_one": "已使用 {{count}} 个工具",
-      "usedTools_other": "已使用 {{count}} 个工具",
-      "failedCount": "{{count}} 个失败"
+      "working": "处理中…"
     }
   }
 };

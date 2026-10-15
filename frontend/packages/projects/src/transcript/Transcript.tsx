@@ -1,21 +1,24 @@
-import {Block, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Robot} from '@tingly/ui/icons';
-import {Box, Button, Chip, CircularProgress, Collapse, Paper, Stack, TextField, Alert, Typography} from '@mui/material';
-import type {TFunction} from 'i18next';
-import {useState} from 'react';
-import {useTranslation} from 'react-i18next';
+import {Block, Build, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Help, Psychology, Robot, Terminal} from '@tingly/ui/icons';
+import {Alert, Box, Button, Chip, CircularProgress, Collapse, Paper, Stack, TextField, Typography} from '@mui/material';
+import type {Theme} from '@mui/material/styles';
 import {getReadableAccent} from '@tingly/ui/theme/status';
 import {fontMono, fontSizes} from '@tingly/ui/theme/fonts';
+import type {TFunction} from 'i18next';
+import type {ReactNode} from 'react';
+import {useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import type {CodeBlockComponent, DraftStorage} from './context';
 import {TranscriptHostProvider, useDraft} from './context';
-import type {ActivityStep, TaskState, TranscriptBlock, TranscriptEntry} from './model';
-import {agentReport, agentStatus, formatTokens, toolSummary} from './model';
+import type {ActivityStep, RequestBlock, RequestOutcome, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry} from './model';
+import {agentReport, agentStatus, approvalSubject, formatTokens, requestOutcome, toolSummary} from './model';
 import Markdown from './Markdown';
 
 interface TranscriptProps {
     blocks: TranscriptBlock[];
     pendingRequestId?: string;
     working: boolean;
-    // Opens every activity row; each row can still be toggled on its own.
+    // Opens every tool call, thought and subagent; each can still be toggled
+    // on its own.
     expandAll?: boolean;
     onRespond: (requestId: string, approved: boolean, answer: string) => Promise<boolean>;
     // Where request-card drafts live; in memory unless the host passes a store.
@@ -34,6 +37,11 @@ const conversationText = {
     color: 'text.primary', fontSize: '0.9375rem', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
 } as const;
 
+const preBox = {
+    ...mono, m: 0, p: 1, borderRadius: 1, maxHeight: 220, overflow: 'auto',
+    whiteSpace: 'pre-wrap', wordBreak: 'break-word', bgcolor: 'action.hover', color: 'text.secondary',
+} as const;
+
 const UserBubble = ({message}: {message: TranscriptEntry}) => (
     <Box sx={{display: 'flex', justifyContent: 'flex-end'}}>
         <Box sx={{maxWidth: '80%', bgcolor: 'action.hover', px: 2, py: 1.25, borderRadius: 3}}>
@@ -49,12 +57,22 @@ const formatDuration = (ms: number): string => {
     return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m ${sec % 60}s`;
 };
 
+const prettyInput = (input: unknown): string => (input == null ? '' : JSON.stringify(input, null, 2));
+
 const statusLabel = (t: TFunction, status: TaskState['status']) => ({
     running: t('projects.transcript.taskRunning', {defaultValue: 'running'}),
     completed: t('projects.transcript.taskDone', {defaultValue: 'done'}),
     stopped: t('projects.transcript.taskStopped', {defaultValue: 'stopped'}),
     failed: t('projects.transcript.taskFailed', {defaultValue: 'failed'}),
 }[status]);
+
+// useExpanded is a row's open state: it follows "expand all", and a row's own
+// toggle holds until "expand all" is flipped again.
+const useExpanded = (expandAll: boolean): [boolean, () => void] => {
+    const [toggled, setToggled] = useState<{under: boolean; open: boolean} | null>(null);
+    const open = toggled?.under === expandAll ? toggled.open : expandAll;
+    return [open, () => setToggled({under: expandAll, open: !open})];
+};
 
 // TaskTag marks a call that runs in the background, with its state: the
 // turn that started it may be long over while it still works.
@@ -72,86 +90,160 @@ const TaskTag = ({task}: {task: TaskState}) => {
     );
 };
 
-const StepDetail = ({step}: {step: ActivityStep}) => {
-    if (step.type === 'thinking') {
-        return (
-            <Typography variant="body2" color="text.secondary" sx={{fontStyle: 'italic', whiteSpace: 'pre-wrap'}}>
-                {step.text}
-            </Typography>
-        );
+const outcomeColor = (theme: Theme, outcome: RequestOutcome): string => {
+    switch (outcome) {
+        case 'allowed':
+        case 'answered':
+            return getReadableAccent(theme, 'success');
+        case 'denied':
+        case 'declined':
+            return getReadableAccent(theme, 'error');
+        default:
+            return theme.palette.text.disabled;
     }
-    const summary = toolSummary(step.input);
+};
+
+// OutcomeTag says how a settled request ended, as a small tag at the end of
+// the line it belongs to.
+const OutcomeTag = ({outcome}: {outcome: RequestOutcome}) => {
+    const {t} = useTranslation();
+    const ok = outcome === 'allowed' || outcome === 'answered';
+    const label = {
+        pending: '',
+        allowed: t('projects.transcript.outcomeAllowed', {defaultValue: 'Allowed'}),
+        answered: t('projects.transcript.outcomeAnswered', {defaultValue: 'Answered'}),
+        denied: t('projects.transcript.outcomeDenied', {defaultValue: 'Denied'}),
+        declined: t('projects.transcript.outcomeDeclined', {defaultValue: 'Declined'}),
+        unanswered: t('projects.transcript.outcomeNotAnswered', {defaultValue: 'Not answered'}),
+    }[outcome];
     return (
-        <Box>
-            <Stack direction="row" spacing={1} sx={{alignItems: 'baseline', minWidth: 0}}>
-                <Typography variant="body2" sx={{fontWeight: 600, flexShrink: 0, color: (theme) => step.isError ? getReadableAccent(theme, 'error') : theme.palette.text.primary}}>
-                    {step.name || 'Result'}
-                </Typography>
-                {summary && (
-                    <Typography variant="body2" color="text.secondary" noWrap sx={mono}>{summary}</Typography>
-                )}
-                {step.task?.background && <TaskTag task={step.task}/>}
-            </Stack>
-            {step.result && (
-                <Box
-                    component="pre"
-                    sx={{
-                        ...mono, m: 0, mt: 0.5, p: 1, borderRadius: 1, maxHeight: 220, overflow: 'auto',
-                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                        bgcolor: 'action.hover',
-                        color: 'text.secondary',
-                    }}
-                >
-                    {step.result}
-                </Box>
-            )}
+        <Box
+            component="span"
+            data-outcome={outcome}
+            sx={{display: 'inline-flex', alignItems: 'center', gap: 0.25, flexShrink: 0, fontSize: fontSizes.sm, color: (theme) => outcomeColor(theme, outcome)}}
+        >
+            {ok ? <Check sx={{fontSize: 13}}/> : <Block sx={{fontSize: 13}}/>}
+            {label}
         </Box>
     );
 };
 
-// ActivityRow is one line for a run of thinking and tool calls ("Used 3
-// tools"), expandable into each call and its output: the reply stays the
-// visual anchor, and the detail is one click away rather than in the way.
-const ActivityRow = ({steps, live, expandAll}: {steps: ActivityStep[]; live: boolean; expandAll: boolean}) => {
-    const {t} = useTranslation();
-    // A row's own toggle holds until "expand all" is flipped again.
-    const [toggled, setToggled] = useState<{under: boolean; open: boolean} | null>(null);
-    const open = toggled?.under === expandAll ? toggled.open : expandAll;
-    const setOpen = (next: (v: boolean) => boolean) => setToggled({under: expandAll, open: next(open)});
-    const tools = steps.filter((s) => s.type === 'tool');
-    const failed = tools.filter((s) => s.type === 'tool' && s.isError).length;
+// A quiet, clickable line: what a tool call or a thought is, one click away
+// from its detail. The reply stays the visual anchor.
+const RowLine = ({open, onToggle, children, error = false}: {open: boolean; onToggle: () => void; children: ReactNode; error?: boolean}) => (
+    <Box
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={onToggle}
+        onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onToggle();
+            }
+        }}
+        sx={{
+            display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, py: 0.25, px: 0.5, mx: -0.5, borderRadius: 1,
+            cursor: 'default', userSelect: 'none',
+            color: (theme) => error ? getReadableAccent(theme, 'error') : theme.palette.text.secondary,
+            '&:hover': {bgcolor: 'action.hover', color: (theme) => error ? getReadableAccent(theme, 'error') : theme.palette.text.primary},
+        }}
+    >
+        {children}
+        {open ? <ExpandMore sx={{fontSize: 16, flexShrink: 0}}/> : <ChevronRight sx={{fontSize: 16, flexShrink: 0}}/>}
+    </Box>
+);
 
-    const label = tools.length === 0
-        ? t('projects.transcript.thought', {defaultValue: 'Thought'})
-        : t('projects.transcript.usedTools', {defaultValue: tools.length === 1 ? 'Used 1 tool' : 'Used {{count}} tools', count: tools.length});
+const Section = ({label, children}: {label: string; children: string}) => (
+    <Box>
+        <Typography variant="caption" sx={{color: 'text.secondary'}}>{label}</Typography>
+        <Box component="pre" sx={preBox}>{children}</Box>
+    </Box>
+);
+
+// ToolRow is one tool call on one line: the tool and the concrete thing it
+// did (the command, the file), how its approval went when it needed one, and
+// whether it failed. Opened, it shows its input and its output.
+const ToolRow = ({step, live, expandAll, pendingRequestId}: {step: ToolStep; live: boolean; expandAll: boolean; pendingRequestId?: string}) => {
+    const {t} = useTranslation();
+    const [open, toggle] = useExpanded(expandAll);
+    const summary = toolSummary(step.input);
+    const request = step.request;
+    const requestId = request?.message.request_id;
+    // The pending approval is its own card below the call.
+    const outcome = request && !(requestId && requestId === pendingRequestId) ? requestOutcome(request, false) : undefined;
+    // A denied call fails by definition; the tag already says why.
+    const failed = step.isError && outcome !== 'denied';
+    const input = prettyInput(step.input);
 
     return (
-        <Box data-call-ids={tools.map((s) => (s.type === 'tool' ? s.id : '')).join(' ')} sx={{borderRadius: 1}}>
-            <Box
-                role="button"
-                onClick={() => setOpen((v) => !v)}
-                sx={{
-                    display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'default', userSelect: 'none',
-                    color: 'text.secondary', '&:hover': {color: 'text.primary'},
-                }}
-            >
-                {live && <CircularProgress size={12} sx={{mr: 0.5}}/>}
-                <Typography variant="body2" sx={{color: 'inherit'}}>{label}</Typography>
-                {/* A failing command is routine inside an agent's run (a red
-                    test it goes on to fix), so only the count is marked. */}
-                {failed > 0 && (
-                    <Typography variant="body2" sx={{color: (theme) => getReadableAccent(theme, 'error')}}>
-                        · {t('projects.transcript.failedCount', {defaultValue: '{{count}} failed', count: failed})}
+        <Box data-call-ids={step.id || undefined} data-request-id={outcome ? requestId : undefined}>
+            <RowLine open={open} onToggle={toggle} error={failed}>
+                {live
+                    ? <CircularProgress size={12} sx={{flexShrink: 0, mx: 0.125}}/>
+                    : failed ? <ErrorOutline sx={{fontSize: 14, flexShrink: 0}}/> : <Build sx={{fontSize: 14, flexShrink: 0}}/>}
+                <Typography variant="body2" sx={{fontWeight: 600, flexShrink: 0, color: 'inherit'}}>
+                    {step.name || t('projects.transcript.result', {defaultValue: 'Result'})}
+                </Typography>
+                <Typography variant="body2" noWrap sx={{...mono, flex: 1, minWidth: 0, color: 'inherit'}}>{summary}</Typography>
+                {step.task?.background && <TaskTag task={step.task}/>}
+                {outcome && <OutcomeTag outcome={outcome}/>}
+                {failed && (
+                    <Typography variant="body2" sx={{flexShrink: 0, color: 'inherit'}}>
+                        {outcome ? '· ' : ''}{t('projects.transcript.callFailed', {defaultValue: 'failed'})}
                     </Typography>
                 )}
-                {open ? <ExpandMore sx={{fontSize: 16}}/> : <ChevronRight sx={{fontSize: 16}}/>}
-            </Box>
+            </RowLine>
             <Collapse in={open} unmountOnExit>
-                <Stack spacing={1.25} sx={{mt: 1, pl: 1.5, borderLeft: 2, borderColor: 'divider'}}>
-                    {steps.map((s, i) => <StepDetail key={i} step={s}/>)}
+                <Stack spacing={0.75} sx={{mt: 0.5, mb: 1, pl: 1.5, borderLeft: 2, borderColor: 'divider'}}>
+                    {input && <Section label={t('projects.transcript.input', {defaultValue: 'Input'})}>{input}</Section>}
+                    {step.result && <Section label={t('projects.transcript.output', {defaultValue: 'Output'})}>{step.result}</Section>}
                 </Stack>
             </Collapse>
         </Box>
+    );
+};
+
+// ThoughtRow folds a run of thinking into one quiet "Thought" line.
+const ThoughtRow = ({steps, live, expandAll}: {steps: ThinkingStep[]; live: boolean; expandAll: boolean}) => {
+    const {t} = useTranslation();
+    const [open, toggle] = useExpanded(expandAll);
+    return (
+        <Box>
+            <RowLine open={open} onToggle={toggle}>
+                {live ? <CircularProgress size={12} sx={{flexShrink: 0, mx: 0.125}}/> : <Psychology sx={{fontSize: 14, flexShrink: 0}}/>}
+                <Typography variant="body2" sx={{color: 'inherit'}}>{t('projects.transcript.thought', {defaultValue: 'Thought'})}</Typography>
+            </RowLine>
+            <Collapse in={open} unmountOnExit>
+                <Stack spacing={1} sx={{mt: 0.5, mb: 1, pl: 1.5, borderLeft: 2, borderColor: 'divider'}}>
+                    {steps.map((s, i) => (
+                        <Typography key={i} variant="body2" color="text.secondary" sx={{fontStyle: 'italic', whiteSpace: 'pre-wrap'}}>{s.text}</Typography>
+                    ))}
+                </Stack>
+            </Collapse>
+        </Box>
+    );
+};
+
+// ActivityRun is a run of thinking and tool calls: one line per call, and
+// each run of thinking folded into one "Thought" line. While the turn runs,
+// the last line carries the spinner.
+const ActivityRun = ({steps, live, expandAll, pendingRequestId}: {steps: ActivityStep[]; live: boolean; expandAll: boolean; pendingRequestId?: string}) => {
+    const rows: (ToolStep | ThinkingStep[])[] = [];
+    for (const s of steps) {
+        if (s.type === 'tool') rows.push(s);
+        else if (Array.isArray(rows[rows.length - 1])) (rows[rows.length - 1] as ThinkingStep[]).push(s);
+        else rows.push([s]);
+    }
+    return (
+        <Stack spacing={0.25}>
+            {rows.map((r, i) => {
+                const last = live && i === rows.length - 1;
+                return Array.isArray(r)
+                    ? <ThoughtRow key={i} steps={r} live={last} expandAll={expandAll}/>
+                    : <ToolRow key={r.id || i} step={r} live={last} expandAll={expandAll} pendingRequestId={pendingRequestId}/>;
+            })}
+        </Stack>
     );
 };
 
@@ -161,27 +253,78 @@ const decodeApproval = (value: unknown): ApprovalDraft => {
     return {answer: typeof saved.answer === 'string' ? saved.answer : '', status: saved.status === 'accepted' ? 'accepted' : 'idle'};
 };
 
-// RequestCard is an approval or a question from Claude. Only the one still
-// waiting on a live turn is actionable; an answered one collapses to a line
-// saying what was decided.
-const RequestCard = ({block, pending, onRespond}: {
-    block: Extract<TranscriptBlock, {type: 'request'}>;
-    pending: boolean;
+// Subject is the concrete thing an approval is about: a command whole, in a
+// code block; a path or URL as the literal value.
+const Subject = ({tool, input, inline = false}: {tool: string; input: unknown; inline?: boolean}) => {
+    const subject = approvalSubject(tool, input);
+    if (!subject.text) return null;
+    if (inline) {
+        return <Typography component="span" variant="body2" noWrap sx={{...mono, minWidth: 0, flex: 1, color: 'inherit'}}>{subject.text.split('\n')[0]}</Typography>;
+    }
+    return (
+        <Box
+            component="pre"
+            data-subject={subject.kind}
+            sx={{...mono, m: 0, p: 1, borderRadius: 1, bgcolor: 'action.hover', color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 200, overflow: 'auto'}}
+        >
+            {subject.text}
+        </Box>
+    );
+};
+
+// SettledRequest is a request nothing waits on any more, as one quiet line:
+// what was asked and how it ended. An answered question reads as the
+// question and, under it, the answer.
+const SettledRequest = ({block}: {block: RequestBlock}) => {
+    const {t} = useTranslation();
+    const {message, response} = block;
+    const isAsk = message.kind === 'ask_request';
+    const outcome = requestOutcome(block, false);
+    return (
+        <Stack data-request-id={message.request_id} direction="row" spacing={0.75} sx={{alignItems: 'flex-start', color: 'text.secondary', minWidth: 0}}>
+            {isAsk ? <Help sx={{fontSize: 14, mt: 0.375, flexShrink: 0}}/> : <Terminal sx={{fontSize: 14, mt: 0.375, flexShrink: 0}}/>}
+            <Box sx={{flex: 1, minWidth: 0}}>
+                <Stack direction="row" spacing={0.75} sx={{alignItems: 'baseline', minWidth: 0}}>
+                    {isAsk
+                        ? <Typography variant="body2" sx={{color: 'inherit', wordBreak: 'break-word'}}>{message.content}</Typography>
+                        : (
+                            <>
+                                <Typography variant="body2" sx={{fontWeight: 600, flexShrink: 0, color: 'inherit'}}>{message.content}</Typography>
+                                <Subject tool={message.content} input={message.payload} inline/>
+                            </>
+                        )}
+                </Stack>
+                {isAsk && response && (
+                    <Typography variant="body2" sx={{color: outcome === 'answered' ? 'text.primary' : 'text.secondary', whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
+                        ↳ {response.content.trim() || t('projects.transcript.noAnswer', {defaultValue: '(no answer)'})}
+                    </Typography>
+                )}
+            </Box>
+            {!(isAsk && response) && <OutcomeTag outcome={outcome}/>}
+        </Stack>
+    );
+};
+
+// RequestCard is the approval or question the live turn waits on: it shows
+// what exactly is being approved, with the full input one click away.
+const RequestCard = ({block, onRespond}: {
+    block: RequestBlock;
     onRespond: (approved: boolean, answer: string) => Promise<boolean>;
 }) => {
     const {t} = useTranslation();
-    const {message, response} = block;
-    const [request, setRequest, currentRequest] = useDraft(`requestDraft:${message.request_id ?? ''}`, decodeApproval);
+    const {message} = block;
+    const [request, setRequest, latestRequest] = useDraft(`requestDraft:${message.request_id ?? ''}`, decodeApproval);
+    const [details, setDetails] = useState(false);
     const answer = request.answer;
     const setAnswer = (text: string) => setRequest((previous) => ({...previous, answer: text}));
     const busy = request.status === 'sending';
     const submitted = request.status === 'accepted';
     const [failed, setFailed] = useState(false);
     const isAsk = message.kind === 'ask_request';
-    const summary = isAsk ? '' : JSON.stringify(message.payload ?? {}, null, 2);
+    const input = isAsk ? '' : prettyInput(message.payload);
 
     const respond = async (approved: boolean) => {
-        if (currentRequest.current.status !== 'idle' || (approved && isAsk && !answer.trim())) return;
+        if (latestRequest().status !== 'idle' || (approved && isAsk && !answer.trim())) return;
         setRequest((previous) => ({...previous, status: 'sending'}));
         setFailed(false);
         try {
@@ -195,27 +338,41 @@ const RequestCard = ({block, pending, onRespond}: {
         }
     };
 
-    if (!pending) {
-        const outcome = response
-            ? (isAsk ? response.content || t('projects.transcript.noAnswer', {defaultValue: '(no answer)'}) : response.content)
-            : t('projects.transcript.unanswered', {defaultValue: 'not answered'});
-        return (
-            <Typography data-request-id={message.request_id} variant="body2" color="text.secondary" noWrap>
-                {isAsk ? message.content : `${message.content}${summary ? ` · ${summary}` : ''}`} → {outcome}
-            </Typography>
-        );
-    }
-
     return (
         <Paper data-request-id={message.request_id} variant="outlined" sx={{p: 1.5, borderRadius: 2, borderColor: 'primary.main'}}>
-            <Typography variant="body2" sx={{fontWeight: 600, mb: 0.75, color: 'text.primary', fontSize: '0.875rem'}}>
+            <Stack direction="row" spacing={1} sx={{alignItems: 'center', mb: 1}}>
                 {isAsk
-                    ? message.content
-                    : t('projects.transcript.approvalTitle', {defaultValue: 'Allow {{tool}}?', tool: message.content})}
-            </Typography>
-            {summary && (
-                <Box component="pre" sx={{...mono, m: 0, mb: 1, p: 1, borderRadius: 1, bgcolor: 'action.hover', whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
-                    {summary}
+                    ? <Help sx={{fontSize: 16, color: 'primary.main'}}/>
+                    : <Terminal sx={{fontSize: 16, color: 'primary.main'}}/>}
+                <Typography variant="body2" sx={{fontWeight: 600, color: 'text.primary', fontSize: '0.875rem', wordBreak: 'break-word'}}>
+                    {isAsk
+                        ? message.content
+                        : t('projects.transcript.approvalTitle', {defaultValue: 'Allow {{tool}}?', tool: message.content})}
+                </Typography>
+            </Stack>
+            {!isAsk && (
+                <Box sx={{mb: 1}}>
+                    <Subject tool={message.content} input={message.payload}/>
+                    {input && (
+                        <>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-expanded={details}
+                                onClick={() => setDetails((v) => !v)}
+                                sx={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 0.25, mt: 0.5, p: 0, border: 0, bgcolor: 'transparent',
+                                    font: 'inherit', fontSize: fontSizes.sm, color: 'text.secondary', cursor: 'pointer', '&:hover': {color: 'text.primary'},
+                                }}
+                            >
+                                {t('projects.transcript.details', {defaultValue: 'Details'})}
+                                {details ? <ExpandMore sx={{fontSize: 14}}/> : <ChevronRight sx={{fontSize: 14}}/>}
+                            </Box>
+                            <Collapse in={details} unmountOnExit>
+                                <Box component="pre" sx={{...preBox, mt: 0.5}}>{input}</Box>
+                            </Collapse>
+                        </>
+                    )}
                 </Box>
             )}
             {isAsk && (
@@ -263,11 +420,33 @@ interface BlockListProps {
     anchored?: boolean;
 }
 
+// shownBlocks is what a list renders: a settled approval that its call's row
+// already reports is left out, and the calls on either side of it read as
+// one run again. Each block keeps its index (the trajectory's anchor) and
+// whether it ends the list (the live one).
+const shownBlocks = (blocks: TranscriptBlock[], pendingRequestId?: string): {block: TranscriptBlock; index: number; last: boolean}[] => {
+    const out: {block: TranscriptBlock; index: number; last: boolean}[] = [];
+    blocks.forEach((block, index) => {
+        const last = index === blocks.length - 1;
+        if (block.type === 'request' && block.toolId && block.message.request_id !== pendingRequestId) {
+            if (last && out.length > 0) out[out.length - 1].last = true;
+            return;
+        }
+        const previous = out[out.length - 1];
+        if (block.type === 'activity' && previous?.block.type === 'activity') {
+            out[out.length - 1] = {block: {type: 'activity', steps: [...previous.block.steps, ...block.steps]}, index: previous.index, last};
+            return;
+        }
+        out.push({block, index, last});
+    });
+    return out;
+};
+
 // BlockList renders a run of blocks: the conversation, or a subagent's own
 // work inside its card.
 const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anchored = false}: BlockListProps) => (
     <>
-        {blocks.map((b, i) => {
+        {shownBlocks(blocks, pendingRequestId).map(({block: b, index: i, last}) => {
             const anchor = anchored ? {'data-block': i} : {};
             switch (b.type) {
                 case 'user':
@@ -275,18 +454,19 @@ const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anc
                 case 'assistant':
                     return <Box key={i} {...anchor}><AssistantText message={b.message}/></Box>;
                 case 'activity':
-                    return <ActivityRow key={i} steps={b.steps} live={working && i === blocks.length - 1} expandAll={expandAll}/>;
+                    return <ActivityRun key={i} steps={b.steps} live={working && last} expandAll={expandAll} pendingRequestId={pendingRequestId}/>;
                 case 'agent':
-                    return <AgentCard key={i} block={b} turnLive={working} expandAll={expandAll} onRespond={onRespond}/>;
+                    return <AgentCard key={i} block={b} turnLive={working} expandAll={expandAll} pendingRequestId={pendingRequestId} onRespond={onRespond}/>;
                 case 'request':
-                    return (
-                        <RequestCard
-                            key={b.message.request_id ?? i}
-                            block={b}
-                            pending={b.message.request_id === pendingRequestId}
-                            onRespond={(approved, answer) => onRespond(b.message.request_id ?? '', approved, answer)}
-                        />
-                    );
+                    return b.message.request_id && b.message.request_id === pendingRequestId
+                        ? (
+                            <RequestCard
+                                key={b.message.request_id}
+                                block={b}
+                                onRespond={(approved, answer) => onRespond(b.message.request_id ?? '', approved, answer)}
+                            />
+                        )
+                        : <SettledRequest key={b.message.request_id ?? i} block={b}/>;
                 case 'error':
                     return (
                         <Stack key={i} {...anchor} direction="row" spacing={0.75} sx={{alignItems: 'flex-start', color: (theme) => getReadableAccent(theme, 'error')}}>
@@ -309,15 +489,15 @@ const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anc
 // current action, tools, tokens, time), and — expanded — everything it did
 // and the report it handed back. Its own work stays inside the card so the
 // conversation reads as the main agent's.
-const AgentCard = ({block, turnLive, expandAll, onRespond}: {
+const AgentCard = ({block, turnLive, expandAll, pendingRequestId, onRespond}: {
     block: Extract<TranscriptBlock, {type: 'agent'}>;
     turnLive: boolean;
     expandAll: boolean;
+    pendingRequestId?: string;
     onRespond: (requestId: string, approved: boolean, answer: string) => Promise<boolean>;
 }) => {
     const {t} = useTranslation();
-    const [toggled, setToggled] = useState<{under: boolean; open: boolean} | null>(null);
-    const open = toggled?.under === expandAll ? toggled.open : expandAll;
+    const [open, toggle] = useExpanded(expandAll);
     const input = (block.call.input ?? {}) as {description?: string; prompt?: string; subagent_type?: string};
     const task = block.task;
     const status = agentStatus(block, turnLive);
@@ -344,7 +524,7 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
             <Box
                 role="button"
                 aria-expanded={open}
-                onClick={() => setToggled({under: expandAll, open: !open})}
+                onClick={toggle}
                 sx={{px: 1.5, py: 1, cursor: 'default', userSelect: 'none', '&:hover': {bgcolor: 'action.hover'}}}
             >
                 <Stack direction="row" spacing={1} sx={{alignItems: 'center', minWidth: 0}}>
@@ -386,6 +566,7 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
                         above it is everything before. */}
                     <BlockList
                         blocks={report && block.children[block.children.length - 1]?.type === 'assistant' ? block.children.slice(0, -1) : block.children}
+                        pendingRequestId={pendingRequestId}
                         working={running}
                         expandAll={expandAll}
                         onRespond={onRespond}
@@ -407,22 +588,22 @@ const AgentCard = ({block, turnLive, expandAll, onRespond}: {
 
 const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRespond, drafts, codeBlock}: TranscriptProps) => {
     const {t} = useTranslation();
-    const last = blocks[blocks.length - 1];
-    // The spinner rides on the last activity row while a turn runs; if the
+    const last = shownBlocks(blocks, pendingRequestId).at(-1)?.block;
+    // The spinner rides on the last activity line while a turn runs; if the
     // turn hasn't produced any activity yet, it gets a line of its own.
     const showWorking = working && !pendingRequestId && last?.type !== 'activity';
 
     return (
         <TranscriptHostProvider drafts={drafts} codeBlock={codeBlock}>
-        <Stack spacing={2.5}>
-            <BlockList anchored blocks={blocks} pendingRequestId={pendingRequestId} working={working} expandAll={expandAll} onRespond={onRespond}/>
-            {showWorking && (
-                <Stack direction="row" spacing={1} sx={{alignItems: 'center', color: 'text.secondary'}}>
-                    <CircularProgress size={12}/>
-                    <Typography variant="body2">{t('projects.transcript.working', {defaultValue: 'Working…'})}</Typography>
-                </Stack>
-            )}
-        </Stack>
+            <Stack spacing={2.5}>
+                <BlockList anchored blocks={blocks} pendingRequestId={pendingRequestId} working={working} expandAll={expandAll} onRespond={onRespond}/>
+                {showWorking && (
+                    <Stack direction="row" spacing={1} sx={{alignItems: 'center', color: 'text.secondary'}}>
+                        <CircularProgress size={12}/>
+                        <Typography variant="body2">{t('projects.transcript.working', {defaultValue: 'Working…'})}</Typography>
+                    </Stack>
+                )}
+            </Stack>
         </TranscriptHostProvider>
     );
 };

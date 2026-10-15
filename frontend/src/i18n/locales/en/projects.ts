@@ -9,11 +9,21 @@ export default {
       "approvalTitle": "Allow {{tool}}?",
       "approve": "Allow",
       "background": "background",
+      "callFailed": "failed",
       "decline": "Decline",
       "deny": "Deny",
+      "details": "Details",
+      "input": "Input",
       "noAnswer": "(no answer)",
+      "outcomeAllowed": "Allowed",
+      "outcomeAnswered": "Answered",
+      "outcomeDeclined": "Declined",
+      "outcomeDenied": "Denied",
+      "outcomeNotAnswered": "Not answered",
+      "output": "Output",
       "responseRetry": "Response was not accepted. Your answer is kept; try again.",
       "responseSubmitted": "Response sent — waiting for the agent…",
+      "result": "Result",
       "subagent": "Subagent",
       "taskDone": "done",
       "taskFailed": "failed",
@@ -44,10 +54,7 @@ export default {
       "trajectoryWaiting": "waiting for you",
       "unanswered": "not answered",
       "viewTrajectory": "Trajectory",
-      "working": "Working…",
-      "usedTools_one": "Used 1 tool",
-      "usedTools_other": "Used {{count}} tools",
-      "failedCount": "{{count}} failed"
+      "working": "Working…"
     }
   }
 };
