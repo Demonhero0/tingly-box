@@ -47,7 +47,7 @@ export default {
     "newInFolder": "在此文件夹中创建会话",
     "folderPlaceholder": "/工作目录路径",
     "modelDefault": "默认",
-    "modelUnified": "{{route}}：此配置为所有层级使用同一个模型，请在该配置的规则中修改",
+    "modelUnifiedHint": "这个配置方案的所有档位都用同一个模型，要换请改配置方案的规则。",
     "model": "模型",
     "newSessionHeading": "需要代理处理什么任务？",
     "promptPlaceholder": "描述任务…",
@@ -129,7 +129,7 @@ export default {
     "projectStorageHint": "保存在此浏览器中，启动任务时会检查文件夹。",
     "removeProjectShortcut": "移除工作目录快捷入口",
     "firstProjectTask": "创建第一个任务",
-    "taskDirectoryHint": "先选择工作目录，再在下方描述任务。",
+    "chooseFolder": "选择工作目录",
     "refreshTimeout": "服务器响应超时。"
   }
 };
