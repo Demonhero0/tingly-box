@@ -1,22 +1,22 @@
 # Projects 接入（宿主侧）
 
-> 读者：要在 tingly-box 里挂上 Projects 的人。Projects 由 tingly-project 仓库
-> 维护，**嵌入契约**（为什么用 submodule、门面与 `Host` 接口、路由/鉴权/存储、
-> 前端入口、步骤与风险）写在 tingly-project 的
-> [`.design/projects.md` §9](https://github.com/tingly-dev/tingly-project/blob/main/.design/projects.md#9-嵌入-tingly-box2026-10-12)，
+> 读者：要在 tingly-box 里挂上 Projects 的人。Projects 的代码在本仓库 `projects/`
+> （原 tingly-project 仓库，2026-10-15 带历史搬入），**嵌入契约**（门面与 `Host`
+> 接口、路由/鉴权/存储、前端入口、步骤与风险）写在
+> [`projects/.design/projects.md` §9](../projects/.design/projects.md)，
 > 这里不重复，只记 tingly-box 这一侧要做什么。
 
-状态：`@tingly/ui` 已合并（#2038）；下面的接入工作尚未开始。
+状态：`@tingly/ui` 已合并（#2038）；Go 部分已搬进 `projects/`；下面的接入工作尚未开始。
 
 ## 1. 依赖与构建
 
-- 用 git submodule 挂在 `libs/tingly-project`，和 `libs/` 下的 SDK 一样；CI 的
-  checkout 需要 `submodules: recursive`。
-- 根 go.mod：`require github.com/tingly-dev/tingly-project` +
-  `replace => ./libs/tingly-project`。根模块的 `replace ./agentboot` 对整个构建生效，
-  Projects 用的就是本地 agentboot，不会出现两个版本。
+- `projects/` 是 go.work 里的一个 module（`github.com/tingly-dev/tingly-box/projects`），
+  和 `agentboot`、`swagger` 一样用 `replace` 指本地目录，不钉版本。
+- 接入时根 go.mod 加 `require github.com/tingly-dev/tingly-box/projects` +
+  `replace => ./projects`，并去掉 CI `verify-compile` 里 cli/gui 对 `projects/**` 的排除。
 - 只 import `projects` 和 `projects/llm`；其余在它的 `internal/` 下，碰不到。
-- `frontend/pnpm-workspace.yaml` 加入 `../libs/tingly-project/frontend`。
+  反方向（projects import 根模块）由 `task projects:boundary` 和 CI 拦住。
+- 前端搬进 `frontend/packages/projects`（`@tingly/projects`），是 workspace 里的普通包。
 
 ## 2. 后端
 

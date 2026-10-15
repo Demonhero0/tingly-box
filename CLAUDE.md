@@ -43,6 +43,13 @@ description starts at `## Summary` with no header above it. Everything that is
 not about the change (requester, thread / session links, hidden markers) goes in
 a short, plain footer after a `---` rule.
 
+# Projects
+
+`projects/` is Projects (formerly the tingly-project repo): its own Go module in
+`go.work`, with its own `CLAUDE.md` and `.design/`. It never imports the root
+module (`task projects:boundary`); Tingly Box reaches it only through its
+`projects` facade.
+
 # Build
 
 ## Submodules

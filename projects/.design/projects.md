@@ -158,21 +158,21 @@ MVP 已实现（§2 中标 ✅ 的部分）。验证：
 
 ## 9. 嵌入 Tingly Box（2026-10-12）
 
-这一节是嵌入契约，由本仓库维护。Tingly Box 那一侧怎么接（submodule、Host 适配器、开关、导航、Desk 改名），写在 tingly-box 的 `.design/projects.md`，那边只链回这里。
+这一节是嵌入契约。Tingly Box 那一侧怎么接（Host 适配器、开关、导航、Desk 改名），写在仓库根目录的 `.design/projects.md`。
 
-### 9.1 为什么留在自己的仓库
+### 9.1 为什么搬进 tingly-box 仓库（2026-10-15 改）
 
 | 方案 | 做法 | 取舍 |
 |---|---|---|
-| 搬进 tingly-box 做嵌套模块 | `tingly-box/projects/` 自带 go.mod | 改接口只需一个 PR；但 tingly-box 变大，Projects 失去独立节奏 |
-| **submodule 引用（采用）** | tingly-box 挂 `libs/tingly-project`，用 `replace` 指过去 | 两边独立 CI 和发版；改接口要两个 PR，用 submodule 指针对齐版本 |
+| **搬进 tingly-box 做嵌套模块（采用）** | `tingly-box/projects/` 自带 go.mod，前端进同一个 pnpm workspace | 改接口、改引擎、改共享组件都只需一个 PR，不用钉版本也不用复制；代价是 tingly-box 变大，Projects 跟着它的 CI 和发版 |
+| submodule 引用（原方案） | tingly-box 挂 `libs/tingly-project`，用 `replace` 指过去 | 两边独立节奏，但 agentboot 要“先合 TB、再升 tp”，`@tingly/ui` 要复制，前端组件没法共用 |
 | 平铺进 tingly-box `internal/` | 代码直接并入根模块 | 边界只能靠自觉，很快会反向依赖；不能再独立运行 |
 
-边界设计和“搬进去”完全一样，将来想搬，只需把 submodule 换成 `git subtree`。
+改主意的原因：两个仓库互相依赖（tp 用 TB 的 agentboot、swagger、`@tingly/ui`，TB 要嵌入 tp），每次跨仓库改动都要两个 PR；而 Desk 和线程页的对话记录组件要共用。搬进来用的是 `git subtree`，保留了原仓库的提交历史。边界设计不变：`projects` 仍是独立 module，不 import 根模块，CI 检查。
 
 ### 9.2 后端边界
 
-依赖只朝一个方向：Tingly Box 根模块 → `projects` → `tingly-box/agentboot`、`tingly-box/swagger`。本模块绝不 import Tingly Box 根模块（`task boundary` 用 `go list -deps` 检查）。对外只有两个公开包：门面 `projects` 和数据类型 `llm`，其余都在 `internal/` 下。
+依赖只朝一个方向：Tingly Box 根模块 → `projects` → `tingly-box/agentboot`、`tingly-box/swagger`。本模块绝不 import Tingly Box 根模块（`task projects:boundary` 用 `go list -deps` 按 module 检查，CI 的 `test-projects` 也跑）。同在一个 go.work 里时，根模块的包是解析得到的，所以这条检查比以前更要紧。对外只有两个公开包：门面 `projects` 和数据类型 `llm`，其余都在 `internal/` 下。
 
 - **门面**：`New(Options{DataDir, Host})`、`Register(api *swagger.RouteGroup)`（只挂路由，不启动任何东西）、`Start(ctx)`（恢复线程、跑后台任务；幂等，开关打开时再调用即可）、`Close()`。`DataDir` 为空时用内存库，供宿主生成 OpenAPI。
 - **Host**：宿主提供协调者的模型客户端（`ClientFor(ctx, model)`）、可选模型（`Models`）、线程里 Claude Code 的环境和默认模型（`ThreadEnv`）。独立版由设置模块实现；Tingly Box 用网关实现（`ThreadEnv` 复用它的 `tbclient.GetClaudeCodeEnv`）。
@@ -199,15 +199,16 @@ Tingly Box 的 Desk 也驱动 Claude Code，但回答的是不同的问题：Des
 
 ### 9.6 步骤与风险
 
-1. 本仓库改边界，行为不变（#4）。
-2. 统一视觉：tingly-box 抽出 `@tingly/ui`（tingly-box #2038，已合并），本仓库复制接入并改用其原语（#5）。
-3. tingly-box 后端接入：submodule、Host 适配器、`projects` 开关。
-4. tingly-box 前端接入：workspace、路由、导航入口、i18n。
-5. 数据迁移与收尾：已有 `~/.tingly-project` 时一键导入；`@tingly/ui` 复制换成真正的包。
+1. 本仓库改边界，行为不变（tingly-project #4）。
+2. 统一视觉：tingly-box 抽出 `@tingly/ui`（#2038），复制接入并改用其原语（tingly-project #5）。
+3. 搬进 tingly-box：Go 部分进 `projects/`（go.work、Taskfile、CI）；前端进 `frontend/packages/projects`（`@tingly/projects`），删掉 `@tingly/ui` 的复制，`@/` 改成包内路径。
+4. 共享对话记录：Desk 和线程页共用 `@tingly/projects/transcript`。
+5. tingly-box 接入：Host 适配器、`projects` 开关、路由、导航入口、i18n。
+6. 数据迁移：已有 `~/.tingly-project` 时一键导入。
 
 | 事项 | 风险 / 问题 | 建议 |
 |---|---|---|
 | worktree 路径 | git 记录的是绝对路径，直接搬数据目录会断链 | 导入时跑 `git worktree repair`；失败就保留旧目录继续用 |
-| agentboot 版本 | 本仓库锁定 pseudo-version，嵌入后由宿主的 `replace` 改用其本地版本 | 第 3 步一次对齐 |
+| agentboot 版本 | 搬进来以后 `replace ../agentboot`，永远用同一份 | 已解决 |
 | 并发 | Desk 和 Projects 各自拉起 `claude` 进程 | 已共用同一个引擎（`agentboot/engine`）；嵌入后可以让宿主传入同一个 `pool` 统一限流 |
 | 独立二进制 | 是否继续维护 | 保留：开发调试和离线演示都靠它 |
