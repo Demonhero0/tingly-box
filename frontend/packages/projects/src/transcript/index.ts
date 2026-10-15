@@ -1,7 +1,8 @@
 // @tingly/projects/transcript: an agent session's transcript, as a model and
 // as the components that render it. Props only — the host (Desk, Projects'
 // thread page) loads the entries and answers requests; nothing here calls an
-// API. Strings live under projects.transcript.* in the host's i18n bundles.
+// API. Strings (projects.transcript.*) ship in ./locales; the host merges them
+// into its i18n bundle (import @tingly/projects/transcript/locales/<lang>).
 
 export type {
     ActivityStep, ApprovalSubject, RequestBlock, RequestOutcome, TaskEvent, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry,
