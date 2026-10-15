@@ -12,6 +12,9 @@ includes:
     taskfile: ./build/Taskfile.linux.yml
   docker:
     taskfile: ./build/Taskfile.docker.yml
+  projects:
+    taskfile: ./projects/Taskfile.yml
+    dir: ./projects
 
 vars:
   VERSION: ""
