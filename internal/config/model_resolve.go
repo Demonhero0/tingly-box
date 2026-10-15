@@ -35,13 +35,16 @@ type ResolvedModels struct {
 	Models      []string
 	Source      ModelListSource
 	LastUpdated string // formatted timestamp of the cached record; empty if unknown
+	// LastUpdatedAt is when the served list was last fetched from upstream;
+	// zero for vmodel/template lists. Callers derive cache expiry from it.
+	LastUpdatedAt time.Time
 }
 
 // ResolveProviderModels returns the effective model list for a provider,
 // walking the full fallback chain in ONE place so every caller (HTTP read,
 // HTTP refresh, CLI, OAuth completion) sees identical behavior:
 //
-//	cache (DB) → VModel (virtual) → upstream API → embedded template
+//	cache (DB) → VModel (virtual) → upstream API → stale cache → embedded template
 //
 // When forceRefresh is false, a fresh-enough DB cache short-circuits the
 // chain; when true the cache is bypassed and upstream is re-queried (the
@@ -62,7 +65,11 @@ func (c *Config) ResolveProviderModels(forceRefresh, forceUpstream bool, uid str
 		if _, updated, exists := c.modelManager.GetProviderInfo(uid); exists {
 			lastUpdated = updated
 		}
-		return ResolvedModels{Models: models, Source: src, LastUpdated: lastUpdated}
+		var lastUpdatedAt time.Time
+		if src == ModelListSourceCache || src == ModelListSourceAPI {
+			lastUpdatedAt, _ = c.modelManager.GetLastUpdatedAt(uid)
+		}
+		return ResolvedModels{Models: models, Source: src, LastUpdated: lastUpdated, LastUpdatedAt: lastUpdatedAt}
 	}
 
 	// A forced upstream fetch re-queries the real upstream by definition, so it
@@ -75,6 +82,15 @@ func (c *Config) ResolveProviderModels(forceRefresh, forceUpstream bool, uid str
 
 	if provErr != nil {
 		return ResolvedModels{}, fmt.Errorf("provider with UUID %s not found: %w", uid, provErr)
+	}
+
+	// A manual refresh invalidates the cache up front, so even if the
+	// upstream call below fails, later reads re-query upstream instead of
+	// serving the pre-refresh list until its TTL runs out.
+	if forceRefresh || forceUpstream {
+		if err := c.modelManager.InvalidateModels(uid); err != nil {
+			logrus.Warnf("Failed to invalidate model cache for %s: %v", provider.Name, err)
+		}
 	}
 
 	// Step 2: VModel static list. A forced upstream attempt skips this shortcut.
@@ -90,6 +106,16 @@ func (c *Config) ResolveProviderModels(forceRefresh, forceUpstream bool, uid str
 	if err := c.fetchAndSaveAPIModels(provider, forceUpstream); err == nil {
 		if fresh := c.modelManager.GetModels(uid); len(fresh) > 0 {
 			return finalize(fresh, ModelListSourceAPI), nil
+		}
+	}
+
+	// Step 3b: the cache only expired and the refetch failed (upstream briefly
+	// unreachable, e.g. another tingly-box restarting). Serve the last real
+	// list rather than dropping to the template or nothing. A manual refresh
+	// skips this so its failure is still reported.
+	if !forceRefresh && !forceUpstream {
+		if stale := c.modelManager.GetStaleModels(uid); len(stale) > 0 {
+			return finalize(stale, ModelListSourceCache), nil
 		}
 	}
 
