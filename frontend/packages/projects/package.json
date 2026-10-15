@@ -1,0 +1,20 @@
+{
+  "name": "@tingly/projects",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Projects frontend. For now only its transcript: the model and rendering of an agent session's conversation (tool calls, approvals, subagents), shared by Desk and Projects' thread page.",
+  "type": "module",
+  "exports": {
+    "./transcript": "./src/transcript/index.ts",
+    "./transcript/locales/*": "./src/transcript/locales/*.ts"
+  },
+  "sideEffects": false,
+  "peerDependencies": {
+    "@ant-design/x-markdown": "^2.9.0",
+    "@mui/material": "^9.5.0",
+    "@tingly/ui": "workspace:*",
+    "i18next": "^26.4.3",
+    "react": "^19.3.0",
+    "react-i18next": "^17.0.16"
+  }
+}

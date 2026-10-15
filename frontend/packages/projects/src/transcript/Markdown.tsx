@@ -1,12 +1,12 @@
-import CodeBlock from '@/components/CodeBlock';
 import XMarkdown, {type ComponentProps} from '@ant-design/x-markdown';
 import {Box} from '@mui/material';
+import {fontMono} from '@tingly/ui/theme/fonts';
 import type {ReactNode} from 'react';
 import {Children, isValidElement} from 'react';
-import { fontMono } from '@/theme/fonts';
+import {useTranscriptHost} from './context';
 
 // Plain text of a rendered node tree: a fenced block's code reaches the code
-// component as parsed children, but CodeBlock highlights a string.
+// component as parsed children, but a code block takes a string.
 const textOf = (node: ReactNode): string => {
     if (typeof node === 'string' || typeof node === 'number') return String(node);
     if (Array.isArray(node)) return node.map(textOf).join('');
@@ -14,10 +14,21 @@ const textOf = (node: ReactNode): string => {
     return '';
 };
 
+// PlainCode is a fenced block when the host passes no code block of its own.
+const PlainCode = ({code}: {code: string; language: string}) => (
+    <Box
+        component="pre"
+        sx={{fontFamily: fontMono, fontSize: '0.85em', m: 0, my: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'action.hover', overflow: 'auto', maxHeight: 480}}
+    >
+        {code}
+    </Box>
+);
+
 const Code = ({block, lang, children}: ComponentProps) => {
+    const {codeBlock: CodeBlock = PlainCode} = useTranscriptHost();
     if (block) {
         const code = Children.toArray(children).map(textOf).join('').replace(/\n$/, '');
-        return <CodeBlock code={code} language={lang?.split(/\s/)[0] ?? ''} maxHeight={480} sx={{margin: '12px 0'}}/>;
+        return <CodeBlock code={code} language={lang?.split(/\s/)[0] ?? ''}/>;
     }
     return (
         <Box

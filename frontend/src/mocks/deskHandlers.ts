@@ -2,9 +2,10 @@ import { http, HttpResponse } from 'msw'
 import { mockClaudeCodeModels } from './claudeCodeModels'
 
 // Mock-mode data for the Desk page (/api/v1/desk). Covers every state the
-// page renders: a turn waiting on an approval, a finished multi-turn session,
-// a failed launch, and an archived session. Mutations simulate the turn
-// finishing a moment later.
+// page renders: a turn waiting on an approval (after an earlier approval
+// that was allowed, a denied one and an answered question), a finished
+// multi-turn session, a failed launch, and an archived session. Mutations
+// simulate the turn finishing a moment later.
 
 type Msg = {
     role?: string
@@ -47,17 +48,33 @@ const messages: Record<string, Msg[]> = {
     'desk-1': [
         { role: 'user', content: 'Fix the flaky persistent session test in internal/desk', timestamp: ago(12) },
         { kind: 'thinking', content: 'The test waits on StatusFailed right after SendMessage, but the status is already Failed from turn 1.', timestamp: ago(11) },
+        { kind: 'tool_use', content: 'Agent', request_id: 'a-find', payload: { description: 'Find the flaky test', subagent_type: 'Explore', prompt: 'Find the persistent-session tests in internal/desk that wait on a status, and which of them can race with the next turn.' }, timestamp: ago(11) },
+        { kind: 'task', content: '', request_id: 'a-find', payload: { event: 'task_started', task_id: 'af1', task_type: 'local_agent', subagent_type: 'Explore', background: false, description: 'Find the flaky test' }, timestamp: ago(11) },
+        { kind: 'tool_use', content: 'Glob', request_id: 'f1', parent: 'a-find', payload: { pattern: 'internal/desk/*_test.go' }, timestamp: ago(11) },
+        { kind: 'tool_result', content: 'internal/desk/service_test.go\ninternal/desk/persistent_e2e_test.go', request_id: 'f1', parent: 'a-find', payload: { is_error: false }, timestamp: ago(11) },
+        { role: 'assistant', parent: 'a-find', content: '`TestPersistentTurn_CrashMidTurnDropsFromPoolAndFails` waits on `StatusFailed`, which the session already has from its first turn.', timestamp: ago(11) },
+        { kind: 'task', content: '', request_id: 'a-find', payload: { event: 'task_notification', status: 'completed', summary: 'Found the racing wait', usage: { total_tokens: 9800, tool_uses: 1, duration_ms: 14000 } }, timestamp: ago(11) },
+        { kind: 'tool_result', content: '[Subagent hand-back] TestPersistentTurn_CrashMidTurnDropsFromPoolAndFails waits on StatusFailed…', request_id: 'a-find', payload: { is_error: false }, timestamp: ago(11) },
         { kind: 'tool_use', content: 'Grep', request_id: 't1', payload: { pattern: 'waitStatus', path: 'internal/desk' }, timestamp: ago(11) },
         { kind: 'tool_result', content: 'internal/desk/service_test.go:365:func waitStatus(...)\ninternal/desk/service_test.go:718:\twaitStatus(t, svc, sess.ID, session.StatusFailed, time.Second)', request_id: 't1', payload: { is_error: false }, timestamp: ago(11) },
         { kind: 'tool_use', content: 'Read', request_id: 't2', payload: { file_path: `${TB}/internal/desk/service_test.go` }, timestamp: ago(10) },
         { kind: 'tool_result', content: 'func TestPersistentTurn_CrashMidTurnDropsFromPoolAndFails(t *testing.T) {\n\t…', request_id: 't2', payload: { is_error: false }, timestamp: ago(10) },
         { kind: 'tool_use', content: 'Bash', request_id: 't3', payload: { command: 'go test ./internal/desk/ -run Crash -count=20' }, timestamp: ago(9) },
+        { kind: 'approval_request', content: 'Bash', request_id: 'r0', payload: { command: 'go test ./internal/desk/ -run Crash -count=20' }, timestamp: ago(9) },
+        { kind: 'approval_response', content: 'approved', request_id: 'r0', timestamp: ago(9) },
         { kind: 'tool_result', content: '--- FAIL: TestPersistentTurn_CrashMidTurnDropsFromPoolAndFails (0.01s)\n    service_test.go:727: Open called 1 times, want 2', request_id: 't3', payload: { is_error: true }, timestamp: ago(9) },
         { kind: 'usage', content: '', payload: { model: 'tingly/cc', input_tokens: 3200, output_tokens: 1450, cache_read_tokens: 48200, cache_write_tokens: 6100, context_tokens: 57500, context_window: 200000 }, timestamp: ago(8) },
         { role: 'assistant', content: 'Reproduced it: `waitStatus` returns immediately because the session is **already Failed** from the first turn, so the assertion runs before the second turn even starts.\n\nI\'ll wait on the second `Open` call instead of the status:\n\n```go\nfor fa.openCalls.Load() < 2 {\n\tif time.Now().After(deadline) {\n\t\tt.Fatalf("Open called %d times, want 2", fa.openCalls.Load())\n\t}\n\ttime.Sleep(5 * time.Millisecond)\n}\n```', timestamp: ago(8) },
         { kind: 'tool_use', content: 'Edit', request_id: 't4', payload: { file_path: `${TB}/internal/desk/service_test.go` }, timestamp: ago(7) },
         { kind: 'tool_result', content: 'Applied 1 edit.', request_id: 't4', payload: { is_error: false }, timestamp: ago(7) },
-        { kind: 'approval_request', content: 'Bash', request_id: 'r1', payload: { command: 'go test ./internal/desk/... -race -count=5' }, timestamp: ago(1) },
+        { kind: 'tool_use', content: 'WebFetch', request_id: 't5', payload: { url: 'https://pkg.go.dev/testing#T.Cleanup', prompt: 'How does Cleanup order work?' }, timestamp: ago(6) },
+        { kind: 'approval_request', content: 'WebFetch', request_id: 'r-web', payload: { url: 'https://pkg.go.dev/testing#T.Cleanup', prompt: 'How does Cleanup order work?' }, timestamp: ago(6) },
+        { kind: 'approval_response', content: 'denied', request_id: 'r-web', timestamp: ago(5) },
+        { kind: 'tool_result', content: 'The user doesn\'t want to proceed with this tool use.', request_id: 't5', payload: { is_error: true }, timestamp: ago(5) },
+        { kind: 'ask_request', content: 'Also run the whole package with -race, or just this test?', request_id: 'q1', timestamp: ago(4) },
+        { kind: 'ask_response', content: 'The whole package', request_id: 'q1', timestamp: ago(3) },
+        { kind: 'tool_use', content: 'Bash', request_id: 't6', payload: { command: 'go test ./internal/desk/... -race -count=5', description: 'Race-check the desk package' }, timestamp: ago(1) },
+        { kind: 'approval_request', content: 'Bash', request_id: 'r1', payload: { command: 'go test ./internal/desk/... -race -count=5', description: 'Race-check the desk package' }, timestamp: ago(1) },
     ],
     'desk-2': [
         { role: 'user', content: 'Add a dark mode toggle to the settings page', timestamp: ago(90) },
@@ -232,6 +249,7 @@ export const deskHandlers = [
         if (!s) return HttpResponse.json({ error: { message: 'session not found' } }, { status: 404 })
         const { request_id, approved } = (await request.json()) as { request_id: string; approved: boolean }
         push(s.id, { kind: 'approval_response', content: approved ? 'approved' : 'denied', request_id })
+        if (request_id === 'r1') push(s.id, { kind: 'tool_result', content: approved ? 'ok  \tgithub.com/tingly-dev/tingly-box/internal/desk\t8.214s' : 'The user doesn\'t want to proceed with this tool use.', request_id: 't6', payload: { is_error: !approved } })
         s.awaiting_input = false
         setTimeout(() => {
             push(s.id, { role: 'assistant', content: approved ? 'All green across 5 race-checked runs.' : 'Skipped running the tests.' })

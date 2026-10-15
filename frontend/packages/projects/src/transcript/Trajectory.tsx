@@ -2,9 +2,9 @@ import {Box, ButtonBase, Chip, Stack, Tooltip, Typography} from '@mui/material';
 import type {Theme} from '@mui/material/styles';
 import {Fragment, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {fontMono, fontSizes} from '@/theme/fonts';
-import {getReadableAccent} from '@/theme/status';
-import type {TranscriptBlock} from './deskUtils';
+import {fontMono, fontSizes} from '@tingly/ui/theme/fonts';
+import {getReadableAccent} from '@tingly/ui/theme/status';
+import type {TranscriptBlock} from './model';
 import type {TrajectoryAnchor, TrajectoryFilter, TrajectoryKind, TrajectoryRow} from './trajectoryRows';
 import {matchesFilter, trajectoryRows, trajectorySummary} from './trajectoryRows';
 
@@ -63,31 +63,31 @@ const Trajectory = ({blocks, working, pendingRequestId, project, onOpen}: Trajec
     const turnTimes = useMemo(() => new Map(rows.filter((r) => r.time).map((r) => [r.turn, clock(r.time)])), [rows]);
 
     const kindLabel: Record<TrajectoryKind, string> = {
-        user: t('desk.trajectoryKindUser', {defaultValue: 'You'}),
-        tool: t('desk.trajectoryKindTool', {defaultValue: 'Tool'}),
-        agent: t('desk.trajectoryKindAgent', {defaultValue: 'Agent'}),
-        approval: t('desk.trajectoryKindApproval', {defaultValue: 'Approval'}),
-        ask: t('desk.trajectoryKindAsk', {defaultValue: 'Question'}),
-        error: t('desk.trajectoryKindError', {defaultValue: 'Error'}),
-        note: t('desk.trajectoryKindNote', {defaultValue: 'Note'}),
-        reply: t('desk.trajectoryKindReply', {defaultValue: 'Reply'}),
-        system: t('desk.trajectoryKindSystem', {defaultValue: 'System'}),
+        user: t('projects.transcript.trajectoryKindUser', {defaultValue: 'You'}),
+        tool: t('projects.transcript.trajectoryKindTool', {defaultValue: 'Tool'}),
+        agent: t('projects.transcript.trajectoryKindAgent', {defaultValue: 'Agent'}),
+        approval: t('projects.transcript.trajectoryKindApproval', {defaultValue: 'Approval'}),
+        ask: t('projects.transcript.trajectoryKindAsk', {defaultValue: 'Question'}),
+        error: t('projects.transcript.trajectoryKindError', {defaultValue: 'Error'}),
+        note: t('projects.transcript.trajectoryKindNote', {defaultValue: 'Note'}),
+        reply: t('projects.transcript.trajectoryKindReply', {defaultValue: 'Reply'}),
+        system: t('projects.transcript.trajectoryKindSystem', {defaultValue: 'System'}),
     };
 
     const chips: {filter: TrajectoryFilter; label: string; count: number; hint?: string}[] = [
         {
-            filter: 'files', label: t('desk.trajectoryFiles', {defaultValue: 'Files changed'}), count: summary.files.length,
-            hint: t('desk.trajectoryFilesHint', {defaultValue: 'Files written by Edit / Write; changes made by shell commands are not counted'}),
+            filter: 'files', label: t('projects.transcript.trajectoryFiles', {defaultValue: 'Files changed'}), count: summary.files.length,
+            hint: t('projects.transcript.trajectoryFilesHint', {defaultValue: 'Files written by Edit / Write; changes made by shell commands are not counted'}),
         },
-        {filter: 'commands', label: t('desk.trajectoryCommands', {defaultValue: 'Commands'}), count: summary.commands},
-        {filter: 'failures', label: t('desk.trajectoryFailures', {defaultValue: 'Failures'}), count: summary.failures},
-        {filter: 'requests', label: t('desk.trajectoryRequests', {defaultValue: 'Approvals & questions'}), count: summary.requests},
+        {filter: 'commands', label: t('projects.transcript.trajectoryCommands', {defaultValue: 'Commands'}), count: summary.commands},
+        {filter: 'failures', label: t('projects.transcript.trajectoryFailures', {defaultValue: 'Failures'}), count: summary.failures},
+        {filter: 'requests', label: t('projects.transcript.trajectoryRequests', {defaultValue: 'Approvals & questions'}), count: summary.requests},
     ];
 
     if (rows.length === 0) {
         return (
             <Typography variant="body2" sx={{color: 'text.secondary', textAlign: 'center', py: 4}}>
-                {t('desk.trajectoryEmpty', {defaultValue: 'Nothing to review yet.'})}
+                {t('projects.transcript.trajectoryEmpty', {defaultValue: 'Nothing to review yet.'})}
             </Typography>
         );
     }
@@ -112,7 +112,7 @@ const Trajectory = ({blocks, working, pendingRequestId, project, onOpen}: Trajec
                     })}
                 </Stack>
             )}
-            <Box role="list" aria-label={t('desk.viewTrajectory', {defaultValue: 'Trajectory'})}>
+            <Box role="list" aria-label={t('projects.transcript.viewTrajectory', {defaultValue: 'Trajectory'})}>
                 {shown.map((r, i) => {
                     const turnStart = r.turn > 0 && (i === 0 || shown[i - 1].turn !== r.turn);
                     const time = turnTimes.get(r.turn);
@@ -121,7 +121,7 @@ const Trajectory = ({blocks, working, pendingRequestId, project, onOpen}: Trajec
                             {turnStart && (
                                 <Stack direction="row" spacing={1} sx={{alignItems: 'center', mt: i === 0 ? 0 : 2, mb: 0.5}}>
                                     <Typography variant="caption" sx={{color: 'text.secondary', whiteSpace: 'nowrap'}}>
-                                        {t('desk.trajectoryTurn', {defaultValue: 'Turn {{turn}}', turn: r.turn})}
+                                        {t('projects.transcript.trajectoryTurn', {defaultValue: 'Turn {{turn}}', turn: r.turn})}
                                         {time ? ` · ${time}` : ''}
                                     </Typography>
                                     <Box sx={{flex: 1, borderTop: 1, borderColor: 'divider'}}/>
@@ -130,7 +130,7 @@ const Trajectory = ({blocks, working, pendingRequestId, project, onOpen}: Trajec
                             <ButtonBase
                                 role="listitem"
                                 onClick={() => onOpen(r.anchor)}
-                                aria-label={`${kindLabel[r.kind]}: ${r.title}${r.detail ? ` ${r.detail}` : ''} — ${t('desk.trajectoryOpen', {defaultValue: 'show in chat'})}`}
+                                aria-label={`${kindLabel[r.kind]}: ${r.title}${r.detail ? ` ${r.detail}` : ''} — ${t('projects.transcript.trajectoryOpen', {defaultValue: 'show in chat'})}`}
                                 sx={{
                                     display: 'grid', gridTemplateColumns: '72px minmax(0, 1fr) auto', columnGap: 1.5, alignItems: 'baseline',
                                     width: '100%', textAlign: 'left', px: 1, py: 0.625, pl: 1 + r.depth * 2.5, borderRadius: 1,
@@ -149,16 +149,16 @@ const Trajectory = ({blocks, working, pendingRequestId, project, onOpen}: Trajec
                                 <Typography component="span" variant="caption" noWrap sx={{maxWidth: 200, color: (theme) => r.failed ? getReadableAccent(theme, 'error') : theme.palette.text.secondary}}>
                                     {r.kind === 'approval' || r.kind === 'ask'
                                         ? `→ ${r.outcome ?? ('request' in r.anchor && r.anchor.request === pendingRequestId
-                                            ? t('desk.trajectoryWaiting', {defaultValue: 'waiting for you'})
-                                            : t('desk.unanswered', {defaultValue: 'not answered'}))}`
+                                            ? t('projects.transcript.trajectoryWaiting', {defaultValue: 'waiting for you'})
+                                            : t('projects.transcript.unanswered', {defaultValue: 'not answered'}))}`
                                         : r.kind === 'agent'
                                             ? {
-                                                running: t('desk.taskRunning', {defaultValue: 'running'}),
-                                                completed: t('desk.taskDone', {defaultValue: 'done'}),
-                                                stopped: t('desk.taskStopped', {defaultValue: 'stopped'}),
-                                                failed: t('desk.taskFailed', {defaultValue: 'failed'}),
+                                                running: t('projects.transcript.taskRunning', {defaultValue: 'running'}),
+                                                completed: t('projects.transcript.taskDone', {defaultValue: 'done'}),
+                                                stopped: t('projects.transcript.taskStopped', {defaultValue: 'stopped'}),
+                                                failed: t('projects.transcript.taskFailed', {defaultValue: 'failed'}),
                                             }[r.status ?? 'running']
-                                            : r.kind === 'tool' && r.failed ? t('desk.trajectoryFailed', {defaultValue: 'failed'}) : ''}
+                                            : r.kind === 'tool' && r.failed ? t('projects.transcript.trajectoryFailed', {defaultValue: 'failed'}) : ''}
                                 </Typography>
                             </ButtonBase>
                         </Fragment>

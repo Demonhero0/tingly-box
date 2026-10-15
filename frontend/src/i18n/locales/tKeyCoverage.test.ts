@@ -27,7 +27,9 @@ const stems = (bundle: Bundle, prefix = '', out = new Set<string>()): Set<string
 
 // Read the sources through Vite rather than node:fs so the suite needs no
 // @types/node (the project deliberately does not depend on it).
-const SOURCES = import.meta.glob('/src/**/*.{ts,tsx}', {
+// The workspace packages the app renders (packages/*) take their strings
+// from these bundles too.
+const SOURCES = import.meta.glob(['/src/**/*.{ts,tsx}', '/packages/*/src/**/*.{ts,tsx}'], {
     query: '?raw',
     import: 'default',
     eager: true,

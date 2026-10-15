@@ -6,7 +6,8 @@ import {Box, Tooltip, Typography} from '@mui/material';
 import type {ReactNode} from 'react';
 import {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {cacheHitPct, formatTokens, sessionUsage} from './deskUtils';
+import {formatTokens} from '@tingly/projects/transcript';
+import {cacheHitPct, sessionUsage} from './deskUtils';
 import { fontMono, fontSizes } from '@/theme/fonts';
 
 // The same 8-cell bar the terminal status line draws for context use.

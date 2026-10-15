@@ -459,12 +459,19 @@ of tool:
   directory-browsing endpoint (§6).
 - **Session** (`SessionView` + `Transcript`): a title bar (first prompt,
   folder chip with the full path on hover, archive), one centered
-  conversation column, and the composer pinned below it. `buildTranscript`
-  (`deskUtils.ts`) collapses each run of thinking and tool calls into one
-  "Used N tools" row, pairing every call with its result by `request_id`,
-  and attaches an approval's or question's answer to it, so the replies stay
-  the visual anchor (ux-principles.md §9). Only the one request still waiting
-  on a live turn is actionable (§11); an answered one collapses to a line.
+  conversation column, and the composer pinned below it. The transcript is
+  shared with Projects' thread page: `@tingly/projects/transcript`
+  (`frontend/packages/projects/src/transcript`; Desk hands it its drafts and
+  `CodeBlock` through `transcriptHost.tsx`). `buildTranscript` (`model.ts`)
+  pairs every call with its result by `request_id` and attaches an
+  approval's or question's answer to it. Each tool call is one quiet line
+  (name + `toolSummary`) that opens to its input and output; a run of
+  thinking folds into one "Thought" line, so the replies stay the visual
+  anchor (ux-principles.md §9). Only the one request still waiting on a live
+  turn is actionable (§11), and its card shows what it is for (the command,
+  file or URL; the raw input behind "Details"). A settled approval right
+  after its call becomes an Allowed / Denied tag on that call's line; any
+  other answered request collapses to a line.
   Replies render as Markdown through `@ant-design/x-markdown` (already used
   by the Skills page) with `escapeRawHtml` on, so HTML in a model's output is
   shown as text, never rendered; fenced code goes through `CodeBlock`.
@@ -538,7 +545,7 @@ page can be previewed and screenshotted without a backend.
 - Desk's conversation, task and setup strings are defined in English, Chinese
   and Russian, including plural tool counts and the feature-enabling notice.
 
-- **Trajectory** (`Trajectory.tsx`, `trajectoryRows.ts`): a second view of the
+- **Trajectory** (`Trajectory.tsx`, `trajectoryRows.ts`, also in `@tingly/projects/transcript`): a second view of the
   same transcript, for reviewing what the agent did rather than reading
   what it said (modeled on DeepSeek Harness's Trajectory tab). It adds no
   data and no API: `trajectoryRows` projects the `buildTranscript` blocks to

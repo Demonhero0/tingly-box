@@ -7,17 +7,17 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import BackgroundTasksPanel from './BackgroundTasksPanel';
 import Composer from './Composer';
-import {backgroundTasks, buildTranscript, isBusyStatus, pendingRequestId, sessionTitle} from './deskUtils';
+import {buildTranscript, pendingRequestId, Trajectory, Transcript} from '@tingly/projects/transcript';
+import type {TrajectoryAnchor} from '@tingly/projects/transcript';
+import {backgroundTasks, isBusyStatus, sessionTitle} from './deskUtils';
 import FolderChip from './FolderChip';
 import ModelSelect from './ModelSelect';
 import PermissionModeSelect from './PermissionModeSelect';
 import ProfileSelect from './ProfileSelect';
 import StatusLine from './StatusLine';
-import Trajectory from './Trajectory';
-import type {TrajectoryAnchor} from './trajectoryRows';
-import Transcript from './Transcript';
 import { fontMono, fontSizes } from '@/theme/fonts';
 import {getReadableAccent} from '@/theme/status';
+import {DeskCodeBlock, deskDrafts} from './transcriptHost';
 import {useTranscriptScroll} from './useTranscriptScroll';
 import type {DeskQueue} from './useDeskQueues';
 
@@ -316,7 +316,7 @@ const SessionView = ({
                 <Box ref={contentRef} sx={{maxWidth: COLUMN_MAX_WIDTH, mx: 'auto', py: 3}}>
                     {messagesLoading && <LinearProgress aria-label={t('desk.loadingConversation', {defaultValue: 'Loading conversation'})} sx={{mb: 2}}/>}
                     {view === 'chat'
-                        ? <Transcript blocks={blocks} pendingRequestId={pendingId} working={turnInFlight} expandAll={expandAll} onRespond={onRespond}/>
+                        ? <Transcript blocks={blocks} pendingRequestId={pendingId} working={turnInFlight} expandAll={expandAll} onRespond={onRespond} drafts={deskDrafts} codeBlock={DeskCodeBlock}/>
                         : <Trajectory blocks={blocks} working={turnInFlight} pendingRequestId={pendingId} project={session.project} onOpen={openInChat}/>}
                 </Box>
             </Box>
