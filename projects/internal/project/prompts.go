@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
 // MaxInstructions is the instructions length limit, as in the official

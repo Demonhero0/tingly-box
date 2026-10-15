@@ -1,17 +1,21 @@
-module github.com/tingly-dev/tingly-project
+module github.com/tingly-dev/tingly-box/projects
 
-go 1.26
+go 1.26.0
+
+replace github.com/tingly-dev/tingly-box/agentboot => ../agentboot
+
+replace github.com/tingly-dev/tingly-box/swagger => ../swagger
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.57.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/openai/openai-go/v3 v3.42.0
-	github.com/sirupsen/logrus v1.10.2
+	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
-	github.com/tingly-dev/tingly-box/agentboot v0.0.0-20261013153420-00217288276e
-	github.com/tingly-dev/tingly-box/swagger v0.0.0-20261010131608-19e97ed89d68
+	github.com/tingly-dev/tingly-box/agentboot v0.0.0-00010101000000-000000000000
+	github.com/tingly-dev/tingly-box/swagger v0.0.0-00010101000000-000000000000
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2
 )
@@ -57,10 +61,10 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/arch v0.25.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

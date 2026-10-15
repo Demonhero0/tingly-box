@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/llm"
-	"github.com/tingly-dev/tingly-project/projects"
+	"github.com/tingly-dev/tingly-box/projects/llm"
+	"github.com/tingly-dev/tingly-box/projects"
 )
 
 type fakeHost struct{}

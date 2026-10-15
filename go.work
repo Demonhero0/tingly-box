@@ -7,5 +7,6 @@ use (
 	./ai
 	./gui/wails3
 	./imbot
+	./projects
 	./swagger
 )

@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/frontend"
-	"github.com/tingly-dev/tingly-project/internal/server/module"
+	"github.com/tingly-dev/tingly-box/projects/frontend"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
 )
 
 // Version is set at build time.

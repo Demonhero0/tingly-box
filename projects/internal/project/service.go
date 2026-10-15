@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/llm"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/llm"
 )
 
 // Host is what the runtime needs from whoever runs it: a model client for

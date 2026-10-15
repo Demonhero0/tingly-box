@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/llm"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/llm"
 )
 
 const settingsKey = "connection"

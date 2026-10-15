@@ -44,16 +44,20 @@ tasks:
   ui:sync:
     desc: Refresh the vendored copy of Tingly Box's @tingly/ui (theme, icons, page primitives)
     vars:
-      TINGLY_BOX: '{{.TINGLY_BOX | default "../tingly-box"}}'
+      TINGLY_BOX: '{{.TINGLY_BOX | default ".."}}'
     cmds:
       - rm -rf frontend/vendor/tingly-ui/src
       - cp -r {{.TINGLY_BOX}}/frontend/packages/ui/src {{.TINGLY_BOX}}/frontend/packages/ui/package.json frontend/vendor/tingly-ui/
       - git -C {{.TINGLY_BOX}} rev-parse --short HEAD > frontend/vendor/tingly-ui/SOURCE_COMMIT
 
   boundary:
-    desc: Fail if this module imports Tingly Box's root module (Tingly Box imports us, never the other way)
+    desc: Fail if this module depends on Tingly Box's root module (Tingly Box imports us, never the other way)
     cmds:
-      - "! go list -deps ./... | grep -E '^github.com/tingly-dev/tingly-box(/internal|/pkg|$)'"
+      - |
+        if go list -deps -f '{{"{{"}}with .Module{{"}}"}}{{"{{"}}.Path{{"}}"}}{{"{{"}}end{{"}}"}}' ./... | grep -qx 'github.com/tingly-dev/tingly-box'; then
+          echo "projects must not import github.com/tingly-dev/tingly-box (the root module); go through Host instead" >&2
+          exit 1
+        fi
 
   test:
     desc: Backend and frontend tests, typecheck and lint

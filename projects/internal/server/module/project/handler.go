@@ -16,11 +16,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/internal/db"
-	rt "github.com/tingly-dev/tingly-project/internal/project"
-	"github.com/tingly-dev/tingly-project/internal/server/module"
-	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
-	"github.com/tingly-dev/tingly-project/llm"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
+	rt "github.com/tingly-dev/tingly-box/projects/internal/project"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module/apierr"
+	"github.com/tingly-dev/tingly-box/projects/llm"
 )
 
 // ThreadCounts is how many threads a project has in each Overview group.

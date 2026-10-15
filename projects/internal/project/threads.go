@@ -16,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tingly-dev/tingly-box/agentboot"
 	"github.com/tingly-dev/tingly-box/agentboot/engine"
-	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
 // Errors returned to callers (mapped to HTTP statuses by the module).

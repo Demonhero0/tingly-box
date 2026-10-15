@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
 // ErrorResponse is the body of every non-2xx JSON response.

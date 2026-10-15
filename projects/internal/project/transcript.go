@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/tingly-dev/tingly-box/agentboot/engine"
-	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
 // threadStore is the session engine's view of the threads: it turns

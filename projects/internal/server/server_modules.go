@@ -1,13 +1,13 @@
 package server
 
 import (
-	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/project"
-	"github.com/tingly-dev/tingly-project/internal/server/module"
-	"github.com/tingly-dev/tingly-project/internal/server/module/conversation"
-	projectmod "github.com/tingly-dev/tingly-project/internal/server/module/project"
-	"github.com/tingly-dev/tingly-project/internal/server/module/settings"
-	"github.com/tingly-dev/tingly-project/internal/server/module/thread"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/project"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module/conversation"
+	projectmod "github.com/tingly-dev/tingly-box/projects/internal/server/module/project"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module/settings"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module/thread"
 )
 
 // Deps are what the modules are built from.

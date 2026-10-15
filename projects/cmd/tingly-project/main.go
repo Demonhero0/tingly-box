@@ -17,10 +17,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/tingly-dev/tingly-project/internal/config"
-	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/project"
-	"github.com/tingly-dev/tingly-project/internal/server"
+	"github.com/tingly-dev/tingly-box/projects/internal/config"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/project"
+	"github.com/tingly-dev/tingly-box/projects/internal/server"
 )
 
 func main() {

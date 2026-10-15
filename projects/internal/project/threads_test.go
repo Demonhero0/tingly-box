@@ -15,7 +15,7 @@ import (
 	"github.com/tingly-dev/tingly-box/agentboot/claude"
 	"github.com/tingly-dev/tingly-box/agentboot/claude/fixture"
 	"github.com/tingly-dev/tingly-box/agentboot/engine/enginetest"
-	"github.com/tingly-dev/tingly-project/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
 type staticEnv struct{}

@@ -18,12 +18,12 @@ import (
 	"time"
 
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/internal/config"
-	"github.com/tingly-dev/tingly-project/internal/db"
-	"github.com/tingly-dev/tingly-project/internal/project"
-	"github.com/tingly-dev/tingly-project/internal/server"
-	"github.com/tingly-dev/tingly-project/internal/server/module"
-	"github.com/tingly-dev/tingly-project/llm"
+	"github.com/tingly-dev/tingly-box/projects/internal/config"
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
+	"github.com/tingly-dev/tingly-box/projects/internal/project"
+	"github.com/tingly-dev/tingly-box/projects/internal/server"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
+	"github.com/tingly-dev/tingly-box/projects/llm"
 )
 
 // Host is what Projects needs from the server embedding it.

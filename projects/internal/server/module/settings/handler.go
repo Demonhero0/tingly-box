@@ -1,15 +1,15 @@
 package settings
 
 import (
-	"github.com/tingly-dev/tingly-project/internal/project"
+	"github.com/tingly-dev/tingly-box/projects/internal/project"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/swagger"
-	"github.com/tingly-dev/tingly-project/internal/server/module"
-	"github.com/tingly-dev/tingly-project/internal/server/module/apierr"
-	"github.com/tingly-dev/tingly-project/llm"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module"
+	"github.com/tingly-dev/tingly-box/projects/internal/server/module/apierr"
+	"github.com/tingly-dev/tingly-box/projects/llm"
 )
 
 // SettingsResponse is the connection as shown to the UI. The API key itself
