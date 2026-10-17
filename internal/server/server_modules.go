@@ -9,7 +9,6 @@ import (
 	"github.com/tingly-dev/tingly-box/internal/server/module/codeximport"
 	"github.com/tingly-dev/tingly-box/internal/server/module/configapply"
 	debugmodule "github.com/tingly-dev/tingly-box/internal/server/module/debug"
-	deskmodule "github.com/tingly-dev/tingly-box/internal/server/module/desk"
 	"github.com/tingly-dev/tingly-box/internal/server/module/imbot"
 	mcpmodule "github.com/tingly-dev/tingly-box/internal/server/module/mcp"
 	notifymodule "github.com/tingly-dev/tingly-box/internal/server/module/notify"
@@ -37,14 +36,13 @@ import (
 
 // engineModules returns the modules that register on the bare engine
 // (outside the swagger-managed /api groups): the Claude Code status line and
-// the notify hooks. status is also returned because the desk module resolves
-// routes through it.
-func (s *Server) engineModules(schema bool) (mods []module.Module, status *statusline.Handler) {
+// the notify hooks.
+func (s *Server) engineModules(schema bool) []module.Module {
 	var quotaMgr statusline.QuotaManager
 	if s.quotaManager != nil {
 		quotaMgr = s.quotaManager
 	}
-	status = statusline.NewHandler(s.config, s.loadBalancer, statusline.NewCache(), quotaMgr)
+	status := statusline.NewHandler(s.config, s.loadBalancer, statusline.NewCache(), quotaMgr)
 
 	// Remote middle-layer wiring for /tingly/:scenario hook events.
 	// When the bot settings store is reachable we set up:
@@ -66,12 +64,12 @@ func (s *Server) engineModules(schema bool) (mods []module.Module, status *statu
 		runtime := remotescenario.NewRouteRuntime(s.channelRegistry, sm.BotAccess(), access.NewEvaluator(sm.BotAccess()), RuntimeAuditSink())
 		notify = notifymodule.NewHandlerWithRouting(s.scenarioRegistry, s.interactionRegistry, runtime)
 	}
-	return []module.Module{status, notify}, status
+	return []module.Module{status, notify}
 }
 
 // apiModules returns the modules mounted on the authenticated /api groups
 // after the core routes (see UseWebAPIEndpoints), in registration order.
-func (s *Server) apiModules(ctx context.Context, schema bool, status *statusline.Handler) []module.Module {
+func (s *Server) apiModules(ctx context.Context, schema bool) []module.Module {
 	mods := []module.Module{
 		s.oauthHandler,
 		// Virtual-model management routes — expose registry contents for the
@@ -143,15 +141,6 @@ func (s *Server) apiModules(ctx context.Context, schema bool, status *statusline
 		// whether quota tracking happens to be configured on this build.
 		providerQuotaModule.NewHandler(s.quotaManager, logrus.StandardLogger()),
 	)
-
-	// Desk: schema generation registers it with no service (never build the
-	// live service there — see newDeskService); at runtime it is mounted only
-	// when the service could be built.
-	if schema {
-		mods = append(mods, deskmodule.NewHandler(nil, nil).WithGate(s.deskEnabled))
-	} else if s.desk = newDeskService(sm, s.config); s.desk != nil {
-		mods = append(mods, deskmodule.NewHandler(s.desk, status).WithGate(s.deskEnabled))
-	}
 
 	// Projects: schema generation mounts an in-memory app that never starts.
 	// At runtime it keeps its own database under <data dir>/projects and

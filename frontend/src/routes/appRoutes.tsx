@@ -68,7 +68,6 @@ const QQPage = lazy(() => import('@/pages/bots/QQPage'));
 const BotOverviewPage = lazy(() => import('@/pages/bots/BotOverviewPage'));
 const RemoteAgentPage = lazy(() => import('@/pages/remote-agent/RemoteAgentPage'));
 const NotifyPage = lazy(() => import('@/pages/notify/NotifyPage'));
-const DeskPage = lazy(() => import('@/pages/desk/DeskPage'));
 // Projects' pages come from @tingly/projects; this wrapper gives them Tingly
 // Box's fetch, routes and strings (.design/projects.md §3).
 const ProjectsRoute = lazy(() => import('@/pages/projects/ProjectsRoute'));
@@ -193,9 +192,6 @@ export const appRoutes = (
             <Route path="/bots/qq" element={<QQPage />} />
             {/* IM Notify — the other purpose mounted on a bot's channel. */}
             <Route path="/notify" element={<NotifyPage />} />
-            {/* Desk — a web-side twin of local `claude`, no IM bot
-                involved. See useActivityItems for the nav row. */}
-            <Route path="/desk" element={<ExperimentalFeatureGate feature="desk"><DeskPage /></ExperimentalFeatureGate>} />
             {/* Projects — a coordinator running Claude Code threads; its own
                 rail item (useActivityItems). */}
             <Route path="/projects" element={<ExperimentalFeatureGate feature="projects"><ProjectsRoute page="list" /></ExperimentalFeatureGate>} />
