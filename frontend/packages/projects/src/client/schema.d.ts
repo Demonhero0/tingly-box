@@ -324,6 +324,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/sessions/{sid}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release the session to a terminal: closes its process and returns the command that resumes it
+         * @description Release the session to a terminal: closes its process and returns the command that resumes it
+         */
+        post: operations["apiV1ProjectsSessionsSidHandoffPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/sessions/{sid}/messages": {
         parameters: {
             query?: never;
@@ -344,6 +364,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/sessions/{sid}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the model of the session's next turn
+         * @description Set the model of the session's next turn
+         */
+        put: operations["apiV1ProjectsSessionsSidModelPut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/sessions/{sid}/permission-mode": {
         parameters: {
             query?: never;
@@ -357,6 +397,26 @@ export interface paths {
          * @description Set the permission mode of the session's next turn
          */
         put: operations["apiV1ProjectsSessionsSidPermission-modePut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/sessions/{sid}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the launch profile of the session's next turn (hosts with profiles only)
+         * @description Set the launch profile of the session's next turn (hosts with profiles only)
+         */
+        put: operations["apiV1ProjectsSessionsSidProfilePut"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1136,6 +1196,10 @@ export interface components {
             /** @description Field id */
             id: string;
         };
+        ModelRequest: {
+            /** @description Field model */
+            model: string;
+        };
         ModelUsage: {
             /**
              * Format: int64
@@ -1172,6 +1236,10 @@ export interface components {
         PostMessageRequest: {
             /** @description Field content */
             content: string;
+        };
+        ProfileRequest: {
+            /** @description Field profile */
+            profile: string;
         };
         Project: {
             /**
@@ -1320,6 +1388,8 @@ export interface components {
             model?: string;
             /** @description Field permission_mode */
             permission_mode?: string;
+            /** @description Field profile */
+            profile?: string;
             /** @description Field title */
             title?: string;
         };
@@ -1331,6 +1401,10 @@ export interface components {
             /** @description Field running */
             running: boolean;
             session: components["schemas"]["Thread"];
+        };
+        SessionHandoffResponse: {
+            /** @description Field command */
+            command: string;
         };
         SessionPermissionModesResponse: {
             /** @description Field modes */
@@ -1488,6 +1562,8 @@ export interface components {
             output_tokens: number;
             /** @description Field permission_mode */
             permission_mode?: string;
+            /** @description Field profile */
+            profile?: string;
             /** @description Field project_id */
             project_id: string;
             /** @description Field repo_path */
@@ -2169,6 +2245,29 @@ export interface operations {
             };
         };
     };
+    apiV1ProjectsSessionsSidHandoffPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionHandoffResponse"];
+                };
+            };
+        };
+    };
     apiV1ProjectsSessionsSidMessagesPost: {
         parameters: {
             query?: never;
@@ -2197,6 +2296,34 @@ export interface operations {
             };
         };
     };
+    apiV1ProjectsSessionsSidModelPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
     "apiV1ProjectsSessionsSidPermission-modePut": {
         parameters: {
             query?: never;
@@ -2211,6 +2338,34 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PermissionModeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsSessionsSidProfilePut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileRequest"];
             };
         };
         responses: {

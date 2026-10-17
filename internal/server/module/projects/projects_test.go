@@ -129,3 +129,19 @@ func TestGate(t *testing.T) {
 	assert.Equal(t, http.StatusOK, get().Code)
 	assert.Equal(t, 1, starts)
 }
+
+// A folder session continues in a terminal through tingly-box itself, so
+// the terminal routes the way the web turns did.
+func TestHostHandoffGoesThroughTinglyBox(t *testing.T) {
+	h := NewHost(newConfig(t))
+	assert.Equal(t, []string{selfExecutable(), "cc"}, h.HandoffLaunch(""))
+	assert.Equal(t, []string{selfExecutable(), "profile", "p1"}, h.HandoffLaunch("p1"))
+}
+
+func TestHostChecksModelTiers(t *testing.T) {
+	h := NewHost(newConfig(t))
+	ctx := context.Background()
+	require.NoError(t, h.CheckLaunch(ctx, "", ""))
+	assert.Error(t, h.CheckLaunch(ctx, "", "gpt-5"))
+	assert.Error(t, h.CheckLaunch(ctx, "no-such-profile", ""))
+}

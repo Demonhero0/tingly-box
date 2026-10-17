@@ -3,7 +3,7 @@ import { Alert, Box, Button, IconButton, Skeleton, Tooltip, Typography } from '@
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fontMono, fontSizes } from '@tingly/ui/theme/fonts';
-import { api, unwrap, type SessionDetail, type Thread, type ThreadEvent } from '../client';
+import { api, unwrap, type BackgroundTask, type SessionDetail, type Thread, type ThreadEvent } from '../client';
 import { AddWorkdirDialog } from '../components/workdir/AddWorkdirDialog';
 import { NewSessionView } from '../components/workdir/NewSessionView';
 import { loadPermissionModes, PermissionModeSelect } from '../components/workdir/PermissionModeSelect';
@@ -14,7 +14,7 @@ import { WorkspaceLayout, useWorkspacePane } from '../components/workspace/Works
 import { Add, Close } from '../components/icons';
 import { useNotify } from '../hooks/useNotify';
 import { useSessionEvents, type ProjectEvent } from '../hooks/useProjectEvents';
-import { useProjectsHost } from '../host/ProjectsHost';
+import { useProjectsHost, type SessionLaunch } from '../host/ProjectsHost';
 import { folderName, timeAgo } from '../utils/format';
 
 /** Replace the item with the same id, else add it (sessions newest first, transcript entries last). */
@@ -24,6 +24,16 @@ function upsert<T extends { id: string }>(list: T[], item: T, last = false): T[]
     const next = list.slice();
     next[i] = item;
     return next;
+}
+
+/** Whether a task event changes the set of running background tasks (progress does not). */
+function changesLiveTasks(e: ThreadEvent): boolean {
+    try {
+        const ev = (JSON.parse(e.payload ?? '{}') as { event?: string }).event;
+        return ev === 'background_tasks_changed' || ev === 'task_notification' || ev === 'task_completed';
+    } catch {
+        return false;
+    }
 }
 
 const GROUPS: { key: string; color: StatusGroup['color']; collapsed?: boolean }[] = [
@@ -42,7 +52,7 @@ const GROUPS: { key: string; color: StatusGroup['color']; collapsed?: boolean }[
 export default function WorkdirPage() {
     const { t, i18n } = useTranslation('projects');
     const notify = useNotify();
-    const { onProjectsChanged: refresh, embedded } = useProjectsHost();
+    const { onProjectsChanged: refresh, embedded, session: slots } = useProjectsHost();
     const [params, setParams] = useSearchParams();
     const scope = params.get('path') ?? '';
     const sessionId = params.get('session') ?? '';
@@ -51,6 +61,7 @@ export default function WorkdirPage() {
 
     const [sessions, setSessions] = useState<Thread[] | null>(null);
     const [events, setEvents] = useState<ThreadEvent[] | null>(null);
+    const [liveTasks, setLiveTasks] = useState<BackgroundTask[]>([]);
     const [modes, setModes] = useState<string[]>([]);
     // The add dialog lives in the URL, so a link (the sidebar's "add") opens it.
     const adding = params.get('add') === '1';
@@ -85,6 +96,7 @@ export default function WorkdirPage() {
             const d: SessionDetail = await unwrap(api.GET('/api/v1/projects/sessions/{sid}', { params: { path: { sid } } }));
             if (n !== sessionReq.current) return;
             setEvents(d.events);
+            setLiveTasks(d.background_tasks ?? []);
             setSessions((list) => upsert(list ?? [], d.session));
         } catch (e) {
             if (n !== sessionReq.current) return;
@@ -106,6 +118,7 @@ export default function WorkdirPage() {
 
     useEffect(() => {
         setEvents(null);
+        setLiveTasks([]);
         if (sessionId) void loadSession(sessionId);
         else sessionReq.current++;
     }, [sessionId, loadSession]);
@@ -118,7 +131,10 @@ export default function WorkdirPage() {
             reloadWorkdirs();
         } else if (ev.type === 'thread_event') {
             const e = ev.data as ThreadEvent;
-            if (e.thread_id === sessionId) setEvents((list) => (list ? upsert(list, e, true) : list));
+            if (e.thread_id !== sessionId) return;
+            setEvents((list) => (list ? upsert(list, e, true) : list));
+            // The live set changed: it comes with the session.
+            if (e.kind === 'task' && changesLiveTasks(e)) void loadSession(sessionId);
         }
     }, () => {
         void loadSessions();
@@ -144,9 +160,11 @@ export default function WorkdirPage() {
     const known = workdirs?.find((w) => w.path === scope);
     const removable = !!known?.saved;
 
-    const create = async (folder: string, content: string, permission_mode: string): Promise<boolean> => {
+    const create = async (folder: string, content: string, permission_mode: string, launch: SessionLaunch): Promise<boolean> => {
         try {
-            const s = await unwrap(api.POST('/api/v1/projects/sessions', { body: { folder, content, permission_mode: permission_mode || undefined } }));
+            const s = await unwrap(api.POST('/api/v1/projects/sessions', {
+                body: { folder, content, permission_mode: permission_mode || undefined, profile: launch.profile || undefined, model: launch.model || undefined },
+            }));
             // Picked another folder than the one open: go to that folder.
             if (scope && s.worktree !== scope) {
                 go({ path: s.worktree, session: s.id });
@@ -168,6 +186,26 @@ export default function WorkdirPage() {
         try {
             const s = await unwrap(api.PUT('/api/v1/projects/sessions/{sid}/permission-mode', { params: { path: { sid: selected.id } }, body: { permission_mode: mode } }));
             setSessions((list) => upsert(list ?? [], s));
+        } catch (e) {
+            notify((e as Error).message, 'error');
+        }
+    };
+
+    // A profile change goes first: it may clear a model the profile cannot run.
+    const setLaunch = async (next: SessionLaunch) => {
+        if (!selected) return;
+        const path = { params: { path: { sid: selected.id } } };
+        try {
+            let s = selected;
+            if (next.profile !== (s.profile ?? '')) {
+                // The server resets the model with the profile.
+                s = await unwrap(api.PUT('/api/v1/projects/sessions/{sid}/profile', { ...path, body: { profile: next.profile } }));
+                setSessions((list) => upsert(list ?? [], s));
+            }
+            if (next.model !== (s.model ?? '')) {
+                s = await unwrap(api.PUT('/api/v1/projects/sessions/{sid}/model', { ...path, body: { model: next.model } }));
+                setSessions((list) => upsert(list ?? [], s));
+            }
         } catch (e) {
             notify((e as Error).message, 'error');
         }
@@ -246,9 +284,15 @@ export default function WorkdirPage() {
                         running={running}
                         disabled={false}
                         onBack={() => openNew()}
+                        liveTasks={liveTasks}
+                        onRefresh={() => void loadSession(sessionId)}
                         composerContext={selected && (
-                            <PermissionModeSelect value={selected.permission_mode ?? ''} modes={modes} onChange={(m) => void setMode(m)} />
+                            <>
+                                {slots?.launchPickers?.({ value: { profile: selected.profile ?? '', model: selected.model ?? '' }, onChange: (n) => void setLaunch(n) })}
+                                <PermissionModeSelect value={selected.permission_mode ?? ''} modes={modes} onChange={(m) => void setMode(m)} />
+                            </>
                         )}
+                        belowComposer={selected && events && slots?.statusLine?.({ session: selected, events })}
                     />
                 ) : (
                     <NewSessionView

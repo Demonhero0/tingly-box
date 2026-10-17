@@ -498,12 +498,12 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 	prompt := a.current.text
 	m.mu.Unlock()
 	// Waiting for the slot can take a while: launch with what the owner
-	// picked since (model, permission mode).
+	// picked since (profile, model, permission mode).
 	if fresh, err := m.store.GetThread(threadID); err == nil {
 		t = fresh
 	}
 
-	env, defModel := m.env.ThreadEnv(ctx)
+	env, defModel, settings := m.launchEnv(ctx, t)
 	// A project thread runs the project's model. A session runs the one its
 	// owner picked; a project thread's Model is only what the API reported,
 	// and launching with it would restart the resident process each turn.
@@ -517,7 +517,7 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 	m.mu.Lock()
 	m.turns[threadID] = &turnTally{launchModel: model}
 	m.mu.Unlock()
-	opts := agentboot.ExecutionOptions{Model: model, PermissionMode: threadPermissionMode(p, t), Env: env}
+	opts := agentboot.ExecutionOptions{Model: model, PermissionMode: threadPermissionMode(p, t), Env: env, SettingsPath: settings}
 	if p != nil {
 		opts.AppendSystemPrompt = threadSystemPrompt(m.layout, p, t)
 		opts.SettingsPath = m.layout.SettingsFile(p.ID, t.ID)
@@ -533,6 +533,21 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		<-slot
 		m.next(threadID)
 	}
+}
+
+// launchEnv is how t's turn reaches a model. A folder session on a host
+// with launch profiles runs under its profile, and an unset model is left to
+// that profile; everything else runs in the host's thread environment.
+func (m *Threads) launchEnv(ctx context.Context, t *db.Thread) (env []string, defModel, settings string) {
+	if l, ok := m.env.(Launcher); ok && t.ProjectID == "" {
+		env, settings, err := l.LaunchEnv(ctx, t.Profile)
+		if err == nil {
+			return env, "", settings
+		}
+		m.addEvent(t, &db.ThreadEvent{Kind: db.EvSystem, Content: fmt.Sprintf("profile %s unavailable, running with the default routing: %v", orDefault(t.Profile), err)})
+	}
+	env, defModel = m.env.ThreadEnv(ctx)
+	return env, defModel, ""
 }
 
 // drop forgets a thread's in-flight state after it gave up before a turn.

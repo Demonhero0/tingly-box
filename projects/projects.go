@@ -42,6 +42,14 @@ type Host interface {
 
 var _ project.Host = Host(nil)
 
+// Optional capabilities a Host can also implement for folder sessions.
+type (
+	// Launcher routes a session's turns by a profile the host names.
+	Launcher = project.Launcher
+	// Handoffer names the program that continues a session in a terminal.
+	Handoffer = project.Handoffer
+)
+
 // Options configure an App.
 type Options struct {
 	// DataDir holds the database and each project's memory, library and

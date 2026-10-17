@@ -45,6 +45,9 @@ type SessionCreateRequest struct {
 	Model string `json:"model,omitempty"`
 	// PermissionMode is empty to inherit the default (acceptEdits).
 	PermissionMode string `json:"permission_mode,omitempty"`
+	// Profile is the host's launch profile; empty for its default. Only
+	// hosts with profiles (Tingly Box) accept one.
+	Profile string `json:"profile,omitempty"`
 }
 
 // SessionDetailResponse is a session with its transcript.
@@ -72,6 +75,21 @@ type SessionRespondRequest struct {
 // PermissionModeRequest sets the mode of the session's next turn.
 type PermissionModeRequest struct {
 	PermissionMode string `json:"permission_mode"`
+}
+
+// ProfileRequest sets the launch profile of the session's next turn.
+type ProfileRequest struct {
+	Profile string `json:"profile"`
+}
+
+// ModelRequest sets the model of the session's next turn ("" for the default).
+type ModelRequest struct {
+	Model string `json:"model"`
+}
+
+// SessionHandoffResponse is the command that continues the session in a terminal.
+type SessionHandoffResponse struct {
+	Command string `json:"command"`
 }
 
 // SessionPermissionModesResponse lists the selectable modes.
@@ -147,6 +165,17 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithDescription("Set the permission mode of the session's next turn"),
 		swagger.WithRequestModel(PermissionModeRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
+	api.PUT("/projects/sessions/:sid/profile", h.setProfile, tag,
+		swagger.WithDescription("Set the launch profile of the session's next turn (hosts with profiles only)"),
+		swagger.WithRequestModel(ProfileRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.PUT("/projects/sessions/:sid/model", h.setModel, tag,
+		swagger.WithDescription("Set the model of the session's next turn"),
+		swagger.WithRequestModel(ModelRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.POST("/projects/sessions/:sid/handoff", h.handoff, tag,
+		swagger.WithDescription("Release the session to a terminal: closes its process and returns the command that resumes it"),
+		swagger.WithResponseModel(SessionHandoffResponse{}))
 	api.POST("/projects/sessions/:sid/tasks/:task_id/stop", h.stopTask, tag,
 		swagger.WithDescription("Stop one background task"))
 	api.GET("/projects/sessions/:sid/tasks/:task_id/output", h.taskOutput, tag,
@@ -159,7 +188,7 @@ func fail(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, db.ErrNotFound):
 		apierr.Store(c, err, "session")
-	case errors.Is(err, rt.ErrResolved), errors.Is(err, rt.ErrNoPrompt), errors.Is(err, rt.ErrTaskNotRunning):
+	case errors.Is(err, rt.ErrResolved), errors.Is(err, rt.ErrNoPrompt), errors.Is(err, rt.ErrTaskNotRunning), errors.Is(err, rt.ErrBusy):
 		apierr.Message(c, http.StatusConflict, err.Error())
 	case errors.Is(err, rt.ErrTaskOutputUnset), errors.Is(err, os.ErrNotExist):
 		// The output file may be gone; never echo its path.
@@ -239,7 +268,7 @@ func (h *Handler) create(c *gin.Context) {
 		return
 	}
 	t, err := h.svc.Threads.StartSession(rt.SessionSpec{
-		Folder: req.Folder, Task: req.Content, Title: req.Title, Model: req.Model, PermissionMode: req.PermissionMode,
+		Folder: req.Folder, Task: req.Content, Title: req.Title, Model: req.Model, PermissionMode: req.PermissionMode, Profile: req.Profile,
 	})
 	if err != nil {
 		fail(c, err)
@@ -353,6 +382,41 @@ func (h *Handler) setPermissionMode(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) setProfile(c *gin.Context) {
+	var req ProfileRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	out, err := h.svc.Threads.SetProfile(c.Request.Context(), c.Param("sid"), req.Profile)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) setModel(c *gin.Context) {
+	var req ModelRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	out, err := h.svc.Threads.SetModel(c.Request.Context(), c.Param("sid"), req.Model)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) handoff(c *gin.Context) {
+	cmd, err := h.svc.Threads.Handoff(c.Param("sid"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, SessionHandoffResponse{Command: cmd})
 }
 
 func (h *Handler) stopTask(c *gin.Context) {

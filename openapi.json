@@ -5474,6 +5474,39 @@
         }
       }
     },
+    "/api/v1/projects/sessions/{sid}/handoff": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Release the session to a terminal: closes its process and returns the command that resumes it",
+        "description": "Release the session to a terminal: closes its process and returns the command that resumes it",
+        "operationId": "apiV1ProjectsSessionsSidHandoffPost",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionHandoffResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/sessions/{sid}/messages": {
       "post": {
         "tags": [
@@ -5518,6 +5551,50 @@
         }
       }
     },
+    "/api/v1/projects/sessions/{sid}/model": {
+      "put": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Set the model of the session's next turn",
+        "description": "Set the model of the session's next turn",
+        "operationId": "apiV1ProjectsSessionsSidModelPut",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/sessions/{sid}/permission-mode": {
       "put": {
         "tags": [
@@ -5544,6 +5621,50 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PermissionModeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/sessions/{sid}/profile": {
+      "put": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Set the launch profile of the session's next turn (hosts with profiles only)",
+        "description": "Set the launch profile of the session's next turn (hosts with profiles only)",
+        "operationId": "apiV1ProjectsSessionsSidProfilePut",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileRequest"
               }
             }
           }
@@ -7984,6 +8105,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProfileClaudeConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scenario/{scenario}/route": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Where a Claude Code session's next request is routed, and the quota it draws on (a session's status line)",
+        "description": "Where a Claude Code session's next request is routed, and the quota it draws on (a session's status line)",
+        "operationId": "apiV1ScenarioScenarioRouteGet",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "description": "Path parameter 'scenario'",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "description": "Claude Code profile id; empty is the main claude_code routing",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "description": "Model tier alias the session asks for; empty is the default tier",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "description": "Model the latest turn asked for, used when the tier cannot be read",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeCodeRouteResponse"
                 }
               }
             }
@@ -11728,6 +11909,38 @@
           }
         }
       },
+      "ClaudeCodeRouteResponse": {
+        "type": "object",
+        "properties": {
+          "provider_model": {
+            "type": "string",
+            "description": "Field provider_model"
+          },
+          "provider_name": {
+            "type": "string",
+            "description": "Field provider_name"
+          },
+          "quota": {
+            "type": "array",
+            "description": "Field quota",
+            "items": {
+              "$ref": "#/components/schemas/RouteQuotaSegment"
+            }
+          },
+          "requested_model": {
+            "type": "string",
+            "description": "Field requested_model"
+          },
+          "scenario": {
+            "type": "string",
+            "description": "Field scenario"
+          }
+        },
+        "required": [
+          "scenario",
+          "quota"
+        ]
+      },
       "ClaudeConfigResponse": {
         "type": "object",
         "properties": {
@@ -15171,6 +15384,18 @@
           "id"
         ]
       },
+      "ModelRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Field model"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
       "ModelRequestDetail": {
         "type": "object",
         "properties": {
@@ -16549,6 +16774,18 @@
           "name"
         ]
       },
+      "ProfileRequest": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "description": "Field profile"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
       "ProfileUpdateRequest": {
         "type": "object",
         "properties": {
@@ -17804,6 +18041,44 @@
           "routes"
         ]
       },
+      "RouteQuotaSegment": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "boolean",
+            "description": "Field balance"
+          },
+          "limit_reached": {
+            "type": "boolean",
+            "description": "Field limit_reached"
+          },
+          "resets_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field resets_at"
+          },
+          "text": {
+            "type": "string",
+            "description": "Field text"
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type"
+          },
+          "used_percent": {
+            "type": "number",
+            "format": "double",
+            "description": "Field used_percent"
+          }
+        },
+        "required": [
+          "type",
+          "balance",
+          "text",
+          "used_percent",
+          "limit_reached"
+        ]
+      },
       "RouteResponse": {
         "type": "object",
         "properties": {
@@ -18518,6 +18793,10 @@
             "type": "string",
             "description": "Field permission_mode"
           },
+          "profile": {
+            "type": "string",
+            "description": "Field profile"
+          },
           "title": {
             "type": "string",
             "description": "Field title"
@@ -18558,6 +18837,18 @@
           "events",
           "running",
           "background_tasks"
+        ]
+      },
+      "SessionHandoffResponse": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Field command"
+          }
+        },
+        "required": [
+          "command"
         ]
       },
       "SessionInfo": {
@@ -19635,6 +19926,10 @@
           "permission_mode": {
             "type": "string",
             "description": "Field permission_mode"
+          },
+          "profile": {
+            "type": "string",
+            "description": "Field profile"
           },
           "project_id": {
             "type": "string",
