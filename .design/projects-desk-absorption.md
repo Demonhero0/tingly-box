@@ -1,5 +1,7 @@
 # Projects absorbs Desk
 
+Diagrams: [projects-desk-absorption.pencil.md](./projects-desk-absorption.pencil.md).
+
 > Status: 已实施 (phases 1–4). Desk is gone; working in a plain folder is a
 > Projects working-folder session. Phase 5 is still open. This note supersedes
 > the "out of scope: merging the two products" line of TEP #2063.
@@ -154,8 +156,10 @@ until phase 4.
      line strings moved to `components/claudeCode` and `claudeSession.*`.
    - [x] `desk.md` marked retired (its §3 engine behaviour still applies),
      `projects-panel.md` rewritten to the current panel.
-5. **After.** One waiting signal on the rail (#2063 step 2), hand a session to
-   a project, `@cc` visibility if wanted.
+5. **After.**
+   - [x] One waiting signal on the rail (#2063 step 2): the dot reads both the
+     project list and the working folders' waiting counts.
+   - [ ] Hand a session to a project, `@cc` visibility: only when asked for.
 
 ## Decisions
 
