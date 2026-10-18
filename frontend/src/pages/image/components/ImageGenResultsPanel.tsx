@@ -2,6 +2,8 @@ import { Box, Button, ButtonBase, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useRef } from 'react';
 import { ContentPaste, FileUpload, Photo, ViewGallery } from '@/components/icons';
+import { CopyIconButton } from '@/components/CopyIconButton';
+import { fontMono } from '@/theme/fonts';
 import GenerationRunCard from './GenerationRunCard';
 import ImportedImageCard from './ImportedImageCard';
 import PanelAction from './PanelAction';
@@ -22,6 +24,9 @@ interface ImageGenResultsPanelProps {
     importedCount: number;
     olderTimelineCount: number;
     desktopPanelHeight: string | number;
+    // Where generated images are written on disk; shown under the results,
+    // next to the images it is about.
+    outputDir?: string;
     // Attached to the scrolling strip so the session hook can keep the newest
     // card in view as new ones arrive.
     historyTrackRef: React.RefObject<HTMLDivElement | null>;
@@ -53,6 +58,7 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
     importedCount,
     olderTimelineCount,
     desktopPanelHeight,
+    outputDir,
     historyTrackRef,
     onDropFiles,
     onImportFiles,
@@ -71,6 +77,36 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
 }) => {
     const { t } = useTranslation();
     const importFileInputRef = useRef<HTMLInputElement>(null);
+    // Its own words, not the reference row's "Browse" / "Paste": what lands
+    // here is worked on as it is (crop, slice, mask), not generated from.
+    const importLabel = t('playground.importFile', { defaultValue: 'Import' });
+    const importClipboardLabel = t('playground.importClipboard', { defaultValue: 'From clipboard' });
+    const outputDirLine = outputDir ? (
+        <Stack
+            direction="row"
+            spacing={0.5}
+            data-testid="imagegen-output-dir"
+            sx={{ alignItems: 'center', minWidth: 0, color: 'text.secondary' }}
+        >
+            <Typography variant="caption" sx={{ flexShrink: 0 }}>
+                {t('playground.outputDirLabel', { defaultValue: 'Generated images are saved to' })}:
+            </Typography>
+            <Typography
+                variant="caption"
+                sx={{ fontFamily: fontMono, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                title={outputDir}
+            >
+                {outputDir}
+            </Typography>
+            <CopyIconButton
+                value={outputDir}
+                label={t('common.copy', { defaultValue: 'Copy' })}
+                copiedLabel={t('common.copied', { defaultValue: 'Copied!' })}
+                iconSize={14}
+                sx={{ p: 0.25 }}
+            />
+        </Stack>
+    ) : null;
     return (
         <Box
             data-testid="imagegen-preview-panel"
@@ -119,12 +155,12 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
                     <Typography variant="subtitle2" sx={{
                         color: "text.secondary"
                     }}>
-                        {t('playground.previewEmpty', { defaultValue: 'Generated and imported images appear here' })}
+                        {t('playground.previewEmpty', { defaultValue: 'Generated images appear here' })}
                     </Typography>
                     <Typography variant="caption" sx={{
                         color: "text.disabled"
                     }}>
-                        {t('playground.previewHint', { defaultValue: 'Drop an image here to work on it without generating anything.' })}
+                        {t('playground.previewHint', { defaultValue: 'To crop, slice or mask an image without generating, import it here.' })}
                     </Typography>
                     <Stack direction="row" spacing={0.5} sx={{ pt: 0.5 }}>
                         <Button
@@ -134,7 +170,7 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
                             onClick={() => importFileInputRef.current?.click()}
                             sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                         >
-                            {t('playground.referenceBrowse', { defaultValue: 'Browse' })}
+                            {importLabel}
                         </Button>
                         <Button
                             size="small"
@@ -143,9 +179,10 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
                             onClick={onImportFromClipboard}
                             sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                         >
-                            {t('playground.referencePaste', { defaultValue: 'Paste' })}
+                            {importClipboardLabel}
                         </Button>
                     </Stack>
+                    {outputDirLine && <Box sx={{ pt: 2, maxWidth: '100%' }}>{outputDirLine}</Box>}
                 </Stack>
             ) : (
                 <Stack spacing={1.5} sx={{ width: '100%', minWidth: 0, height: '100%' }}>
@@ -186,12 +223,12 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
                                 testId="imagegen-open-gallery"
                             />
                             <PanelAction
-                                label={t('playground.referenceBrowse', { defaultValue: 'Browse' })}
+                                label={importLabel}
                                 icon={<FileUpload fontSize="small" />}
                                 onClick={() => importFileInputRef.current?.click()}
                             />
                             <PanelAction
-                                label={t('playground.referencePaste', { defaultValue: 'Paste' })}
+                                label={importClipboardLabel}
                                 icon={<ContentPaste fontSize="small" />}
                                 onClick={onImportFromClipboard}
                             />
@@ -293,6 +330,7 @@ const ImageGenResultsPanel: React.FC<ImageGenResultsPanelProps> = ({
                             />
                         )))}
                     </Box>
+                    {outputDirLine}
                 </Stack>
             )}
         </Box>

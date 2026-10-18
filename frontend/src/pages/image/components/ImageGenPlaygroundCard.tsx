@@ -25,12 +25,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { Rule } from '@/components/RoutingGraphTypes';
 import UnifiedCard from '@/components/UnifiedCard';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { CopyIconButton } from '@/components/CopyIconButton';
 import { AutoAwesome, Cable, Close, DeleteOutline, Description, Edit, OpenInFull, Palette, tablerMui } from '@/components/icons';
 import { IconTextPlus } from '@tabler/icons-react';
 import { fetchBlob } from '@tingly/vision';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
-import { fontMono } from '@/theme/fonts';
 import { api } from '@/services/api';
 import { downloadImage, slugify } from '@/utils/download';
 import { isPromptFile, partitionDroppedFiles, readPromptFile } from '@/utils/promptFile';
@@ -791,35 +789,16 @@ const ImageGenPlaygroundCard: React.FC<ImageGenPlaygroundCardProps> = ({
                         )}
                     </Stack>
                 )}
-                subtitle={(showProfileIntro || outputDir) ? (
-                    <Stack spacing={0.5}>
-                        {showProfileIntro && (
-                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', color: 'text.primary' }}>
-                                <Box component="span">
-                                    {t('imageProfile.intro', { defaultValue: 'A profile keeps its references, prompts and settings. Changes save as you go.' })}
-                                </Box>
-                                <Button size="small" onClick={dismissProfileIntro} sx={{ minWidth: 0, py: 0 }}>
-                                    {t('imageProfile.introDismiss', { defaultValue: 'Got it' })}
-                                </Button>
-                            </Stack>
-                        )}
-                        {outputDir && (
-                            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                                <Box component="span">
-                                    {t('playground.outputDirLabel', { defaultValue: 'Generated images are saved to' })}:
-                                </Box>
-                                <Box component="span" sx={{ fontFamily: fontMono, wordBreak: 'break-all' }}>
-                                    {outputDir}
-                                </Box>
-                                <CopyIconButton
-                                    value={outputDir}
-                                    label={t('common.copy', { defaultValue: 'Copy' })}
-                                    copiedLabel={t('common.copied', { defaultValue: 'Copied!' })}
-                                    iconSize={14}
-                                    sx={{ p: 0.25 }}
-                                />
-                            </Stack>
-                        )}
+                // The output folder sits under the results it is about
+                // (ImageGenResultsPanel), not in the page's headline.
+                subtitle={showProfileIntro ? (
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', color: 'text.primary' }}>
+                        <Box component="span">
+                            {t('imageProfile.intro', { defaultValue: 'A profile keeps its references, prompts and settings. Changes save as you go.' })}
+                        </Box>
+                        <Button size="small" onClick={dismissProfileIntro} sx={{ minWidth: 0, py: 0 }}>
+                            {t('imageProfile.introDismiss', { defaultValue: 'Got it' })}
+                        </Button>
                     </Stack>
                 ) : undefined}
             >
@@ -1059,6 +1038,7 @@ const ImageGenPlaygroundCard: React.FC<ImageGenPlaygroundCardProps> = ({
                         importedCount={imported.length}
                         olderTimelineCount={olderTimelineCount}
                         desktopPanelHeight={desktopPanelHeight}
+                        outputDir={outputDir}
                         historyTrackRef={historyTrackRef}
                         onDropFiles={handleDroppedFiles}
                         onImportFiles={(files) => { void handleImportImages(files); }}
