@@ -36,7 +36,7 @@ func TestSessionRunsInFolderWithoutProject(t *testing.T) {
 	assert.Equal(t, folder, spec.ProjectPath)
 	assert.Equal(t, "plan", spec.PermissionMode)
 	assert.Empty(t, spec.AppendSystemPrompt, "no project instructions")
-	assert.Empty(t, spec.SettingsPath)
+	assert.Equal(t, f.threads.layout.SessionSettingsFile(s.ID), spec.SettingsPath, "a session reads its own uploads")
 	assert.Contains(t, spec.Env, "ANTHROPIC_BASE_URL=http://gw")
 
 	select {
@@ -188,14 +188,18 @@ func TestSessionKeepsSubagentsAndTasksProjectThreadsDoNot(t *testing.T) {
 
 // profiles is a host with launch profiles: "work" routes through its own
 // settings file and runs only the tiers it lists.
-type profiles struct{ staticEnv }
+type profiles struct {
+	staticEnv
+	// settings is the profile's settings file, when the test wrote one.
+	settings string
+}
 
-func (profiles) LaunchEnv(_ context.Context, profile string) ([]string, string, error) {
+func (p profiles) LaunchEnv(_ context.Context, profile string) ([]string, string, error) {
 	switch profile {
 	case "":
 		return []string{"ANTHROPIC_BASE_URL=http://gw/main"}, "", nil
 	case "work":
-		return nil, "/settings/work.json", nil
+		return nil, p.settings, nil
 	}
 	return nil, "", errors.New("no such profile")
 }
@@ -239,7 +243,9 @@ func TestSessionWithoutLauncherHasNoProfiles(t *testing.T) {
 
 func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 	f := newFixture(t, func(*enginetest.Turn) error { return nil })
-	f.threads.env = profiles{}
+	work := filepath.Join(t.TempDir(), "work.json")
+	require.NoError(t, os.WriteFile(work, []byte(`{"env":{"X":"1"},"permissions":{"additionalDirectories":["/data"]}}`), 0o644))
+	f.threads.env = profiles{settings: work}
 	ctx := context.Background()
 
 	_, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "x", Profile: "nope"})
@@ -248,7 +254,12 @@ func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	spec := f.agent.Launches()[0]
-	assert.Equal(t, "/settings/work.json", spec.SettingsPath)
+	assert.Equal(t, f.threads.layout.SessionSettingsFile(s.ID), spec.SettingsPath, "the profile's settings plus the session's uploads")
+	merged, err := os.ReadFile(spec.SettingsPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(merged), `"X":"1"`, "the profile's own settings are kept")
+	assert.Contains(t, string(merged), `"/data"`)
+	assert.Contains(t, string(merged), f.threads.layout.LibraryDir(SessionOwner(s.ID)))
 	assert.Empty(t, spec.Env)
 	assert.Empty(t, spec.Model, "the profile decides when no model is picked")
 
@@ -273,7 +284,7 @@ func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 	require.Eventually(t, func() bool { return len(f.agent.Launches()) == 2 }, 5*time.Second, 10*time.Millisecond)
 	spec = f.agent.Launches()[1]
 	assert.Contains(t, spec.Env, "ANTHROPIC_BASE_URL=http://gw/main")
-	assert.Empty(t, spec.SettingsPath)
+	assert.Equal(t, f.threads.layout.SessionSettingsFile(s.ID), spec.SettingsPath)
 
 	events, _ := f.store.ListThreadEvents(s.ID)
 	var notes []string
@@ -302,10 +313,10 @@ func TestSessionFirstMessageCarriesAttachments(t *testing.T) {
 		turn.Say("Saw it.", 1, 1)
 		return nil
 	})
-	a, err := f.threads.layout.SaveAttachment(SessionOwner, "log.txt", strings.NewReader("boom"), 0)
+	a, err := f.threads.layout.SaveAttachment(DraftOwner, "log.txt", strings.NewReader("boom"), 0)
 	require.NoError(t, err)
-	// Resolved the way the handler does: against the session pool, not a project.
-	atts, err := f.threads.layout.ResolveAttachments(SessionOwner, []string{a.Path})
+	// Resolved the way the handler does: against the drafts, before the session exists.
+	atts, err := f.threads.layout.ResolveAttachments(DraftOwner, []string{a.Path})
 	require.NoError(t, err)
 
 	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Attachments: atts})
@@ -317,4 +328,24 @@ func TestSessionFirstMessageCarriesAttachments(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, events)
 	assert.Equal(t, atts, ParseAttachments(events[0].Payload))
+
+	// The files moved into the session's own area, out of the drafts.
+	_, err = f.threads.layout.ResolveAttachments(SessionOwner(s.ID), []string{a.Path})
+	assert.NoError(t, err)
+	_, err = f.threads.layout.ResolveAttachments(DraftOwner, []string{a.Path})
+	assert.Error(t, err)
+
+	// The session may read its own area and no one else's.
+	raw, err := os.ReadFile(f.threads.layout.SessionSettingsFile(s.ID))
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), f.threads.layout.LibraryDir(SessionOwner(s.ID)))
+	assert.NotContains(t, string(raw), "_new")
+}
+
+func TestSessionsDoNotShareUploads(t *testing.T) {
+	f := newFixture(t, func(*enginetest.Turn) error { return nil })
+	a, err := f.threads.layout.SaveAttachment(SessionOwner("s1"), "x.txt", strings.NewReader("x"), 0)
+	require.NoError(t, err)
+	_, err = f.threads.layout.ResolveAttachments(SessionOwner("s2"), []string{a.Path})
+	assert.Error(t, err, "another session's files cannot be attached")
 }

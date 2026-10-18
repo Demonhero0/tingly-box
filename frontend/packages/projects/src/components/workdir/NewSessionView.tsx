@@ -45,7 +45,7 @@ export function NewSessionView({ initialFolder, folders, permissionModes, onCrea
                     text={text}
                     onTextChange={setText}
                     onAccepted={(sent) => setText((prev) => (prev === sent ? '' : prev))}
-                    attach={(files) => uploadAttachments('', files)}
+                    attach={(files) => uploadAttachments({}, files)}
                     onSend={(prompt, attachments) => onCreate(folder.trim(), prompt, mode, launch, attachments)}
                     leftSlot={(
                         <>

@@ -48,6 +48,11 @@ func (l Layout) SettingsFile(projectID, threadID string) string {
 	return filepath.Join(l.Dir(projectID), "threads", threadID+".settings.json")
 }
 
+// SessionSettingsFile is the Claude Code settings file a folder session runs with.
+func (l Layout) SessionSettingsFile(threadID string) string {
+	return filepath.Join(l.Root, "_sessions", "settings", threadID+".json")
+}
+
 // Ensure creates a project's directories.
 func (l Layout) Ensure(projectID string) error {
 	for _, d := range []string{l.MemoryDir(projectID), l.LibraryDir(projectID), filepath.Join(l.Dir(projectID), "worktrees"), filepath.Join(l.Dir(projectID), "threads")} {

@@ -133,10 +133,13 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api.GET("/projects/workdirs", h.workdirs, tag,
 		swagger.WithDescription("Working folders: the saved ones and every folder that has a session, with what waits there"),
 		swagger.WithResponseModel(WorkdirsResponse{}))
-	api.POST("/projects/workdirs/attachments", h.uploadAttachments, tag,
-		swagger.WithDescription("Upload files for a session message (multipart field \"files\"); sessions have no project, so they share one upload pool"),
+	api.POST("/projects/workdirs/attachments", h.uploadDraft, tag,
+		swagger.WithDescription("Upload files for the first message of a new session (multipart field \"files\"); they move into the session when it starts"),
 		swagger.WithResponseModel(rt.AttachmentsResponse{}))
-	api.GET("/projects/workdirs/attachments/file", h.downloadAttachment, tag,
+	api.POST("/projects/sessions/:sid/attachments", h.uploadAttachments, tag,
+		swagger.WithDescription("Upload files for a session message (multipart field \"files\"); kept per session, outside the working folder"),
+		swagger.WithResponseModel(rt.AttachmentsResponse{}))
+	api.GET("/projects/sessions/:sid/attachments/file", h.downloadAttachment, tag,
 		swagger.WithDescription("Download a session attachment"),
 		swagger.WithQuery("path", "string", "Path returned by the upload"))
 	api.POST("/projects/workdirs", h.addWorkdir, tag,
@@ -285,7 +288,7 @@ func (h *Handler) create(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	atts, err := h.svc.Layout.ResolveAttachments(rt.SessionOwner, req.Attachments)
+	atts, err := h.svc.Layout.ResolveAttachments(rt.DraftOwner, req.Attachments)
 	if err != nil {
 		apierr.BadRequest(c, err.Error())
 		return
@@ -318,13 +321,24 @@ func (h *Handler) get(c *gin.Context) {
 	})
 }
 
+// uploadDraft stores files for the first message of a session not yet created.
+func (h *Handler) uploadDraft(c *gin.Context) { h.store(c, rt.DraftOwner) }
+
 func (h *Handler) uploadAttachments(c *gin.Context) {
+	t, ok := h.session(c)
+	if !ok {
+		return
+	}
+	h.store(c, rt.SessionOwner(t.ID))
+}
+
+func (h *Handler) store(c *gin.Context, owner string) {
 	form, err := c.MultipartForm()
 	if err != nil {
 		apierr.BadRequest(c, `expected multipart form with field "files"`)
 		return
 	}
-	atts, err := h.svc.Layout.SaveUploads(rt.SessionOwner, form.File["files"], maxUpload)
+	atts, err := h.svc.Layout.SaveUploads(owner, form.File["files"], maxUpload)
 	if err != nil {
 		apierr.BadRequest(c, err.Error())
 		return
@@ -333,12 +347,16 @@ func (h *Handler) uploadAttachments(c *gin.Context) {
 }
 
 func (h *Handler) downloadAttachment(c *gin.Context) {
+	t, ok := h.session(c)
+	if !ok {
+		return
+	}
 	rel := filepath.ToSlash(filepath.Clean(c.Query("path")))
 	if !strings.HasPrefix(rel, rt.UploadsDir+"/") {
 		apierr.BadRequest(c, "invalid attachment path")
 		return
 	}
-	path, err := h.svc.Layout.LibraryPath(rt.SessionOwner, rel)
+	path, err := h.svc.Layout.LibraryPath(rt.SessionOwner(t.ID), rel)
 	if err != nil {
 		apierr.BadRequest(c, err.Error())
 		return
@@ -363,7 +381,7 @@ func (h *Handler) send(c *gin.Context) {
 	if !ok {
 		return
 	}
-	atts, err := h.svc.Layout.ResolveAttachments(rt.SessionOwner, req.Attachments)
+	atts, err := h.svc.Layout.ResolveAttachments(rt.SessionOwner(t.ID), req.Attachments)
 	if err != nil {
 		apierr.BadRequest(c, err.Error())
 		return

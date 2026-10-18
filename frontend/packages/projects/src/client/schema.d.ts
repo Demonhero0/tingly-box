@@ -324,6 +324,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/sessions/{sid}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload files for a session message (multipart field "files"); kept per session, outside the working folder
+         * @description Upload files for a session message (multipart field "files"); kept per session, outside the working folder
+         */
+        post: operations["apiV1ProjectsSessionsSidAttachmentsPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/sessions/{sid}/attachments/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a session attachment
+         * @description Download a session attachment
+         */
+        get: operations["apiV1ProjectsSessionsSidAttachmentsFileGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/sessions/{sid}/handoff": {
         parameters: {
             query?: never;
@@ -562,30 +602,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Upload files for a session message (multipart field "files"); sessions have no project, so they share one upload pool
-         * @description Upload files for a session message (multipart field "files"); sessions have no project, so they share one upload pool
+         * Upload files for the first message of a new session (multipart field "files"); they move into the session when it starts
+         * @description Upload files for the first message of a new session (multipart field "files"); they move into the session when it starts
          */
         post: operations["apiV1ProjectsWorkdirsAttachmentsPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/workdirs/attachments/file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download a session attachment
-         * @description Download a session attachment
-         */
-        get: operations["apiV1ProjectsWorkdirsAttachmentsFileGet"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2336,6 +2356,55 @@ export interface operations {
             };
         };
     };
+    apiV1ProjectsSessionsSidAttachmentsPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentsResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsSessionsSidAttachmentsFileGet: {
+        parameters: {
+            query?: {
+                /** @description Path returned by the upload */
+                path?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     apiV1ProjectsSessionsSidHandoffPost: {
         parameters: {
             query?: never;
@@ -2682,29 +2751,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttachmentsResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsWorkdirsAttachmentsFileGet: {
-        parameters: {
-            query?: {
-                /** @description Path returned by the upload */
-                path?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
                 };
             };
         };

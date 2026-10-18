@@ -39,12 +39,17 @@ only in memory or in the conversation.
   age or per owner without touching anything else. Deleting a project already
   removes its library. Age-based cleanup of files never sent is the follow-up.
 
-A working-folder session has no project, so its uploads share one pool,
-`<data>/projects/_sessions/library/uploads/<id>/<name>`, outside any folder the
-person works in. The pool has its own routes (`/projects/workdirs/attachments`
-and `.../file`); the frontend picks them when a composer's `projectId` is empty.
-The first message of a new session may carry files, and a file alone starts one
-(the title is the file's name).
+A working-folder session has no project, so each session gets its own area,
+`<data>/projects/_sessions/<session>/library/uploads/<id>/<name>`. It is outside
+the folder the person works in on purpose: files put inside would show up in
+their repository's `git status` and could be committed. Uploads made before
+the session exists (the first message) wait in `_sessions/_new` and move into
+the session when it starts. A session reaches only its own area: its Claude
+Code settings (the host profile's, if any, merged with one extra allowed
+directory) list that directory and nothing else, so no approval prompt and no
+view of other sessions' files. Routes: `POST /projects/workdirs/attachments`
+for the first message, `POST /projects/sessions/:sid/attachments` and
+`GET .../attachments/file` after.
 
 ## What the model gets
 
@@ -71,7 +76,6 @@ blocks, so `@tingly/projects/transcript` stays free of API calls.
 
 ## Open
 
-- A session's pool is not among Claude Code's allowed directories (the engine
-  has no such option for sessions), so its first read asks for approval.
+- Drafts left in `_sessions/_new` by messages never sent are cleanup's job.
 - Chats need multi-part message content in `llm`.
 - Cleanup: unsent drafts' uploads, by age, and a per-project usage line.

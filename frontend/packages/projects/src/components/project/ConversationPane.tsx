@@ -183,7 +183,7 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
                                 return m.role === 'user' ? (
                                     <Box key={m.id} sx={{ display: 'flex', justifyContent: 'flex-end', my: 2 }}>
                                         <Box sx={{ maxWidth: '85%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                            <AttachmentChips projectId={projectId} items={parse<{ attachments?: Attachment[] }>(m.payload)?.attachments ?? []} />
+                                            <AttachmentChips owner={{ projectId }} items={parse<{ attachments?: Attachment[] }>(m.payload)?.attachments ?? []} />
                                             {m.content.trim() !== '' && (
                                                 <Box sx={{ bgcolor: 'action.hover', borderRadius: 1.5, px: 1.75, py: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'text.primary', fontSize: '0.875rem', lineHeight: 1.65 }}>{m.content}</Box>
                                             )}
@@ -235,7 +235,7 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
                     disabled={disabled}
                     seed={seed}
                     placeholder={t('conversation.placeholder')}
-                    attach={(files) => uploadAttachments(projectId, files)}
+                    attach={(files) => uploadAttachments({ projectId }, files)}
                     onSend={async (text, attachments) => {
                         stick.current = true;
                         return onSend(text, attachments);

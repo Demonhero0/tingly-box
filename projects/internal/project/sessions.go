@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/tingly-dev/tingly-box/agentboot/engine"
 	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
@@ -120,6 +121,9 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 	}
 	if err := m.store.CreateThread(t); err != nil {
 		return nil, err
+	}
+	if err := m.layout.AdoptUploads(DraftOwner, SessionOwner(t.ID), spec.Attachments); err != nil {
+		logrus.WithError(err).Warn("move session uploads")
 	}
 	_ = m.store.SaveWorkdir(folder)
 	m.hub.Publish(Event{Type: EventThread, Data: t})

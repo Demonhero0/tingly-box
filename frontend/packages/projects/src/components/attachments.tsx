@@ -17,17 +17,26 @@ export const pastedTextFile = (text: string): File => new File([text], 'pasted-t
 
 export const formatSize = (n: number): string => (n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : n >= 1 << 10 ? `${Math.round(n / (1 << 10))} KB` : `${n} B`);
 
-// A project keeps its uploads in its library; a working-folder session has no
-// project and shares one upload pool (an empty projectId).
-const fileUrl = (projectId: string, path: string) => (projectId
-    ? `/api/v1/projects/${projectId}/library/file?path=${encodeURIComponent(path)}`
-    : `/api/v1/projects/workdirs/attachments/file?path=${encodeURIComponent(path)}`);
+/**
+ * Whose uploads: a project's (its library), a folder session's own, or none
+ * yet (the first message of a session that is not started).
+ */
+export interface AttachOwner {
+    projectId?: string;
+    sessionId?: string;
+}
 
-/** Stores files for a message (the project's uploads, or the session pool for an empty projectId); returns what to send with it. */
-export async function uploadAttachments(projectId: string, files: File[]): Promise<Attachment[]> {
+const base = (o: AttachOwner) => (o.projectId ? `/api/v1/projects/${o.projectId}` : o.sessionId ? `/api/v1/projects/sessions/${o.sessionId}` : '/api/v1/projects/workdirs');
+
+const fileUrl = (o: AttachOwner, path: string) => (o.projectId
+    ? `${base(o)}/library/file?path=${encodeURIComponent(path)}`
+    : `${base(o)}/attachments/file?path=${encodeURIComponent(path)}`);
+
+/** Stores files for a message and returns what to send with it. */
+export async function uploadAttachments(owner: AttachOwner, files: File[]): Promise<Attachment[]> {
     const form = new FormData();
     files.forEach((f) => form.append('files', f, f.name));
-    const res = await apiFetch(projectId ? `/api/v1/projects/${projectId}/attachments` : '/api/v1/projects/workdirs/attachments', { method: 'POST', body: form });
+    const res = await apiFetch(`${base(owner)}/attachments`, { method: 'POST', body: form });
     const body = (await res.json().catch(() => ({}))) as { error?: string; attachments?: Attachment[] };
     if (!res.ok) throw new Error(body.error ?? res.statusText);
     return body.attachments ?? [];
@@ -36,27 +45,28 @@ export async function uploadAttachments(projectId: string, files: File[]): Promi
 const isImage = (a: { type: string }) => a.type.startsWith('image/');
 
 /** Loads a stored file through the host's fetch (so its auth applies); null once it is gone. */
-function useStoredFile(projectId: string, path: string, enabled: boolean): string | null | undefined {
+function useStoredFile(owner: AttachOwner, path: string, enabled: boolean): string | null | undefined {
     const [url, setUrl] = useState<string | null | undefined>(undefined);
+    const source = fileUrl(owner, path);
     useEffect(() => {
         if (!enabled) return;
         let made: string | undefined;
         let live = true;
-        apiFetch(fileUrl(projectId, path))
+        apiFetch(source)
             .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.statusText))))
             .then((b) => { if (live) { made = URL.createObjectURL(b); setUrl(made); } })
             .catch(() => { if (live) setUrl(null); });
         return () => { live = false; if (made) URL.revokeObjectURL(made); };
-    }, [projectId, path, enabled]);
+    }, [source, enabled]);
     return url;
 }
 
-function AttachmentChip({ projectId, item }: { projectId: string; item: Attachment }) {
+function AttachmentChip({ owner, item }: { owner: AttachOwner; item: Attachment }) {
     const { t } = useTranslation('projects');
     const image = isImage(item);
-    const src = useStoredFile(projectId, item.path, image);
+    const src = useStoredFile(owner, item.path, image);
     const open = async () => {
-        const res = await apiFetch(fileUrl(projectId, item.path)).catch(() => null);
+        const res = await apiFetch(fileUrl(owner, item.path)).catch(() => null);
         if (!res?.ok) return;
         window.open(URL.createObjectURL(await res.blob()), '_blank', 'noopener');
     };
@@ -82,11 +92,11 @@ function AttachmentChip({ projectId, item }: { projectId: string; item: Attachme
 }
 
 /** The files a sent message carries: thumbnails for images, chips for the rest. */
-export function AttachmentChips({ projectId, items, align = 'flex-end' }: { projectId: string; items: Attachment[]; align?: 'flex-start' | 'flex-end' }) {
+export function AttachmentChips({ owner, items, align = 'flex-end' }: { owner: AttachOwner; items: Attachment[]; align?: 'flex-start' | 'flex-end' }) {
     if (items.length === 0) return null;
     return (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, justifyContent: align, mb: 0.75 }}>
-            {items.map((a) => <AttachmentChip key={a.path} projectId={projectId} item={a} />)}
+            {items.map((a) => <AttachmentChip key={a.path} owner={owner} item={a} />)}
         </Box>
     );
 }

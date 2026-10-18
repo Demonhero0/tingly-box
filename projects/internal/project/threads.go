@@ -497,7 +497,7 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		return
 	}
 	a.slot = slot
-	prompt := withAttachments(a.current.text, m.layout.LibraryDir(OwnerOf(t.ProjectID)), a.current.atts)
+	prompt := withAttachments(a.current.text, m.layout.LibraryDir(UploadOwner(t)), a.current.atts)
 	m.mu.Unlock()
 	// Waiting for the slot can take a while: launch with what the owner
 	// picked since (profile, model, permission mode).
@@ -523,6 +523,8 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 	if p != nil {
 		opts.AppendSystemPrompt = threadSystemPrompt(m.layout, p, t)
 		opts.SettingsPath = m.layout.SettingsFile(p.ID, t.ID)
+	} else if path, err := m.sessionSettings(t, settings); err == nil {
+		opts.SettingsPath = path
 	}
 	started := m.engine.Start(m.sessionOf(threadID), t.Worktree, prompt, t.Turns > 0, func(context.Context) agentboot.ExecutionOptions { return opts })
 	if !started {
@@ -535,6 +537,38 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		<-slot
 		m.next(threadID)
 	}
+}
+
+// sessionSettings lets a folder session read its own folder's uploads, which
+// live outside the folder: the host's settings (a profile's), if any, plus
+// that one extra directory. On error the session keeps the host's settings.
+func (m *Threads) sessionSettings(t *db.Thread, host string) (string, error) {
+	doc := map[string]any{}
+	if host != "" {
+		b, err := os.ReadFile(host)
+		if err != nil {
+			return host, err
+		}
+		if err := json.Unmarshal(b, &doc); err != nil {
+			return host, err
+		}
+	}
+	perms, _ := doc["permissions"].(map[string]any)
+	if perms == nil {
+		perms = map[string]any{}
+	}
+	dirs, _ := perms["additionalDirectories"].([]any)
+	perms["additionalDirectories"] = append(dirs, m.layout.LibraryDir(UploadOwner(t)))
+	doc["permissions"] = perms
+	path := m.layout.SessionSettingsFile(t.ID)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return host, err
+	}
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return host, err
+	}
+	return path, os.WriteFile(path, out, 0o644)
 }
 
 // launchEnv is how t's turn reaches a model. A folder session on a host

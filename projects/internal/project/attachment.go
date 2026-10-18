@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
 // UploadsDir is where everything a person attaches lives, inside the
@@ -19,16 +21,42 @@ import (
 // and cleaned up on its own, and the Library tab shows it.
 const UploadsDir = "uploads"
 
-// SessionOwner is the upload owner of working-folder sessions, which have no
-// project: one pool under the data root, outside any user folder.
-const SessionOwner = "_sessions"
+// SessionOwner is the upload owner of one folder session. Sessions have no
+// project, so each gets its own area under the data root, outside the folder
+// it works in (nothing lands in the person's repository).
+func SessionOwner(sessionID string) string { return "_sessions/" + sessionID }
 
-// OwnerOf is whose uploads a thread reads: its project's, or the session pool.
-func OwnerOf(projectID string) string {
-	if projectID == "" {
-		return SessionOwner
+// DraftOwner holds uploads made before the session exists (the first message
+// of a new session); StartSession moves them into the session's own area.
+const DraftOwner = "_sessions/_new"
+
+// UploadOwner is whose uploads a thread reads: its project's, or its own.
+func UploadOwner(t *db.Thread) string {
+	if t.ProjectID == "" {
+		return SessionOwner(t.ID)
 	}
-	return projectID
+	return t.ProjectID
+}
+
+// AdoptUploads moves uploads of one owner to another, keeping their paths.
+func (l Layout) AdoptUploads(from, to string, atts []Attachment) error {
+	for _, a := range atts {
+		src, err := l.LibraryPath(from, a.Path)
+		if err != nil {
+			return err
+		}
+		dst, err := l.LibraryPath(to, a.Path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(filepath.Dir(dst)), 0o755); err != nil {
+			return err
+		}
+		if err := os.Rename(filepath.Dir(src), filepath.Dir(dst)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AttachmentsResponse lists the files stored for a message.
