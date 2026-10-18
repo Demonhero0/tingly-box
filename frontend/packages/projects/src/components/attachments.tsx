@@ -17,13 +17,17 @@ export const pastedTextFile = (text: string): File => new File([text], 'pasted-t
 
 export const formatSize = (n: number): string => (n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : n >= 1 << 10 ? `${Math.round(n / (1 << 10))} KB` : `${n} B`);
 
-const fileUrl = (projectId: string, path: string) => `/api/v1/projects/${projectId}/library/file?path=${encodeURIComponent(path)}`;
+// A project keeps its uploads in its library; a working-folder session has no
+// project and shares one upload pool (an empty projectId).
+const fileUrl = (projectId: string, path: string) => (projectId
+    ? `/api/v1/projects/${projectId}/library/file?path=${encodeURIComponent(path)}`
+    : `/api/v1/projects/workdirs/attachments/file?path=${encodeURIComponent(path)}`);
 
-/** Stores files for a message in the project's uploads; returns what to send with it. */
+/** Stores files for a message (the project's uploads, or the session pool for an empty projectId); returns what to send with it. */
 export async function uploadAttachments(projectId: string, files: File[]): Promise<Attachment[]> {
     const form = new FormData();
     files.forEach((f) => form.append('files', f, f.name));
-    const res = await apiFetch(`/api/v1/projects/${projectId}/attachments`, { method: 'POST', body: form });
+    const res = await apiFetch(projectId ? `/api/v1/projects/${projectId}/attachments` : '/api/v1/projects/workdirs/attachments', { method: 'POST', body: form });
     const body = (await res.json().catch(() => ({}))) as { error?: string; attachments?: Attachment[] };
     if (!res.ok) throw new Error(body.error ?? res.statusText);
     return body.attachments ?? [];

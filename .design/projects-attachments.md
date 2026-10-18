@@ -1,8 +1,8 @@
 # Projects attachments: files, images and long text as input
 
 > TEP: [#2107](https://github.com/tingly-dev/tingly-box/issues/2107). Status:
-> in progress. Implemented: the upload store, the project conversation and
-> project threads. Not yet: working-folder sessions, standalone Chats, cleanup.
+> in progress. Implemented: the upload store, the project conversation,
+> project threads and working-folder sessions. Not yet: standalone Chats, cleanup.
 
 ## Problem
 
@@ -39,6 +39,13 @@ only in memory or in the conversation.
   age or per owner without touching anything else. Deleting a project already
   removes its library. Age-based cleanup of files never sent is the follow-up.
 
+A working-folder session has no project, so its uploads share one pool,
+`<data>/projects/_sessions/library/uploads/<id>/<name>`, outside any folder the
+person works in. The pool has its own routes (`/projects/workdirs/attachments`
+and `.../file`); the frontend picks them when a composer's `projectId` is empty.
+The first message of a new session may carry files, and a file alone starts one
+(the title is the file's name).
+
 ## What the model gets
 
 The message text is followed by a note listing each file's absolute path, type
@@ -64,6 +71,7 @@ blocks, so `@tingly/projects/transcript` stays free of API calls.
 
 ## Open
 
-- Working-folder sessions have no project library; they need an owner-scoped
-  store with the same shape. Chats need multi-part message content in `llm`.
+- A session's pool is not among Claude Code's allowed directories (the engine
+  has no such option for sessions), so its first read asks for approval.
+- Chats need multi-part message content in `llm`.
 - Cleanup: unsent drafts' uploads, by age, and a per-project usage line.

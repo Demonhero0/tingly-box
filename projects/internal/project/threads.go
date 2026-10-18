@@ -497,7 +497,7 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		return
 	}
 	a.slot = slot
-	prompt := withAttachments(a.current.text, m.layout.LibraryDir(t.ProjectID), a.current.atts)
+	prompt := withAttachments(a.current.text, m.layout.LibraryDir(OwnerOf(t.ProjectID)), a.current.atts)
 	m.mu.Unlock()
 	// Waiting for the slot can take a while: launch with what the owner
 	// picked since (profile, model, permission mode).

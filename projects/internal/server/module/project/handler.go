@@ -250,7 +250,7 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithResponseModel(LibraryResponse{}))
 	api.POST("/projects/:id/attachments", h.uploadAttachments, tag,
 		swagger.WithDescription("Upload files for a message (multipart field \"files\"); they are kept in the library under uploads/"),
-		swagger.WithResponseModel(AttachmentsResponse{}))
+		swagger.WithResponseModel(rt.AttachmentsResponse{}))
 	api.GET("/projects/:id/library/file", h.downloadLibrary, tag,
 		swagger.WithDescription("Download a library file"),
 		swagger.WithQuery("path", "string", "Library-relative path"))
@@ -630,11 +630,6 @@ func (h *Handler) uploadLibrary(c *gin.Context) {
 	h.listLibrary(c)
 }
 
-// AttachmentsResponse lists the files stored for a message.
-type AttachmentsResponse struct {
-	Attachments []rt.Attachment `json:"attachments"`
-}
-
 func (h *Handler) uploadAttachments(c *gin.Context) {
 	p, ok := h.project(c)
 	if !ok {
@@ -645,31 +640,12 @@ func (h *Handler) uploadAttachments(c *gin.Context) {
 		apierr.BadRequest(c, `expected multipart form with field "files"`)
 		return
 	}
-	files := form.File["files"]
-	if len(files) == 0 || len(files) > rt.MaxAttachments {
-		apierr.BadRequest(c, fmt.Sprintf("send 1 to %d files", rt.MaxAttachments))
+	atts, err := h.svc.Layout.SaveUploads(p.ID, form.File["files"], maxUpload)
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
 		return
 	}
-	out := make([]rt.Attachment, 0, len(files))
-	for _, fh := range files {
-		if fh.Size > maxUpload {
-			apierr.BadRequest(c, fmt.Sprintf("%s is larger than 200 MB", fh.Filename))
-			return
-		}
-		src, err := fh.Open()
-		if err != nil {
-			apierr.Message(c, http.StatusInternalServerError, err.Error())
-			return
-		}
-		a, err := h.svc.Layout.SaveAttachment(p.ID, fh.Filename, src, maxUpload)
-		src.Close()
-		if err != nil {
-			apierr.Message(c, http.StatusInternalServerError, err.Error())
-			return
-		}
-		out = append(out, a)
-	}
-	c.JSON(http.StatusCreated, AttachmentsResponse{Attachments: out})
+	c.JSON(http.StatusCreated, rt.AttachmentsResponse{Attachments: atts})
 }
 
 func saveUpload(open func() (multipartFile, error), dst string) error {

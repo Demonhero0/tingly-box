@@ -329,7 +329,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                     onStop={() => { void act(ops.stop); }}
                     disabled={disabled || thread.status === 'resolved'}
                     placeholder={thread.status === 'resolved' ? t(session ? 'session.archivedPlaceholder' : 'thread.resolvedPlaceholder') : running ? t(session ? 'session.queuePlaceholder' : 'thread.queuePlaceholder') : t(session ? 'session.placeholder' : 'thread.placeholder')}
-                    attach={session ? undefined : (files) => uploadAttachments(projectId, files)}
+                    attach={(files) => uploadAttachments(projectId, files)}
                     onSend={async (text, attachments) => {
                         try {
                             await ops.send(text, attachments);

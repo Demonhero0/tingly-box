@@ -1146,6 +1146,61 @@
         }
       }
     },
+    "/api/v1/projects/workdirs/attachments": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload files for a session message (multipart field \"files\"); sessions have no project, so they share one upload pool",
+        "description": "Upload files for a session message (multipart field \"files\"); sessions have no project, so they share one upload pool",
+        "operationId": "apiV1ProjectsWorkdirsAttachmentsPost",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/workdirs/attachments/file": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Download a session attachment",
+        "description": "Download a session attachment",
+        "operationId": "apiV1ProjectsWorkdirsAttachmentsFileGet",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "description": "Path returned by the upload",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{id}": {
       "get": {
         "tags": [
@@ -3272,6 +3327,13 @@
       "SendRequest": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "type": "string"
+            }
+          },
           "content": {
             "type": "string",
             "description": "Field content"
@@ -3284,6 +3346,13 @@
       "SessionCreateRequest": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "type": "string"
+            }
+          },
           "content": {
             "type": "string",
             "description": "Field content"

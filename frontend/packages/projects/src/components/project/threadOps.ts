@@ -31,7 +31,7 @@ export function projectThreadOps(projectId: string, tid: string): ThreadOps {
 export function sessionOps(sid: string): ThreadOps {
     const path = { params: { path: { sid } } };
     return {
-        send: (content) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/messages', { ...path, body: { content } })),
+        send: (content, attachments) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path) } })),
         respond: (request_id, allow, remember, answer, answers) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/respond', {
             ...path, body: { request_id, allow, scope: remember ? 'thread' : 'once', answer: answer || undefined, answers: answers && Object.keys(answers).length ? answers : undefined },
         })),

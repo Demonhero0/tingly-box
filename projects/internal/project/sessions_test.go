@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -294,4 +295,26 @@ func TestTerminalCommandQuotesForTheShell(t *testing.T) {
 	argv := []string{"/opt/tingly box/tb", "profile", "it's", "--resume", "sid-1"}
 	assert.Equal(t, `cd '/w/it'\''s' && '/opt/tingly box/tb' profile 'it'\''s' --resume sid-1`, terminalCommand("linux", "/w/it's", argv))
 	assert.Equal(t, `Set-Location -LiteralPath 'C:\w\it''s'; & '/opt/tingly box/tb' 'profile' 'it''s' '--resume' 'sid-1'`, terminalCommand("windows", `C:\w\it's`, argv))
+}
+
+func TestSessionFirstMessageCarriesAttachments(t *testing.T) {
+	f := newFixture(t, func(turn *enginetest.Turn) error {
+		turn.Say("Saw it.", 1, 1)
+		return nil
+	})
+	a, err := f.threads.layout.SaveAttachment(SessionOwner, "log.txt", strings.NewReader("boom"), 0)
+	require.NoError(t, err)
+	// Resolved the way the handler does: against the session pool, not a project.
+	atts, err := f.threads.layout.ResolveAttachments(SessionOwner, []string{a.Path})
+	require.NoError(t, err)
+
+	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Attachments: atts})
+	require.NoError(t, err, "a file alone is a first message")
+	assert.Equal(t, "log.txt", s.Title)
+	waitStatus(t, f.store, s.ID, db.ThreadIdle)
+
+	events, err := f.store.ListThreadEvents(s.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+	assert.Equal(t, atts, ParseAttachments(events[0].Payload))
 }

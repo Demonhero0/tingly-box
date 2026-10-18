@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,23 @@ import (
 // project library: one folder per upload, so a file can be listed, opened
 // and cleaned up on its own, and the Library tab shows it.
 const UploadsDir = "uploads"
+
+// SessionOwner is the upload owner of working-folder sessions, which have no
+// project: one pool under the data root, outside any user folder.
+const SessionOwner = "_sessions"
+
+// OwnerOf is whose uploads a thread reads: its project's, or the session pool.
+func OwnerOf(projectID string) string {
+	if projectID == "" {
+		return SessionOwner
+	}
+	return projectID
+}
+
+// AttachmentsResponse lists the files stored for a message.
+type AttachmentsResponse struct {
+	Attachments []Attachment `json:"attachments"`
+}
 
 // MaxAttachments caps the files on one message.
 const MaxAttachments = 20
@@ -182,4 +200,28 @@ func humanSize(n int64) string {
 		return fmt.Sprintf("%.0f KB", float64(n)/(1<<10))
 	}
 	return fmt.Sprintf("%d B", n)
+}
+
+// SaveUploads stores the files of a multipart form field as uploads of owner.
+func (l Layout) SaveUploads(owner string, files []*multipart.FileHeader, limit int64) ([]Attachment, error) {
+	if len(files) == 0 || len(files) > MaxAttachments {
+		return nil, fmt.Errorf("send 1 to %d files", MaxAttachments)
+	}
+	out := make([]Attachment, 0, len(files))
+	for _, fh := range files {
+		if fh.Size > limit {
+			return nil, fmt.Errorf("%s is larger than %d MB", fh.Filename, limit>>20)
+		}
+		src, err := fh.Open()
+		if err != nil {
+			return nil, err
+		}
+		a, err := l.SaveAttachment(owner, fh.Filename, src, limit)
+		src.Close()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, nil
 }

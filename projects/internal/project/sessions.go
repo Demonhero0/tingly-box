@@ -48,8 +48,10 @@ var (
 
 // SessionSpec describes a new folder session.
 type SessionSpec struct {
-	Folder         string
-	Task           string
+	Folder string
+	Task   string
+	// Attachments are uploads of the session pool sent with the first message.
+	Attachments    []Attachment
 	Title          string
 	Model          string
 	PermissionMode string
@@ -90,7 +92,7 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 		return nil, err
 	}
 	task := strings.TrimSpace(spec.Task)
-	if task == "" {
+	if task == "" && len(spec.Attachments) == 0 {
 		return nil, errors.New("the first message is empty")
 	}
 	if !ValidPermissionMode(spec.PermissionMode) {
@@ -108,6 +110,9 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 	if title == "" {
 		title = firstLine(task, 60)
 	}
+	if title == "" {
+		title = spec.Attachments[0].Name
+	}
 	t := &db.Thread{
 		Title: title, Task: task, Status: db.ThreadWorking, Origin: "user",
 		Worktree: folder, SessionID: uuid.NewString(),
@@ -118,7 +123,7 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 	}
 	_ = m.store.SaveWorkdir(folder)
 	m.hub.Publish(Event{Type: EventThread, Data: t})
-	m.enqueue(t.ID, queued{text: task, from: "user"})
+	m.enqueue(t.ID, queued{text: task, from: "user", atts: spec.Attachments})
 	return t, nil
 }
 

@@ -3,7 +3,7 @@ import { Alert, Box, Button, IconButton, Skeleton, Tooltip, Typography } from '@
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fontMono, fontSizes } from '@tingly/ui/theme/fonts';
-import { api, unwrap, type BackgroundTask, type SessionDetail, type Thread, type ThreadEvent } from '../client';
+import { api, unwrap, type Attachment, type BackgroundTask, type SessionDetail, type Thread, type ThreadEvent } from '../client';
 import { AddWorkdirDialog } from '../components/workdir/AddWorkdirDialog';
 import { NewSessionView } from '../components/workdir/NewSessionView';
 import { loadPermissionModes, PermissionModeSelect } from '../components/workdir/PermissionModeSelect';
@@ -160,10 +160,10 @@ export default function WorkdirPage() {
     const known = workdirs?.find((w) => w.path === scope);
     const removable = !!known?.saved;
 
-    const create = async (folder: string, content: string, permission_mode: string, launch: SessionLaunch): Promise<boolean> => {
+    const create = async (folder: string, content: string, permission_mode: string, launch: SessionLaunch, attachments: Attachment[]): Promise<boolean> => {
         try {
             const s = await unwrap(api.POST('/api/v1/projects/sessions', {
-                body: { folder, content, permission_mode: permission_mode || undefined, profile: launch.profile || undefined, model: launch.model || undefined },
+                body: { folder, content, attachments: attachments.map((a) => a.path), permission_mode: permission_mode || undefined, profile: launch.profile || undefined, model: launch.model || undefined },
             }));
             // Picked another folder than the one open: go to that folder.
             if (scope && s.worktree !== scope) {

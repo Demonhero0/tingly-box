@@ -552,6 +552,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/workdirs/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload files for a session message (multipart field "files"); sessions have no project, so they share one upload pool
+         * @description Upload files for a session message (multipart field "files"); sessions have no project, so they share one upload pool
+         */
+        post: operations["apiV1ProjectsWorkdirsAttachmentsPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/workdirs/attachments/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a session attachment
+         * @description Download a session attachment
+         */
+        get: operations["apiV1ProjectsWorkdirsAttachmentsFileGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}": {
         parameters: {
             query?: never;
@@ -1415,10 +1455,14 @@ export interface components {
             model?: string;
         };
         SendRequest: {
+            /** @description Field attachments */
+            attachments?: string[];
             /** @description Field content */
             content: string;
         };
         SessionCreateRequest: {
+            /** @description Field attachments */
+            attachments?: string[];
             /** @description Field content */
             content: string;
             /** @description Field folder */
@@ -2603,6 +2647,49 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The folder */
+                path?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    apiV1ProjectsWorkdirsAttachmentsPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentsResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsWorkdirsAttachmentsFileGet: {
+        parameters: {
+            query?: {
+                /** @description Path returned by the upload */
                 path?: string;
             };
             header?: never;
