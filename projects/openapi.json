@@ -650,6 +650,81 @@
         }
       }
     },
+    "/api/v1/projects/sessions/{sid}/attachments": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload files for a session message (multipart field \"files\"); kept per session, outside the working folder",
+        "description": "Upload files for a session message (multipart field \"files\"); kept per session, outside the working folder",
+        "operationId": "apiV1ProjectsSessionsSidAttachmentsPost",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/sessions/{sid}/attachments/file": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Download a session attachment",
+        "description": "Download a session attachment",
+        "operationId": "apiV1ProjectsSessionsSidAttachmentsFileGet",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "description": "Path returned by the upload",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/sessions/{sid}/handoff": {
       "post": {
         "tags": [
@@ -1146,6 +1221,28 @@
         }
       }
     },
+    "/api/v1/projects/workdirs/attachments": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload files for the first message of a new session (multipart field \"files\"); they move into the session when it starts",
+        "description": "Upload files for the first message of a new session (multipart field \"files\"); they move into the session when it starts",
+        "operationId": "apiV1ProjectsWorkdirsAttachmentsPost",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{id}": {
       "get": {
         "tags": [
@@ -1245,6 +1342,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/attachments": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Upload files for a message (multipart field \"files\"); they are kept in the library under uploads/",
+        "description": "Upload files for a message (multipart field \"files\"); they are kept in the library under uploads/",
+        "operationId": "apiV1ProjectsIdAttachmentsPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentsResponse"
                 }
               }
             }
@@ -2269,6 +2399,49 @@
           "path"
         ]
       },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "path": {
+            "type": "string",
+            "description": "Field path"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field size"
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "type",
+          "size"
+        ]
+      },
+      "AttachmentsResponse": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          }
+        },
+        "required": [
+          "attachments"
+        ]
+      },
       "BackgroundTask": {
         "type": "object",
         "properties": {
@@ -2844,6 +3017,13 @@
       "PostMessageRequest": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "type": "string"
+            }
+          },
           "content": {
             "type": "string",
             "description": "Field content"
@@ -3189,6 +3369,13 @@
       "SendRequest": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "type": "string"
+            }
+          },
           "content": {
             "type": "string",
             "description": "Field content"
@@ -3201,6 +3388,13 @@
       "SessionCreateRequest": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "type": "string"
+            }
+          },
           "content": {
             "type": "string",
             "description": "Field content"

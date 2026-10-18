@@ -82,7 +82,10 @@ type MessagesResponse struct {
 
 // PostMessageRequest sends work or a question to the coordinator.
 type PostMessageRequest struct {
-	Content string `json:"content" binding:"required"`
+	// Content may be empty when attachments are sent.
+	Content string `json:"content"`
+	// Attachments are paths returned by the attachments upload.
+	Attachments []string `json:"attachments,omitempty"`
 }
 
 // StartSuggestionsRequest starts proposed threads; empty indexes start all.
@@ -245,6 +248,9 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api.POST("/projects/:id/library", h.uploadLibrary, tag,
 		swagger.WithDescription("Upload files (multipart field \"files\") to the library"),
 		swagger.WithResponseModel(LibraryResponse{}))
+	api.POST("/projects/:id/attachments", h.uploadAttachments, tag,
+		swagger.WithDescription("Upload files for a message (multipart field \"files\"); they are kept in the library under uploads/"),
+		swagger.WithResponseModel(rt.AttachmentsResponse{}))
 	api.GET("/projects/:id/library/file", h.downloadLibrary, tag,
 		swagger.WithDescription("Download a library file"),
 		swagger.WithQuery("path", "string", "Library-relative path"))
@@ -470,11 +476,16 @@ func (h *Handler) post(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	if strings.TrimSpace(req.Content) == "" {
+	if strings.TrimSpace(req.Content) == "" && len(req.Attachments) == 0 {
 		apierr.BadRequest(c, "message is empty")
 		return
 	}
-	m, err := h.svc.Coordinator.Post(c.Param("id"), req.Content)
+	atts, err := h.svc.Layout.ResolveAttachments(c.Param("id"), req.Attachments)
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	m, err := h.svc.Coordinator.Post(c.Param("id"), req.Content, atts)
 	if err != nil {
 		storeErr(c, err, "project")
 		return
@@ -617,6 +628,24 @@ func (h *Handler) uploadLibrary(c *gin.Context) {
 		}
 	}
 	h.listLibrary(c)
+}
+
+func (h *Handler) uploadAttachments(c *gin.Context) {
+	p, ok := h.project(c)
+	if !ok {
+		return
+	}
+	form, err := c.MultipartForm()
+	if err != nil {
+		apierr.BadRequest(c, `expected multipart form with field "files"`)
+		return
+	}
+	atts, err := h.svc.Layout.SaveUploads(p.ID, form.File["files"], maxUpload)
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusCreated, rt.AttachmentsResponse{Attachments: atts})
 }
 
 func saveUpload(open func() (multipartFile, error), dst string) error {

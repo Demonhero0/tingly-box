@@ -1,10 +1,10 @@
 // What a thread page does to its thread, over either set of routes: a
 // project's thread, or a folder session (a thread with no project). The
 // panel works with one of these so it never branches on the URL itself.
-import { api, unwrap } from '../../client';
+import { api, unwrap, type Attachment } from '../../client';
 
 export interface ThreadOps {
-    send: (content: string) => Promise<unknown>;
+    send: (content: string, attachments?: Attachment[]) => Promise<unknown>;
     respond: (requestId: string, allow: boolean, remember: boolean, answer?: string, answers?: Record<string, string>) => Promise<unknown>;
     stop: () => Promise<unknown>;
     /** Resolve a thread; archive a session. */
@@ -17,7 +17,7 @@ export interface ThreadOps {
 export function projectThreadOps(projectId: string, tid: string): ThreadOps {
     const path = { params: { path: { id: projectId, tid } } };
     return {
-        send: (content) => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/messages', { ...path, body: { content } })),
+        send: (content, attachments) => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path) } })),
         respond: (request_id, allow, remember, answer, answers) => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/respond', {
             ...path, body: { request_id, allow, scope: remember ? 'thread' : 'once', answer: answer || undefined, answers: answers && Object.keys(answers).length ? answers : undefined },
         })),
@@ -31,7 +31,7 @@ export function projectThreadOps(projectId: string, tid: string): ThreadOps {
 export function sessionOps(sid: string): ThreadOps {
     const path = { params: { path: { sid } } };
     return {
-        send: (content) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/messages', { ...path, body: { content } })),
+        send: (content, attachments) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path) } })),
         respond: (request_id, allow, remember, answer, answers) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/respond', {
             ...path, body: { request_id, allow, scope: remember ? 'thread' : 'once', answer: answer || undefined, answers: answers && Object.keys(answers).length ? answers : undefined },
         })),

@@ -215,7 +215,7 @@ func TestNeedsInputAndFollowUpResumes(t *testing.T) {
 	got := waitStatus(t, f.store, th.ID, db.ThreadWaiting)
 	assert.Equal(t, "Should I use Postgres or SQLite?", got.WaitReason)
 
-	_, err = f.threads.Send(context.Background(), th.ID, "SQLite", "user")
+	_, err = f.threads.Send(context.Background(), th.ID, "SQLite", "user", nil)
 	require.NoError(t, err)
 	rep = f.report(t)
 	assert.Equal(t, "Used SQLite", rep.Text)
@@ -245,7 +245,7 @@ func TestStopAndPausedProject(t *testing.T) {
 
 	f.project.Paused = true
 	require.NoError(t, f.store.SaveProject(f.project))
-	_, err = f.threads.Send(context.Background(), th.ID, "go on", "user")
+	_, err = f.threads.Send(context.Background(), th.ID, "go on", "user", nil)
 	assert.ErrorIs(t, err, ErrPaused)
 }
 
@@ -331,7 +331,7 @@ func TestMessageDuringATurnRunsNext(t *testing.T) {
 	th, err := f.threads.Start(context.Background(), f.project, StartSpec{Task: "first"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, th.ID, db.ThreadWorking)
-	_, err = f.threads.Send(context.Background(), th.ID, "second", "user")
+	_, err = f.threads.Send(context.Background(), th.ID, "second", "user", nil)
 	require.NoError(t, err)
 	close(release)
 
@@ -361,7 +361,7 @@ func TestMessageSentAfterStopRuns(t *testing.T) {
 	<-started
 	f.threads.Stop(th.ID)
 	<-stopping
-	_, err = f.threads.Send(context.Background(), th.ID, "instead", "user")
+	_, err = f.threads.Send(context.Background(), th.ID, "instead", "user", nil)
 	require.NoError(t, err)
 	close(hold)
 

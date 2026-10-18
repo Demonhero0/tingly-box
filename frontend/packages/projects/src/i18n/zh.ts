@@ -52,7 +52,7 @@ export const zh: Dict<typeof en> = {
         placeholder: '今天想聊点什么？',
         projectHint: '这里是和模型的快速对话。需要以线程方式持续推进的工作，请新建一个项目。',
     },
-    composer: { placeholder: '输入消息…', send: '发送（Enter）', sendShort: '发送', stop: '停止', stopTurn: '停止当前轮次', keys: 'Enter 发送 · Shift+Enter 换行' },
+    composer: { placeholder: '输入消息…', send: '发送（Enter）', sendShort: '发送', stop: '停止', stopTurn: '停止当前轮次', attach: '添加附件', pastedText: '粘贴的文本 · {{count}} 行', removeAttachment: '移除 {{name}}', attachFailed: '附件上传失败', keys: 'Enter 发送 · Shift+Enter 换行' },
     model: { auto: '默认模型', listFailed: '无法从端点获取模型列表，请直接输入模型 ID。', customPlaceholder: '模型 ID，例如 claude-sonnet-4-5' },
     connection: { open: '去设置' },
     chat: {
@@ -128,6 +128,7 @@ export const zh: Dict<typeof en> = {
         noChanges: '没有已提交的改动。', truncated: 'diff 已截断。',
         uncommittedWarn: '线程在 worktree 里留下了未提交的改动，它们不在本次合并中：',
     },
+    attachments: { removed: '{{name}}（已移除）' },
     library: {
         intro: '你添加的文件每个线程都能读取。没有仓库的线程会把产出放在这里。',
         add: '添加文件', empty: '还没有文件。', download: '下载', copyPath: '复制文件夹路径',

@@ -24,7 +24,10 @@ type ThreadDetailResponse struct {
 
 // SendRequest is a message to the thread.
 type SendRequest struct {
-	Content string `json:"content" binding:"required"`
+	// Content may be empty when attachments are sent.
+	Content string `json:"content"`
+	// Attachments are paths returned by the project's attachments upload.
+	Attachments []string `json:"attachments,omitempty"`
 }
 
 // ThreadRespondRequest answers a pending approval or question.
@@ -136,7 +139,7 @@ func (h *Handler) send(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	if strings.TrimSpace(req.Content) == "" {
+	if strings.TrimSpace(req.Content) == "" && len(req.Attachments) == 0 {
 		apierr.BadRequest(c, "message is empty")
 		return
 	}
@@ -144,7 +147,15 @@ func (h *Handler) send(c *gin.Context) {
 	if !ok {
 		return
 	}
-	t, err := h.svc.Threads.Send(c.Request.Context(), cur.ID, req.Content, "user")
+	var atts []rt.Attachment
+	if len(req.Attachments) > 0 {
+		var err error
+		if atts, err = h.svc.Layout.ResolveAttachments(cur.ProjectID, req.Attachments); err != nil {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
+	}
+	t, err := h.svc.Threads.Send(c.Request.Context(), cur.ID, req.Content, "user", atts)
 	if err != nil {
 		fail(c, err)
 		return

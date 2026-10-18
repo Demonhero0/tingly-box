@@ -4,9 +4,10 @@ import {
     Popover, Skeleton, Tooltip, Typography,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import type { BackgroundTask, Thread, ThreadEvent } from '../../client';
+import type { Attachment, BackgroundTask, Thread, ThreadEvent } from '../../client';
 import { buildTranscript, Trajectory, Transcript, type Respond, type TrajectoryAnchor } from '../../transcript';
 import { Composer } from '../Composer';
+import { AttachmentChips, uploadAttachments, type AttachOwner } from '../attachments';
 import { CodeBlock, Markdown } from '../Markdown';
 import { ConfirmDialog, CopyIconButton } from '@tingly/ui';
 import { ArrowBack, Branch, CheckCircle, DiffIcon, FolderOpen, Merge, MoreVert, Stream, Terminal, Undo } from '../icons';
@@ -117,6 +118,8 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
     const stick = useRef(true);
     // A folder session has no project: no branch, review or merge.
     const session = !projectId;
+    const owner = useMemo<AttachOwner>(() => (session ? { sessionId: threadId } : { projectId }), [session, projectId, threadId]);
+    const Attachments = useMemo(() => ({ items }: { items: Attachment[] }) => <AttachmentChips owner={owner} items={items} />, [owner]);
     const ops = useMemo(() => session ? sessionOps(threadId) : projectThreadOps(projectId, threadId), [session, projectId, threadId]);
 
     useEffect(() => {
@@ -293,7 +296,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                 {events === null
                     ? <Skeleton variant="rounded" height={120} />
                     : view === 'chat'
-                        ? <Transcript blocks={blocks} pendingRequestId={pendingRequestId} working={running} newSince={newSince.at} expandAll={expandAll} onRespond={respond} codeBlock={CodeBlock} rememberLabel={rememberLabel} />
+                        ? <Transcript blocks={blocks} pendingRequestId={pendingRequestId} working={running} newSince={newSince.at} expandAll={expandAll} onRespond={respond} codeBlock={CodeBlock} attachments={Attachments} rememberLabel={rememberLabel} />
                         : <Trajectory blocks={blocks} working={running} pendingRequestId={pendingRequestId} project={thread.worktree} onOpen={openInChat} />}
             </Box>
 
@@ -327,9 +330,10 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                     onStop={() => { void act(ops.stop); }}
                     disabled={disabled || thread.status === 'resolved'}
                     placeholder={thread.status === 'resolved' ? t(session ? 'session.archivedPlaceholder' : 'thread.resolvedPlaceholder') : running ? t(session ? 'session.queuePlaceholder' : 'thread.queuePlaceholder') : t(session ? 'session.placeholder' : 'thread.placeholder')}
-                    onSend={async (text) => {
+                    attach={(files) => uploadAttachments(owner, files)}
+                    onSend={async (text, attachments) => {
                         try {
-                            await ops.send(text);
+                            await ops.send(text, attachments);
                             stick.current = true;
                             return true;
                         } catch (e) {

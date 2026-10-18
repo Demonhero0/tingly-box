@@ -1,12 +1,31 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, CircularProgress, IconButton, InputBase, Paper, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpward, Stop } from './icons';
+import type { Attachment } from '../client';
+import { isLongText, lineCount, pastedTextFile } from './attachments';
+import { ArrowUpward, Attach, Close, Description, Stop } from './icons';
 import { ModelPicker } from './ModelPicker';
+
+/** A file on its way into the message: uploading, ready, or refused. */
+interface Pending {
+    key: number;
+    name: string;
+    /** Lines of a long paste stored as a file; the chip says so instead of a file name. */
+    lines?: number;
+    /** Local preview of an image while and after it uploads. */
+    preview?: string;
+    done?: Attachment;
+}
 
 export interface ComposerProps {
     /** Returns false to keep the text in the box (e.g. the send failed). */
-    onSend: (text: string) => Promise<boolean | void> | boolean | void;
+    onSend: (text: string, attachments: Attachment[]) => Promise<boolean | void> | boolean | void;
+    /**
+     * Stores files for the message and returns what to send with it. Setting
+     * it turns on the attach button, dropping files and pasting (a long
+     * paste becomes a text file).
+     */
+    attach?: (files: File[]) => Promise<Attachment[]>;
     /** A turn runs: Stop shows when onStop is set, and Send waits unless sendWhileStreaming. */
     streaming?: boolean;
     onStop?: () => void | Promise<void>;
@@ -49,7 +68,7 @@ export interface ComposerProps {
  * Enter (confirming a candidate) never sends, and a send never runs twice.
  */
 export function Composer({
-    onSend, streaming, onStop, sendWhileStreaming, disabled, canSubmit = true, placeholder, autoFocus, model, onModelChange,
+    onSend, attach, streaming, onStop, sendWhileStreaming, disabled, canSubmit = true, placeholder, autoFocus, model, onModelChange,
     context, leftSlot, minRows = 1, seed, keepUntilSent, text: controlled, onTextChange, onAccepted, keysHint,
 }: ComposerProps) {
     const { t } = useTranslation('projects');
@@ -63,6 +82,49 @@ export function Composer({
         if (onTextChange) onTextChange(v);
         else setOwn(v);
     };
+    const [dragging, setDragging] = useState(false);
+    const [files, setFiles] = useState<Pending[]>([]);
+    const [attachError, setAttachError] = useState('');
+    const fileInput = useRef<HTMLInputElement>(null);
+    const nextKey = useRef(0);
+    const uploading = files.some((f) => !f.done);
+    const ready = files.flatMap((f) => (f.done ? [f.done] : []));
+    const filesRef = useRef(files);
+    filesRef.current = files;
+    useEffect(() => () => filesRef.current.forEach((f) => f.preview && URL.revokeObjectURL(f.preview)), []);
+
+    const addFiles = async (list: File[], pastedLines?: number) => {
+        if (!attach || list.length === 0) return;
+        setAttachError('');
+        const added: Pending[] = list.map((f) => ({
+            key: nextKey.current++,
+            name: f.name || 'file',
+            lines: pastedLines,
+            preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
+        }));
+        setFiles((cur) => [...cur, ...added]);
+        const drop = (keys: number[]) => setFiles((cur) => cur.filter((f) => {
+            const gone = keys.includes(f.key);
+            if (gone && f.preview) URL.revokeObjectURL(f.preview);
+            return !gone;
+        }));
+        try {
+            const stored = await attach(list);
+            if (stored.length !== added.length) throw new Error(t('composer.attachFailed'));
+            setFiles((cur) => cur.map((f) => {
+                const i = added.findIndex((a) => a.key === f.key);
+                return i < 0 ? f : { ...f, done: stored[i] };
+            }));
+        } catch (e) {
+            drop(added.map((a) => a.key));
+            setAttachError((e as Error).message || t('composer.attachFailed'));
+        }
+    };
+    const removeFile = (key: number) => setFiles((cur) => cur.filter((f) => {
+        if (f.key === key && f.preview) URL.revokeObjectURL(f.preview);
+        return f.key !== key;
+    }));
+
     const [sending, setSending] = useState(false);
     const sendingRef = useRef(false);
     const [stopping, setStopping] = useState(false);
@@ -79,7 +141,8 @@ export function Composer({
     }, [seed]);
 
     const blockedByTurn = streaming && !sendWhileStreaming;
-    const canSend = text.trim() !== '' && canSubmit && !blockedByTurn && !sending && !disabled;
+    const hasContent = text.trim() !== '' || ready.length > 0;
+    const canSend = hasContent && !uploading && canSubmit && !blockedByTurn && !sending && !disabled;
 
     const submit = async () => {
         if (!canSend || sendingRef.current) return;
@@ -88,7 +151,8 @@ export function Composer({
         setSending(true);
         if (!keepUntilSent) setText('');
         try {
-            const ok = (await onSend(value.trim())) !== false;
+            const ok = (await onSend(value.trim(), ready)) !== false;
+            if (ok) setFiles([]);
             if (ok && keepUntilSent) {
                 if (onAccepted) onAccepted(value);
                 else if (textRef.current === value) setText('');
@@ -118,7 +182,7 @@ export function Composer({
 
     const showStop = streaming && onStop;
     // While a turn runs, Send shows next to Stop once there is something to send.
-    const showSend = !showStop || (sendWhileStreaming && text.trim() !== '');
+    const showSend = !showStop || (sendWhileStreaming && hasContent);
 
     const sendButton = showSend && (
         <Tooltip title={t('composer.send')}>
@@ -160,6 +224,52 @@ export function Composer({
     // line until the text grows.
     const inline = !leftSlot && !onModelChange && !hint;
 
+    const attachButton = attach && (
+        <Tooltip title={t('composer.attach')}>
+            <span>
+                <IconButton size="small" disabled={disabled} onClick={() => fileInput.current?.click()} aria-label={t('composer.attach')} sx={{ color: 'text.secondary' }}>
+                    <Attach fontSize="small" />
+                </IconButton>
+                <input
+                    ref={fileInput}
+                    type="file"
+                    multiple
+                    hidden
+                    data-testid="composer-file-input"
+                    onChange={(e) => {
+                        void addFiles(Array.from(e.target.files ?? []));
+                        e.target.value = '';
+                    }}
+                />
+            </span>
+        </Tooltip>
+    );
+    const chips = (files.length > 0 || attachError !== '') && (
+        <Box sx={{ mb: 1 }}>
+            {files.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                    {files.map((f) => (
+                        <Box
+                            key={f.key}
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.75, pl: f.preview ? 0.5 : 1, pr: 0.5, py: 0.5, borderRadius: 1, border: 1, borderColor: 'divider', maxWidth: 240 }}
+                        >
+                            {f.preview
+                                ? <Box component="img" src={f.preview} alt="" sx={{ width: 28, height: 28, borderRadius: 0.5, objectFit: 'cover' }} />
+                                : <Description fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0 }} />}
+                            <Typography variant="caption" noWrap sx={{ minWidth: 0 }}>
+                                {f.lines !== undefined ? t('composer.pastedText', { count: f.lines }) : f.name}
+                            </Typography>
+                            {f.done
+                                ? <IconButton size="small" onClick={() => removeFile(f.key)} aria-label={t('composer.removeAttachment', { name: f.name })} sx={{ p: 0.25 }}><Close sx={{ fontSize: 14 }} /></IconButton>
+                                : <CircularProgress size={14} sx={{ mx: 0.5 }} />}
+                        </Box>
+                    ))}
+                </Box>
+            )}
+            {attachError !== '' && <Typography variant="caption" color="error" role="alert" sx={{ display: 'block', mt: 0.5 }}>{attachError}</Typography>}
+        </Box>
+    );
+
     const input = (
         <InputBase
             inputRef={inputRef}
@@ -172,6 +282,19 @@ export function Composer({
             placeholder={placeholder ?? t('composer.placeholder')}
             inputProps={{ 'aria-label': placeholder ?? t('composer.placeholder') }}
             onChange={(e) => setText(e.target.value)}
+            onPaste={attach ? (e) => {
+                const pasted = Array.from(e.clipboardData.files);
+                if (pasted.length > 0) {
+                    e.preventDefault();
+                    void addFiles(pasted);
+                    return;
+                }
+                const long = e.clipboardData.getData('text/plain');
+                if (isLongText(long)) {
+                    e.preventDefault();
+                    void addFiles([pastedTextFile(long)], lineCount(long));
+                }
+            } : undefined}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (!mobile || e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -193,13 +316,28 @@ export function Composer({
                 bgcolor: 'background.paper',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
                 '&:focus-within': { borderColor: 'text.disabled' },
+                ...(dragging && { borderColor: 'primary.main', borderStyle: 'dashed' }),
             }}
+            onDragOver={attach ? (e) => {
+                if (!e.dataTransfer.types.includes('Files')) return;
+                e.preventDefault();
+                setDragging(true);
+            } : undefined}
+            onDragLeave={attach ? () => setDragging(false) : undefined}
+            onDrop={attach ? (e) => {
+                if (e.dataTransfer.files.length === 0) return;
+                e.preventDefault();
+                setDragging(false);
+                void addFiles(Array.from(e.dataTransfer.files));
+            } : undefined}
         >
             {context && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', rowGap: 0.5, mb: 1 }}>{context}</Box>
             )}
+            {chips}
             {inline ? (
                 <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+                    {attachButton}
                     {input}
                     {sendButton}
                     {stopButton}
@@ -209,6 +347,7 @@ export function Composer({
                     {input}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+                            {attachButton}
                             {leftSlot}
                             {hint && <Typography variant="caption" color="text.secondary">{t('composer.keys')}</Typography>}
                         </Box>

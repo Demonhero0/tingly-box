@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import type { Workdir } from '../../client';
+import type { Attachment, Workdir } from '../../client';
+import { uploadAttachments } from '../attachments';
 import { Composer } from '../Composer';
 import { FolderPicker } from './FolderPicker';
 import { PermissionModeSelect } from './PermissionModeSelect';
@@ -12,7 +13,7 @@ interface Props {
     initialFolder?: string;
     folders: Workdir[];
     permissionModes: string[];
-    onCreate: (folder: string, prompt: string, permissionMode: string, launch: SessionLaunch) => Promise<boolean>;
+    onCreate: (folder: string, prompt: string, permissionMode: string, launch: SessionLaunch, attachments: Attachment[]) => Promise<boolean>;
     onAddFolder?: () => void;
 }
 
@@ -44,7 +45,8 @@ export function NewSessionView({ initialFolder, folders, permissionModes, onCrea
                     text={text}
                     onTextChange={setText}
                     onAccepted={(sent) => setText((prev) => (prev === sent ? '' : prev))}
-                    onSend={(prompt) => onCreate(folder.trim(), prompt, mode, launch)}
+                    attach={(files) => uploadAttachments({}, files)}
+                    onSend={(prompt, attachments) => onCreate(folder.trim(), prompt, mode, launch, attachments)}
                     leftSlot={(
                         <>
                             <FolderPicker value={folder} onChange={setPicked} folders={folders} onAddFolder={onAddFolder} />

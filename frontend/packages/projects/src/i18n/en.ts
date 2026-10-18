@@ -48,7 +48,7 @@ export const en = {
         placeholder: 'How can I help you today?',
         projectHint: 'A quick chat with the model. For ongoing work that should run as threads, start a project.',
     },
-    composer: { placeholder: 'Write a message…', send: 'Send (Enter)', sendShort: 'Send', stop: 'Stop', stopTurn: 'Stop the current turn', keys: 'Enter to send · Shift+Enter for a new line' },
+    composer: { placeholder: 'Write a message…', send: 'Send (Enter)', sendShort: 'Send', stop: 'Stop', stopTurn: 'Stop the current turn', attach: 'Attach files', pastedText: 'Pasted text · {{count}} lines', removeAttachment: 'Remove {{name}}', attachFailed: 'Could not attach the file', keys: 'Enter to send · Shift+Enter for a new line' },
     model: { auto: 'Default model', listFailed: 'Could not list models from the endpoint. Type a model ID instead.', customPlaceholder: 'Model ID, e.g. claude-sonnet-4-5' },
     connection: { open: 'Settings' },
     chat: {
@@ -124,6 +124,7 @@ export const en = {
         noChanges: 'No committed changes.', truncated: 'Diff truncated.',
         uncommittedWarn: 'The thread left uncommitted changes in its worktree; they are not part of the merge:',
     },
+    attachments: { removed: '{{name}} (removed)' },
     library: {
         intro: 'Files you add are readable by every thread. Threads without a repository deliver their files here.',
         add: 'Add files', empty: 'No files yet.', download: 'Download', copyPath: 'Copy folder path',

@@ -49,7 +49,7 @@ export function threadTranscript(events: ThreadEvent[], running: boolean, author
         const first = entries.length;
         switch (e.kind) {
             case 'user':
-                entries.push({ role: 'user', content: e.content, author: author(e.from), timestamp });
+                entries.push({ role: 'user', content: e.content, author: author(e.from), attachments: parse<{ attachments?: TranscriptEntry['attachments'] }>(e.payload)?.attachments, timestamp });
                 break;
             case 'assistant':
                 entries.push({ role: 'assistant', content: e.content, timestamp });
