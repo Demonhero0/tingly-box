@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/tingly-dev/tingly-box/projects/internal/db"
@@ -49,10 +50,10 @@ func (l Layout) AdoptUploads(from, to string, atts []Attachment) error {
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(filepath.Dir(filepath.Dir(dst)), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
 		}
-		if err := os.Rename(filepath.Dir(src), filepath.Dir(dst)); err != nil {
+		if err := os.Rename(src, dst); err != nil {
 			return err
 		}
 	}
@@ -63,6 +64,15 @@ func (l Layout) AdoptUploads(from, to string, atts []Attachment) error {
 type AttachmentsResponse struct {
 	Attachments []Attachment `json:"attachments"`
 }
+
+// An upload is one file, `uploads/<id>-<name>`: the id keeps names unique, the
+// name stays readable for the model, and removing the file removes the upload.
+const idLen = 12
+
+var uploadNameRe = regexp.MustCompile(`^[0-9a-f]{12}-.+$`)
+
+// maxNameBytes keeps id and name within a file name limit.
+const maxNameBytes = 200
 
 // MaxAttachments caps the files on one message.
 const MaxAttachments = 20
@@ -81,11 +91,11 @@ type Attachment struct {
 // size (0 for none).
 func (l Layout) SaveAttachment(projectID, name string, src io.Reader, limit int64) (Attachment, error) {
 	name = cleanUploadName(name)
-	var id [6]byte
+	var id [idLen / 2]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return Attachment{}, err
 	}
-	rel := UploadsDir + "/" + hex.EncodeToString(id[:]) + "/" + name
+	rel := UploadsDir + "/" + hex.EncodeToString(id[:]) + "-" + name
 	dst, err := l.LibraryPath(projectID, rel)
 	if err != nil {
 		return Attachment{}, err
@@ -108,7 +118,7 @@ func (l Layout) SaveAttachment(projectID, name string, src io.Reader, limit int6
 		err = fmt.Errorf("%s is larger than %d MB", name, limit>>20)
 	}
 	if err != nil {
-		_ = os.RemoveAll(filepath.Dir(dst))
+		_ = os.Remove(dst)
 		return Attachment{}, err
 	}
 	return Attachment{Name: name, Path: rel, Type: sniffType(dst, name), Size: n}, nil
@@ -124,7 +134,7 @@ func (l Layout) ResolveAttachments(projectID string, paths []string) ([]Attachme
 	out := make([]Attachment, 0, len(paths))
 	for _, rel := range paths {
 		rel = filepath.ToSlash(filepath.Clean(rel))
-		if !strings.HasPrefix(rel, UploadsDir+"/") {
+		if filepath.ToSlash(filepath.Dir(rel)) != UploadsDir || !uploadNameRe.MatchString(filepath.Base(rel)) {
 			return nil, fmt.Errorf("invalid attachment %q", rel)
 		}
 		abs, err := l.LibraryPath(projectID, rel)
@@ -135,7 +145,7 @@ func (l Layout) ResolveAttachments(projectID string, paths []string) ([]Attachme
 		if err != nil || st.IsDir() {
 			return nil, fmt.Errorf("attachment %q not found", rel)
 		}
-		name := filepath.Base(rel)
+		name := filepath.Base(rel)[idLen+1:]
 		out = append(out, Attachment{Name: name, Path: rel, Type: sniffType(abs, name), Size: st.Size()})
 	}
 	return out, nil
@@ -202,6 +212,14 @@ func cleanUploadName(name string) string {
 	}, strings.TrimSpace(name))
 	if name == "" || name == "." || name == ".." {
 		return "file"
+	}
+	if len(name) > maxNameBytes {
+		ext := filepath.Ext(name)
+		if len(ext) > 20 {
+			ext = ""
+		}
+		stem := strings.ToValidUTF8(name[:maxNameBytes-len(ext)], "")
+		name = stem + ext
 	}
 	return name
 }

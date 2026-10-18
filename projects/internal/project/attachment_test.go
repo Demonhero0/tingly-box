@@ -19,7 +19,7 @@ func TestAttachmentRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "shot.png", a.Name)
 	assert.Equal(t, "image/png", a.Type)
-	assert.True(t, strings.HasPrefix(a.Path, "uploads/"))
+	assert.Regexp(t, `^uploads/[0-9a-f]{12}-shot\.png$`, a.Path, "one flat file: id, then the name")
 
 	got, err := l.ResolveAttachments("p1", []string{a.Path})
 	require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestAttachmentRoundTrip(t *testing.T) {
 	assert.Equal(t, got, ParseAttachments(AttachmentsPayload(got)))
 
 	// Removing the file turns the note into "removed", not an error.
-	require.NoError(t, os.RemoveAll(filepath.Dir(filepath.Join(l.LibraryDir("p1"), a.Path))))
+	require.NoError(t, os.Remove(filepath.Join(l.LibraryDir("p1"), a.Path)))
 	assert.Contains(t, AttachmentNote(l.LibraryDir("p1"), got), "shot.png (removed)")
 }
 
@@ -43,8 +43,10 @@ func TestAttachmentRefusals(t *testing.T) {
 	assert.Error(t, err, "only uploads/ can be attached")
 	_, err = l.ResolveAttachments("p1", []string{"uploads/../secret.txt"})
 	assert.Error(t, err)
-	_, err = l.ResolveAttachments("p1", []string{"uploads/none/x.txt"})
+	_, err = l.ResolveAttachments("p1", []string{"uploads/000000000000-x.txt"})
 	assert.Error(t, err)
+	_, err = l.ResolveAttachments("p1", []string{"uploads/sub/000000000000-x.txt"})
+	assert.Error(t, err, "uploads are flat")
 
 	_, err = l.SaveAttachment("p1", "big.bin", strings.NewReader("12345"), 4)
 	assert.Error(t, err)
@@ -56,8 +58,18 @@ func TestRenderHistoryListsAttachments(t *testing.T) {
 	dir := t.TempDir()
 	msgs := renderHistory([]db.ProjectMessage{{
 		Role: db.RoleUser, Kind: db.MsgText, Content: "look",
-		Payload: AttachmentsPayload([]Attachment{{Name: "a.txt", Path: "uploads/x/a.txt", Type: "text/plain", Size: 1}}),
+		Payload: AttachmentsPayload([]Attachment{{Name: "a.txt", Path: "uploads/aaaaaaaaaaaa-a.txt", Type: "text/plain", Size: 1}}),
 	}}, dir)
 	require.Len(t, msgs, 1)
 	assert.Contains(t, msgs[0].Content, "a.txt (removed)")
+}
+
+func TestLongUploadNameIsCut(t *testing.T) {
+	l := Layout{Root: t.TempDir()}
+	a, err := l.SaveAttachment("p1", strings.Repeat("长", 200)+".txt", strings.NewReader("x"), 0)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(filepath.Base(a.Path)), 255)
+	assert.True(t, strings.HasSuffix(a.Name, ".txt"))
+	_, err = l.ResolveAttachments("p1", []string{a.Path})
+	assert.NoError(t, err)
 }

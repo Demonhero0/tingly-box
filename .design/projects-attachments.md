@@ -27,7 +27,7 @@ One composer, the same everywhere it is wired:
 ## One place for uploads
 
 Everything attached is written to disk as it is attached, under the project's
-library: `library/uploads/<id>/<name>`, one folder per upload. Nothing lives
+library: `library/uploads/<id>-<name>`, one flat file per upload (a short id keeps names unique; the name stays readable for the model). Nothing lives
 only in memory or in the conversation.
 
 - Composer uploads and Library uploads are one store: the Library tab lists
@@ -35,12 +35,12 @@ only in memory or in the conversation.
 - A message records only a reference (name, library-relative path, type, size)
   in its payload; no schema change. The server re-reads size and type from
   disk when a send names a path, and refuses any path outside `uploads/`.
-- Because each upload is its own folder, cleanup can later work per file, per
+- Because each upload is one file, cleanup can later work per file, per
   age or per owner without touching anything else. Deleting a project already
   removes its library. Age-based cleanup of files never sent is the follow-up.
 
 A working-folder session has no project, so each session gets its own area,
-`<data>/projects/_sessions/<session>/library/uploads/<id>/<name>`. It is outside
+`<data>/projects/_sessions/<session>/library/uploads/<id>-<name>`. It is outside
 the folder the person works in on purpose: files put inside would show up in
 their repository's `git status` and could be committed. Uploads made before
 the session exists (the first message) wait in `_sessions/_new` and move into
