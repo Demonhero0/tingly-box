@@ -64,8 +64,9 @@ const (
 	ScenarioCodex         RuleScenario = "codex"
 	ScenarioClaudeCode    RuleScenario = "claude_code"
 	ScenarioOpenCode      RuleScenario = "opencode"
-	ScenarioPi            RuleScenario = "pi"  // Pi agent (https://github.com/earendil-works/pi)
-	ScenarioDsh           RuleScenario = "dsh" // DeepSeek Harness (https://github.com/deepseek-ai/deepseek-harness)
+	ScenarioPi            RuleScenario = "pi"        // Pi agent (https://github.com/earendil-works/pi)
+	ScenarioWorkBuddy     RuleScenario = "workbuddy" // Tencent WorkBuddy desktop agent, via its custom-model (OpenAI-compatible) setting
+	ScenarioDsh           RuleScenario = "dsh"       // DeepSeek Harness (https://github.com/deepseek-ai/deepseek-harness)
 	ScenarioXcode         RuleScenario = "xcode"
 	ScenarioVSCode        RuleScenario = "vscode"
 	ScenarioCursor        RuleScenario = "cursor"
@@ -87,6 +88,7 @@ func BuiltinScenarios() []RuleScenario {
 		ScenarioClaudeCode,
 		ScenarioOpenCode,
 		ScenarioPi,
+		ScenarioWorkBuddy,
 		ScenarioDsh,
 		ScenarioXcode,
 		ScenarioVSCode,

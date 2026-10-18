@@ -159,6 +159,21 @@ type DshConfigPreviewResponse struct {
 	Message         string   `json:"message,omitempty"`
 }
 
+// ApplyWorkBuddyConfigResponse is the response for ApplyWorkBuddyConfigFromState.
+type ApplyWorkBuddyConfigResponse struct {
+	config.WorkBuddyApplyResult
+}
+
+// WorkBuddyConfigPreviewResponse is the response for GetWorkBuddyConfigPreview.
+// ConfigJSON is the models.json content Auto Config would merge in, API key masked.
+type WorkBuddyConfigPreviewResponse struct {
+	Success    bool     `json:"success"`
+	ConfigJSON string   `json:"configJson"`
+	Path       string   `json:"path,omitempty"`
+	Models     []string `json:"models"`
+	Message    string   `json:"message,omitempty"`
+}
+
 // RestoreConfigResponse is the response for the restore endpoints. It mirrors
 // the agent.RestoreAgentResult so callers can drive UI from the same data
 // the CLI prints.

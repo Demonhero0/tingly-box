@@ -21,6 +21,7 @@ import {
     OpenCode,
     Pi,
     VSCode,
+    WorkBuddy,
     Xcode,
 } from '@/components/BrandIcons';
 
@@ -73,6 +74,14 @@ export const SCENARIOS: ScenarioDescriptor[] = [
         descKey: 'scenarioOverview.descriptions.pi',
         path: '/agent/pi',
         icon: (size) => <Pi size={size} />,
+        hideable: true,
+    },
+    {
+        id: 'workbuddy',
+        labelKey: 'layout.nav.useWorkBuddy',
+        descKey: 'scenarioOverview.descriptions.workbuddy',
+        path: '/agent/workbuddy',
+        icon: (size) => <WorkBuddy size={size} />,
         hideable: true,
     },
     {

@@ -1783,6 +1783,28 @@
         }
       }
     },
+    "/api/v1/config/apply/workbuddy": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Merge the WorkBuddy scenario's models into ~/.codebuddy/models.json",
+        "description": "Merge the WorkBuddy scenario's models into ~/.codebuddy/models.json",
+        "operationId": "apiV1ConfigApplyWorkbuddyPost",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyWorkBuddyConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/claude": {
       "get": {
         "tags": [
@@ -2025,6 +2047,28 @@
         }
       }
     },
+    "/api/v1/config/preview/workbuddy": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Preview the models.json entries WorkBuddy Auto Config would write",
+        "description": "Preview the models.json entries WorkBuddy Auto Config would write",
+        "operationId": "apiV1ConfigPreviewWorkbuddyGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkBuddyConfigPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/restore/claude": {
       "post": {
         "tags": [
@@ -2106,6 +2150,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RestoreConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/restore/workbuddy": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Restore ~/.codebuddy/models.json from the most recent backup",
+        "description": "Restore ~/.codebuddy/models.json from the most recent backup",
+        "operationId": "apiV1ConfigRestoreWorkbuddyPost",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/workbuddy/status": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Whether ~/.codebuddy/models.json has tingly-box models matching the WorkBuddy rules Auto Config would write now",
+        "description": "Whether ~/.codebuddy/models.json has tingly-box models matching the WorkBuddy rules Auto Config would write now",
+        "operationId": "apiV1ConfigWorkbuddyStatusGet",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientConfigStatusResponse"
                 }
               }
             }
@@ -10628,6 +10716,42 @@
           "message": {
             "type": "string",
             "description": "Field message"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Field success"
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Field updated"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "ApplyWorkBuddyConfigResponse": {
+        "type": "object",
+        "properties": {
+          "backupPath": {
+            "type": "string",
+            "description": "Field backupPath"
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Field created"
+          },
+          "message": {
+            "type": "string",
+            "description": "Field message"
+          },
+          "skipped": {
+            "type": "array",
+            "description": "Field skipped",
+            "items": {
+              "type": "string"
+            }
           },
           "success": {
             "type": "boolean",
@@ -20484,6 +20608,39 @@
         "required": [
           "provider",
           "model"
+        ]
+      },
+      "WorkBuddyConfigPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "configJson": {
+            "type": "string",
+            "description": "Field configJson"
+          },
+          "message": {
+            "type": "string",
+            "description": "Field message"
+          },
+          "models": {
+            "type": "array",
+            "description": "Field models",
+            "items": {
+              "type": "string"
+            }
+          },
+          "path": {
+            "type": "string",
+            "description": "Field path"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Field success"
+          }
+        },
+        "required": [
+          "success",
+          "configJson",
+          "models"
         ]
       },
       "Workdir": {

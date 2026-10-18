@@ -283,6 +283,7 @@ func TestGetScenarioEndpointPath(t *testing.T) {
 		{"claude_code:profile-abc", "/tingly/claude_code"},
 		{typ.ScenarioOpenCode, "/tingly/opencode"},
 		{"opencode:p1", "/tingly/opencode"},
+		{typ.ScenarioWorkBuddy, "/tingly/workbuddy"},
 		{typ.ScenarioXcode, "/tingly/xcode"},
 		{typ.ScenarioVSCode, "/tingly/vscode"},
 		{typ.ScenarioTeam, "/tingly/team"},

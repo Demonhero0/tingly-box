@@ -6,7 +6,7 @@ import {
     LaptopMac,
     Rule,
 } from '@/components/icons';
-import { Anthropic, Claude, OpenAI } from '@/components/BrandIcons';
+import { Anthropic, Claude, OpenAI, WorkBuddy } from '@/components/BrandIcons';
 import { toggleValue } from './listField';
 
 const getScenarioPresentation = (scenario: string) => {
@@ -40,6 +40,12 @@ const getScenarioPresentation = (scenario: string) => {
                 label: 'Xcode',
                 description: 'Xcode-integrated coding workflows.',
                 icon: <LaptopMac sx={{ fontSize: 18 }} />,
+            };
+        case 'workbuddy':
+            return {
+                label: 'WorkBuddy',
+                description: 'Tencent WorkBuddy custom-model traffic.',
+                icon: <WorkBuddy size={18} />,
             };
         case 'custom':
             return {

@@ -30,6 +30,7 @@ const TeamKeysPage = lazy(() => import('@/pages/scenario/TeamKeysPage'));
 const AgentLanding = lazy(() => import('@/pages/scenario/AgentLanding'));
 const UseOpenCodePage = lazy(() => import('@/pages/scenario/UseOpenCodePage'));
 const UsePiPage = lazy(() => import('@/pages/scenario/UsePiPage'));
+const UseWorkBuddyPage = lazy(() => import('@/pages/scenario/UseWorkBuddyPage'));
 const UseDshPage = lazy(() => import('@/pages/scenario/UseDshPage'));
 const UseXcodePage = lazy(() => import('@/pages/scenario/UseXcodePage'));
 const UseVSCodePage = lazy(() => import('@/pages/scenario/UseVSCodePage'));
@@ -130,6 +131,7 @@ export const appRoutes = (
             <Route path="/agent/team/:teamSlug" element={<UseTeamPage />} />
             <Route path="/agent/opencode" element={<UseOpenCodePage />} />
             <Route path="/agent/pi" element={<UsePiPage />} />
+            <Route path="/agent/workbuddy" element={<UseWorkBuddyPage />} />
             <Route path="/agent/dsh" element={<UseDshPage />} />
             <Route path="/agent/xcode" element={<UseXcodePage />} />
             <Route path="/agent/vscode" element={<UseVSCodePage />} />

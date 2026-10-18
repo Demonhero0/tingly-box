@@ -253,6 +253,8 @@ func GetScenarioEndpointPath(scenario typ.RuleScenario) string {
 		return "/tingly/opencode"
 	case typ.ScenarioPi:
 		return "/tingly/pi"
+	case typ.ScenarioWorkBuddy:
+		return "/tingly/workbuddy"
 	case typ.ScenarioDsh:
 		return "/tingly/dsh"
 	case typ.ScenarioXcode:

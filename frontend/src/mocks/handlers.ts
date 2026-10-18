@@ -900,6 +900,17 @@ const mockV1Rules: Record<string, any[]> = {
             services: [{ uuid: 'svc-vs1', provider: 'mock-provider-anthropic', model: 'claude-sonnet-5', weight: 1, active: true }],
         },
     ],
+    workbuddy: [
+        {
+            uuid: 'mock-rule-wb-1',
+            scenario: 'workbuddy',
+            request_model: 'claude-sonnet-5',
+            response_model: '',
+            active: true,
+            description: '',
+            services: [{ uuid: 'svc-wb1', provider: 'mock-provider-zai', model: 'glm-5.1', weight: 1, active: true }],
+        },
+    ],
     xcode: [
         {
             uuid: 'mock-rule-xc-1',
@@ -3772,6 +3783,30 @@ export const handlers = [
     })),
     http.get('/api/v1/config/dsh/status', () => HttpResponse.json({
         success: true, state: 'applied', path: '~/.dsh/settings.yaml', differences: [],
+    })),
+    // WorkBuddy: starts "not applied" so Auto Config is the obvious next step.
+    http.get('/api/v1/config/workbuddy/status', () => HttpResponse.json({
+        success: true, state: 'not_applied', path: '~/.codebuddy/models.json', differences: [],
+    })),
+    http.get('/api/v1/config/preview/workbuddy', () => HttpResponse.json({
+        success: true,
+        path: '~/.codebuddy/models.json',
+        models: ['claude-sonnet-5'],
+        configJson: JSON.stringify({
+            models: [{
+                id: 'claude-sonnet-5',
+                name: 'claude-sonnet-5',
+                vendor: 'Tingly Box',
+                url: 'http://localhost:3000/tingly/workbuddy/v1/chat/completions',
+                apiKey: 'tingly-b…mnop',
+                supportsToolCall: true,
+                supportsImages: false,
+                supportsReasoning: false,
+            }],
+        }, null, 2),
+    })),
+    http.post('/api/v1/config/apply/workbuddy', () => HttpResponse.json({
+        success: true, created: true, message: 'Created ~/.codebuddy/models.json',
     })),
 
     http.get('/api/v1/config/claude', () => {

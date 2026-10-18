@@ -57,6 +57,7 @@ export default {
       "useClaudeDesktop": "Claude Desktop",
       "useOpenCode": "OpenCode",
       "usePi": "Pi",
+      "useWorkBuddy": "WorkBuddy",
       "useDsh": "DeepSeek",
       "useXcode": "Xcode",
       "useVSCode": "VS Code",

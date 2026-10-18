@@ -24,6 +24,15 @@ export const configApplyApi = {
         return controlApi((client, headers) => client.GET('/api/v1/config/preview/opencode', {headers}));
     },
 
+    // WorkBuddy: merges the scenario's models into ~/.codebuddy/models.json.
+    applyWorkBuddyConfig: async (): Promise<any> => {
+        return controlApi((client, headers) => client.POST('/api/v1/config/apply/workbuddy', {headers}));
+    },
+
+    getWorkBuddyConfigPreview: async (): Promise<any> => {
+        return controlApi((client, headers) => client.GET('/api/v1/config/preview/workbuddy', {headers}));
+    },
+
     applyCodexConfig: async (
         preferences?: Record<string, string>,
         writeCatalog?: boolean,
