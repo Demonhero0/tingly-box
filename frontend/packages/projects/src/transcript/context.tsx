@@ -41,21 +41,27 @@ const memoryDrafts = createMemoryDraftStorage();
 // its own (highlighting, copy button); without one, the code is shown plain.
 export type CodeBlockComponent = ComponentType<{code: string; language: string}>;
 
+// AttachmentsComponent renders the files a user message carries. The host
+// passes its own (thumbnails fetched with its auth); without one, names only.
+export type AttachmentsComponent = ComponentType<{items: {name: string; path: string; type: string; size: number}[]}>;
+
 interface TranscriptHost {
     drafts: DraftStorage;
     codeBlock?: CodeBlockComponent;
+    attachments?: AttachmentsComponent;
     rememberLabel?: (tool: string) => string;
 }
 
 const HostContext = createContext<TranscriptHost>({drafts: memoryDrafts});
 
-export const TranscriptHostProvider = ({drafts, codeBlock, rememberLabel, children}: {
+export const TranscriptHostProvider = ({drafts, codeBlock, attachments, rememberLabel, children}: {
     drafts?: DraftStorage;
     codeBlock?: CodeBlockComponent;
+    attachments?: AttachmentsComponent;
     rememberLabel?: (tool: string) => string;
     children: ReactNode;
 }) => {
-    const value = useMemo(() => ({drafts: drafts ?? memoryDrafts, codeBlock, rememberLabel}), [drafts, codeBlock, rememberLabel]);
+    const value = useMemo(() => ({drafts: drafts ?? memoryDrafts, codeBlock, attachments, rememberLabel}), [drafts, codeBlock, attachments, rememberLabel]);
     return <HostContext.Provider value={value}>{children}</HostContext.Provider>;
 };
 

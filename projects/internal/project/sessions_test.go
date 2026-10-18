@@ -96,7 +96,7 @@ func TestSessionApprovalsMessagesAndModeChange(t *testing.T) {
 	require.NoError(t, err)
 	_, err = f.threads.SetPermissionMode(s.ID, "yolo")
 	assert.ErrorIs(t, err, ErrBadPermission)
-	_, err = f.threads.Send(context.Background(), s.ID, "again", "user")
+	_, err = f.threads.Send(context.Background(), s.ID, "again", "user", nil)
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadWaiting)
 	require.NoError(t, f.threads.Respond(s.ID, "req-1", Answer{Allow: false}))
@@ -110,7 +110,7 @@ func TestSessionApprovalsMessagesAndModeChange(t *testing.T) {
 	archived, err := f.threads.Resolve(s.ID)
 	require.NoError(t, err)
 	assert.Equal(t, db.ThreadResolved, archived.Status)
-	_, err = f.threads.Send(context.Background(), s.ID, "late", "user")
+	_, err = f.threads.Send(context.Background(), s.ID, "late", "user", nil)
 	assert.ErrorIs(t, err, ErrResolved)
 	reopened, err := f.threads.Reopen(s.ID)
 	require.NoError(t, err)
@@ -267,7 +267,7 @@ func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 
 	_, err = f.threads.SetProfile(ctx, s.ID, "")
 	require.NoError(t, err)
-	_, err = f.threads.Send(ctx, s.ID, "again", "user")
+	_, err = f.threads.Send(ctx, s.ID, "again", "user", nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return len(f.agent.Launches()) == 2 }, 5*time.Second, 10*time.Millisecond)
 	spec = f.agent.Launches()[1]

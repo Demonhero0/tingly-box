@@ -1252,6 +1252,39 @@
         }
       }
     },
+    "/api/v1/projects/{id}/attachments": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Upload files for a message (multipart field \"files\"); they are kept in the library under uploads/",
+        "description": "Upload files for a message (multipart field \"files\"); they are kept in the library under uploads/",
+        "operationId": "apiV1ProjectsIdAttachmentsPost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{id}/events": {
       "get": {
         "tags": [
@@ -2269,6 +2302,49 @@
           "path"
         ]
       },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "path": {
+            "type": "string",
+            "description": "Field path"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field size"
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "type",
+          "size"
+        ]
+      },
+      "AttachmentsResponse": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          }
+        },
+        "required": [
+          "attachments"
+        ]
+      },
       "BackgroundTask": {
         "type": "object",
         "properties": {
@@ -2844,6 +2920,13 @@
       "PostMessageRequest": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "type": "array",
+            "description": "Field attachments",
+            "items": {
+              "type": "string"
+            }
+          },
           "content": {
             "type": "string",
             "description": "Field content"

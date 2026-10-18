@@ -101,6 +101,7 @@
 | [im-feishu.md](./im-feishu.md) | Feishu/Lark: IM Service Built Directly, Not via the Fat SDK Client | 设计说明；局部实施状态见正文 |
 | [remote-cc-profile.md](./remote-cc-profile.md) | Remote @cc Profile Selection | 设计说明；局部实施状态见正文 |
 | [desk.md](./desk.md) | Desk (MVP)：已并入 Projects；§3 的会话引擎行为仍然适用 | 已退役 |
+| [projects-attachments.md](./projects-attachments.md) | Projects 附件：文件、图片、长文本作为输入，统一落盘在项目 uploads（TEP-2107） | 进行中 |
 | [projects-panel.md](./projects-panel.md) | Projects 面板：项目和工作目录共用一个侧边栏（TEP-2063） | 已实现 |
 | [projects-desk-absorption.md](./projects-desk-absorption.md) | Desk 并入 Projects：工作目录会话、宿主能力与插槽、切换 | 已实施 |
 | [projects-ui.md](./projects-ui.md) | Projects 面板的 UI 对齐：对照 TB 页面和官方 Projects 的审查与分批计划 | 进行中 |

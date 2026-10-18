@@ -103,6 +103,7 @@ type activeThread struct {
 type queued struct {
 	text string
 	from string
+	atts []Attachment
 }
 
 // turnTally is what a turn's transcript entries add up to, for its report.
@@ -391,7 +392,7 @@ func (m *Threads) writeSettings(p *db.Project, t *db.Thread) error {
 
 // Send gives a thread a message from the user or the coordinator. A busy
 // thread runs it after its current turn.
-func (m *Threads) Send(ctx context.Context, threadID, text, from string) (*db.Thread, error) {
+func (m *Threads) Send(ctx context.Context, threadID, text, from string, atts []Attachment) (*db.Thread, error) {
 	t, err := m.store.GetThread(threadID)
 	if err != nil {
 		return nil, err
@@ -411,7 +412,7 @@ func (m *Threads) Send(ctx context.Context, threadID, text, from string) (*db.Th
 	if t.Status == db.ThreadResolved {
 		return nil, ErrResolved
 	}
-	m.enqueue(threadID, queued{text: text, from: from})
+	m.enqueue(threadID, queued{text: text, from: from, atts: atts})
 	return m.store.GetThread(threadID)
 }
 
@@ -422,7 +423,7 @@ func (m *Threads) enqueue(threadID string, q queued) {
 	if err != nil {
 		return
 	}
-	m.addEvent(t, &db.ThreadEvent{Kind: db.EvUser, Content: q.text, From: q.from})
+	m.addEvent(t, &db.ThreadEvent{Kind: db.EvUser, Content: q.text, From: q.from, Payload: AttachmentsPayload(q.atts)})
 	followingUp := m.engine.Busy(m.sessionOf(threadID))
 	m.mu.Lock()
 	if a, busy := m.active[threadID]; busy || followingUp {
@@ -496,7 +497,7 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		return
 	}
 	a.slot = slot
-	prompt := a.current.text
+	prompt := withAttachments(a.current.text, m.layout.LibraryDir(t.ProjectID), a.current.atts)
 	m.mu.Unlock()
 	// Waiting for the slot can take a while: launch with what the owner
 	// picked since (profile, model, permission mode).

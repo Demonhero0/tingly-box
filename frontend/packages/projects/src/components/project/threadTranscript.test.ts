@@ -66,3 +66,13 @@ describe('threadTranscript', () => {
         expect(entries[1].payload).toMatchObject({ event: 'task_started' });
     });
 });
+
+describe('threadTranscript attachments', () => {
+    it('carries the files of a user message', () => {
+        const file = { name: 'a.png', path: 'uploads/x/a.png', type: 'image/png', size: 4 };
+        const { entries } = threadTranscript([
+            { id: '1', thread_id: 't', kind: 'user', content: '', from: 'user', payload: JSON.stringify({ attachments: [file] }), created_at: '2026-10-18T00:00:00Z' },
+        ], false, () => undefined);
+        expect(entries[0].attachments).toEqual([file]);
+    });
+});

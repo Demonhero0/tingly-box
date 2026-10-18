@@ -69,7 +69,7 @@ func (c *Coordinator) addMessage(m *db.ProjectMessage) *db.ProjectMessage {
 }
 
 // Post adds a user message to the conversation and runs a coordinator turn.
-func (c *Coordinator) Post(projectID, text string) (*db.ProjectMessage, error) {
+func (c *Coordinator) Post(projectID, text string, atts []Attachment) (*db.ProjectMessage, error) {
 	p, err := c.store.GetProject(projectID)
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func (c *Coordinator) Post(projectID, text string) (*db.ProjectMessage, error) {
 	if p.Paused {
 		return nil, ErrPaused
 	}
-	m := c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleUser, Kind: db.MsgText, Content: text})
+	m := c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleUser, Kind: db.MsgText, Content: text, Payload: AttachmentsPayload(atts)})
 	_ = c.store.TouchProject(projectID)
 	c.schedule(projectID, func(q *queue) { q.user = true })
 	return m, nil
@@ -164,7 +164,7 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 	if err != nil {
 		return err
 	}
-	msgs := renderHistory(history)
+	msgs := renderHistory(history, c.layout.LibraryDir(projectID))
 	if len(msgs) == 0 {
 		return nil
 	}
@@ -243,7 +243,7 @@ func appendUser(msgs []llm.Message, text string) []llm.Message {
 }
 
 // renderHistory turns the stored conversation into alternating model turns.
-func renderHistory(history []db.ProjectMessage) []llm.Message {
+func renderHistory(history []db.ProjectMessage, libraryDir string) []llm.Message {
 	var out []llm.Message
 	add := func(role, text string) {
 		text = strings.TrimSpace(text)
@@ -260,7 +260,7 @@ func renderHistory(history []db.ProjectMessage) []llm.Message {
 		switch m.Kind {
 		case db.MsgText:
 			if m.Role == db.RoleUser {
-				add("user", m.Content)
+				add("user", withAttachments(m.Content, libraryDir, ParseAttachments(m.Payload)))
 			} else {
 				add("assistant", m.Content)
 			}
@@ -473,7 +473,7 @@ func (c *Coordinator) runTool(ctx context.Context, p *db.Project, call llm.ToolC
 			return fail(err)
 		}
 		busy := c.threads.Running(t.ID)
-		if _, err := c.threads.Send(ctx, t.ID, in.Message, "coordinator"); err != nil {
+		if _, err := c.threads.Send(ctx, t.ID, in.Message, "coordinator", nil); err != nil {
 			return fail(err)
 		}
 		if busy {

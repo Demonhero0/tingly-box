@@ -5,7 +5,7 @@
 // into its i18n bundle (import @tingly/projects/transcript/locales/<lang>).
 
 export type {
-    ActivityStep, ApprovalSubject, AskOption, AskQuestion, RequestBlock, RequestOutcome, TaskEvent, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry, WorkingVerb,
+    ActivityStep, ApprovalSubject, AskOption, AskQuestion, RequestBlock, RequestOutcome, TaskEvent, TaskState, ThinkingStep, ToolStep, TranscriptAttachment, TranscriptBlock, TranscriptEntry, WorkingVerb,
 } from './model';
 export {
     agentReport, agentStatus, approvalSubject, askQuestions, blockTime, buildTranscript, firstNewBlock, foldTasks, formatTokens, isAgentTool, pendingRequestId, requestOutcome, toolSummary, workingState,
@@ -14,7 +14,7 @@ export {
 export type {TrajectoryAnchor, TrajectoryFilter, TrajectoryKind, TrajectoryRow, TrajectorySummary} from './trajectoryRows';
 export {matchesFilter, plainLine, trajectoryRows, trajectorySummary} from './trajectoryRows';
 
-export type {CodeBlockComponent, DraftStorage} from './context';
+export type {AttachmentsComponent, CodeBlockComponent, DraftStorage} from './context';
 export {createMemoryDraftStorage} from './context';
 
 export {default as Transcript} from './Transcript';

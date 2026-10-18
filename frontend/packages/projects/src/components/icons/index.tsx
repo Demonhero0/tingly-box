@@ -27,6 +27,7 @@ import {
     IconMessages,
     IconMinus,
     IconLayout2,
+    IconPaperclip,
     IconPencil,
     IconPictureInPictureOn,
     IconPlayerStopFilled,
@@ -53,6 +54,7 @@ export const PostAdd = tablerMui(IconTextPlus);
 export const SidebarCollapse = tablerMui(IconLayoutSidebarLeftCollapse);
 export const SidebarExpand = tablerMui(IconLayoutSidebarLeftExpand);
 export const Pencil = tablerMui(IconPencil);
+export const Attach = tablerMui(IconPaperclip);
 export const MemoryOff = tablerMui(IconHistoryToggle);
 export const Branch = tablerMui(IconGitBranch);
 export const Merge = tablerMui(IconGitMerge);

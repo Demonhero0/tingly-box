@@ -17,6 +17,7 @@ export type ThreadDetail = S['ThreadDetailResponse'];
 export type Diff = S['Diff'];
 export type MemoryFile = S['MemoryFile'];
 export type LibraryFile = S['LibraryFile'];
+export type Attachment = S['Attachment'];
 export type Usage = S['UsageResponse'];
 export type Conversation = S['Conversation'];
 export type ConversationDetail = S['ConversationDetailResponse'];

@@ -311,7 +311,7 @@ func (h *Handler) send(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.svc.Threads.Send(c.Request.Context(), t.ID, req.Content, "user")
+	out, err := h.svc.Threads.Send(c.Request.Context(), t.ID, req.Content, "user", nil)
 	if err != nil {
 		fail(c, err)
 		return

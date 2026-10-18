@@ -7,7 +7,7 @@ import type {TFunction} from 'i18next';
 import type {ReactNode} from 'react';
 import {Fragment, useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import type {CodeBlockComponent, DraftStorage} from './context';
+import type {AttachmentsComponent, CodeBlockComponent, DraftStorage} from './context';
 import {TranscriptHostProvider, useDraft, useTranscriptHost} from './context';
 import type {ActivityStep, RequestBlock, RequestOutcome, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry, WorkingVerb} from './model';
 import {agentReport, agentStatus, approvalSubject, askQuestions, firstNewBlock, formatTokens, requestOutcome, toolSummary, workingState} from './model';
@@ -31,6 +31,8 @@ interface TranscriptProps {
     drafts?: DraftStorage;
     // Renders fenced code in replies; plain monospace unless the host passes one.
     codeBlock?: CodeBlockComponent;
+    // Renders a user message's files; just their names unless the host passes one.
+    attachments?: AttachmentsComponent;
     // The label of a second "allow" on an approval card that also allows the
     // tool from now on ("Allow Bash in this thread"); none unless passed.
     rememberLabel?: (tool: string) => string;
@@ -54,14 +56,23 @@ const preBox = {
     whiteSpace: 'pre-wrap', wordBreak: 'break-word', bgcolor: 'action.hover', color: 'text.secondary',
 } as const;
 
-const UserBubble = ({message}: {message: TranscriptEntry}) => (
-    <Box sx={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
-        {message.author && <Typography variant="caption" sx={{color: 'text.secondary', mb: 0.25}}>{message.author}</Typography>}
-        <Box sx={{maxWidth: '80%', bgcolor: 'action.hover', px: 1.75, py: 1, borderRadius: 1.5}}>
-            <Typography variant="body1" sx={conversationText}>{message.content}</Typography>
+const UserBubble = ({message}: {message: TranscriptEntry}) => {
+    const {attachments: Attachments} = useTranscriptHost();
+    const files = message.attachments ?? [];
+    return (
+        <Box sx={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
+            {message.author && <Typography variant="caption" sx={{color: 'text.secondary', mb: 0.25}}>{message.author}</Typography>}
+            {files.length > 0 && (Attachments
+                ? <Box sx={{maxWidth: '80%'}}><Attachments items={files}/></Box>
+                : <Typography variant="caption" sx={{color: 'text.secondary', mb: 0.5}}>{files.map((f) => f.name).join(', ')}</Typography>)}
+            {message.content.trim() !== '' && (
+                <Box sx={{maxWidth: '80%', bgcolor: 'action.hover', px: 1.75, py: 1, borderRadius: 1.5}}>
+                    <Typography variant="body1" sx={conversationText}>{message.content}</Typography>
+                </Box>
+            )}
         </Box>
-    </Box>
-);
+    );
+};
 
 const AssistantText = ({message}: {message: TranscriptEntry}) => <Markdown content={message.content}/>;
 
@@ -636,13 +647,13 @@ const VERB_DEFAULTS: Record<WorkingVerb, string> = {
     searching: 'Searching the web', delegating: 'Waiting on a subagent', working: 'Working',
 };
 
-const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRespond, drafts, codeBlock, rememberLabel, newSince}: TranscriptProps) => {
+const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRespond, drafts, codeBlock, attachments, rememberLabel, newSince}: TranscriptProps) => {
     // While a request waits, its card is the live part; otherwise the turn
     // gets a line saying what it does and for how long.
     const showWorking = working && !pendingRequestId;
 
     return (
-        <TranscriptHostProvider drafts={drafts} codeBlock={codeBlock} rememberLabel={rememberLabel}>
+        <TranscriptHostProvider drafts={drafts} codeBlock={codeBlock} attachments={attachments} rememberLabel={rememberLabel}>
             <Stack spacing={2.5}>
                 <BlockList anchored blocks={blocks} pendingRequestId={pendingRequestId} working={working} expandAll={expandAll} onRespond={onRespond} newFrom={firstNewBlock(blocks, newSince)}/>
                 {showWorking && <WorkingLine blocks={blocks}/>}

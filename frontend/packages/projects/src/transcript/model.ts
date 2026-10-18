@@ -19,7 +19,16 @@ export interface TranscriptEntry {
     // Who sent a user message, when the host knows more than "the user"
     // (a Projects thread is also written to by its coordinator).
     author?: string;
+    // Files attached to a user message.
+    attachments?: TranscriptAttachment[];
     timestamp: string;
+}
+
+export interface TranscriptAttachment {
+    name: string;
+    path: string;
+    type: string;
+    size: number;
 }
 
 const SUMMARY_KEYS = ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'description', 'prompt'];

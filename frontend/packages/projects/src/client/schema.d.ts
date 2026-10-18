@@ -580,6 +580,26 @@ export interface paths {
         patch: operations["apiV1ProjectsIdPatch"];
         trace?: never;
     };
+    "/api/v1/projects/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload files for a message (multipart field "files"); they are kept in the library under uploads/
+         * @description Upload files for a message (multipart field "files"); they are kept in the library under uploads/
+         */
+        post: operations["apiV1ProjectsIdAttachmentsPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}/events": {
         parameters: {
             query?: never;
@@ -992,6 +1012,23 @@ export interface components {
             /** @description Field path */
             path: string;
         };
+        Attachment: {
+            /** @description Field name */
+            name: string;
+            /** @description Field path */
+            path: string;
+            /**
+             * Format: int64
+             * @description Field size
+             */
+            size: number;
+            /** @description Field type */
+            type: string;
+        };
+        AttachmentsResponse: {
+            /** @description Field attachments */
+            attachments: components["schemas"]["Attachment"][];
+        };
         BackgroundTask: {
             /** @description Field description */
             description: string;
@@ -1234,6 +1271,8 @@ export interface components {
             permission_mode: string;
         };
         PostMessageRequest: {
+            /** @description Field attachments */
+            attachments?: string[];
             /** @description Field content */
             content: string;
         };
@@ -2653,6 +2692,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdAttachmentsPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentsResponse"];
                 };
             };
         };

@@ -125,7 +125,7 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, ai)
 
-	_, err := coord.Post(f.project.ID, "Update the docs, and fix the login bug.")
+	_, err := coord.Post(f.project.ID, "Update the docs, and fix the login bug.", nil)
 	require.NoError(t, err)
 
 	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ProjectMessage) bool {
@@ -157,7 +157,7 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 	assert.Contains(t, first.System, "Ship it")
 
 	// Coordination preferences go to memory.
-	_, err = coord.Post(f.project.ID, "Please run only two at a time.")
+	_, err = coord.Post(f.project.ID, "Please run only two at a time.", nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		return strings.Contains(f.threads.layout.memoryIndexText(f.project.ID), "max 2 parallel threads")
@@ -184,7 +184,7 @@ func TestProposeThenStartSuggestions(t *testing.T) {
 		}})}}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, ai)
-	_, err := coord.Post(f.project.ID, "Plan the migration first.")
+	_, err := coord.Post(f.project.ID, "Plan the migration first.", nil)
 	require.NoError(t, err)
 	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ProjectMessage) bool { return countKind(m, db.MsgSuggestions) == 1 })
 	threads, _ := f.store.ListThreads(f.project.ID)
@@ -216,7 +216,7 @@ func TestRenderHistoryAlternates(t *testing.T) {
 		{Role: db.RoleUser, Kind: db.MsgText, Content: "b"},
 		{Role: db.RoleAssistant, Kind: db.MsgThreadStarted, Payload: `{"thread_ids":["0123456789"]}`},
 		{Role: db.RoleSystem, Kind: db.MsgThreadUpdate, Content: "done", Payload: `{"thread_id":"0123456789","title":"T","kind":"finished","status":"idle"}`},
-	})
+	}, "")
 	require.Len(t, msgs, 3)
 	assert.Equal(t, "user", msgs[0].Role)
 	assert.Equal(t, "a\n\nb", msgs[0].Content)

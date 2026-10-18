@@ -277,15 +277,16 @@ export default function ProjectPage() {
                     <Box sx={{ flex: 1, p: 3 }}><Skeleton variant="rounded" height={80} /></Box>
                 ) : (
                     <ConversationPane
+                        projectId={id}
                         messages={messages}
                         threads={threadMap}
                         busy={busy}
                         disabled={blocked || !project}
                         disabledReason={banner}
                         onOpenThread={openThread}
-                        onSend={async (text) => {
+                        onSend={async (text, attachments) => {
                             try {
-                                const m = await unwrap(api.POST('/api/v1/projects/{id}/messages', { params: { path: { id } }, body: { content: text } }));
+                                const m = await unwrap(api.POST('/api/v1/projects/{id}/messages', { params: { path: { id } }, body: { content: text, attachments: attachments.map((a) => a.path) } }));
                                 setMessages((list) => (list ? upsert(list, m) : list));
                                 setBusy(true);
                                 return true;
