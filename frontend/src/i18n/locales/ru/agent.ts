@@ -135,7 +135,12 @@ export default {
       "pi": "Агент программирования Pi через прокси Tingly Box",
       "workbuddy": "Tencent WorkBuddy через прокси Tingly Box как пользовательская OpenAI-совместимая модель",
       "dsh": "Агентная оболочка DeepSeek Harness (dsh) через прокси Tingly Box",
-      "imagegen": "Генерация и редактирование изображений через прокси Tingly Box с поддержкой нескольких моделей"
+      "imagegen": "Генерация и редактирование изображений через прокси Tingly Box с поддержкой нескольких моделей",
+      "openai": "Укажите этот Base URL и ключ в любом OpenAI SDK (или OpenAI-совместимом клиенте)",
+      "anthropic": "Укажите этот Base URL и ключ в любом Anthropic SDK (или Anthropic-совместимом клиенте)",
+      "custom": "Своё имя модели в запросе: универсальный сценарий для любого клиента",
+      "embed": "Маршрутизация запросов эмбеддингов через Tingly Box к вашему провайдеру",
+      "decisions": "Маршрутизация запросов решений через Tingly Box к вашему провайдеру",
     },
     "vscode": {
       "installDescription": "Установите расширение Tingly Box из VS Code или Marketplace.",

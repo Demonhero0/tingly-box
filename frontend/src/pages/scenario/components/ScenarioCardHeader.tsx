@@ -31,3 +31,20 @@ export const ScenarioCardHeader: React.FC<{ title: string; tooltipKey?: string; 
         </Box>
     );
 };
+
+/**
+ * The `PageHeader` layout every Agent-shaped page shares (Agent pages, a Claude
+ * Code profile, a Team, Image API): title, status and actions on one row where
+ * they fit; below `breakpoint` the actions drop under the title instead of
+ * wrapping it. The buttons never wrap among themselves (the primary one never
+ * lands on a line of its own); the status text wraps under the title instead.
+ * Pages with more buttons than an Agent page pass `lg`.
+ */
+export const agentPageHeaderSx = (breakpoint: 'md' | 'lg' = 'md') => ({
+    pb: 0,
+    borderBottom: 0,
+    flexDirection: { xs: 'column', [breakpoint]: 'row' },
+    alignItems: { xs: 'flex-start', [breakpoint]: 'center' },
+    '& h1': { whiteSpace: 'nowrap' },
+    '& > :last-child': { flexWrap: { [breakpoint]: 'nowrap' }, flexShrink: { [breakpoint]: 0 } },
+}) as const;

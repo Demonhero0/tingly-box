@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Box, Button, Card, Stack, Tooltip } from '@mui/material';
+import { Box, Button, Stack, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,6 @@ import ConnectAIDialogs from '@/components/ConnectAIDialogs';
 import PageLayout from '@/components/PageLayout';
 import ProviderConfigCard from '@/components/ProviderConfigCard.tsx';
 import ScenarioLogDialog from '@/components/RuleLogDialog';
-import PluginFeatures from '@/components/PluginFeatures';
 import type { EnvironmentMode } from '@/components/EnvironmentModeSwitcher';
 import { transformUrlByMode } from '@/utils/tokenUtils';
 import { type ClientConfigTool, useClientConfigStatus } from '@/hooks/useClientConfigStatus';
@@ -30,7 +29,8 @@ import AgentSetupCard, {
     resetSetupProgress,
     scrollToModelsCard,
 } from './components/AgentSetupCard';
-import { SCENARIO_HEADER_CONTENT_MAX_WIDTH, ScenarioCardHeader } from './components/ScenarioCardHeader';
+import { SCENARIO_HEADER_CONTENT_MAX_WIDTH, ScenarioCardHeader, agentPageHeaderSx } from './components/ScenarioCardHeader';
+import AgentPluginsCard from './components/AgentPluginsCard';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
 import TemplatePage from './components/TemplatePage.tsx';
 
@@ -297,18 +297,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         />
                     )}
                     actions={headerActions}
-                    // Title, status and actions share a row only where they fit; below that
-                    // the actions drop under the title instead of wrapping it.
-                    sx={{
-                        pb: 0,
-                        borderBottom: 0,
-                        flexDirection: { xs: 'column', md: 'row' },
-                        alignItems: { xs: 'flex-start', md: 'center' },
-                        '& h1': { whiteSpace: 'nowrap' },
-                        // The buttons stay on one row (the primary one never drops to a line of its
-                        // own); the status text wraps under the title instead.
-                        '& > :last-child': { flexWrap: { md: 'nowrap' }, flexShrink: { md: 0 } },
-                    }}
+                    sx={agentPageHeaderSx()}
                 />
                 {/* Connection: always here, between the status row and the rules; open
                     until the agent is connected (or while its config is out of date),
@@ -345,14 +334,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     </Box>
                 </AgentAccessSection>
 
-                {/* Page-level plugins (Thinking, Vision Proxy, Record): their own card,
-                    always shown, whether the connection above is folded or not. */}
-                <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper' }}>
-                    {/* Same height and left inset as the folded connection card above. */}
-                    <Box sx={{ px: 2, py: 0.5, minHeight: 58, display: 'flex', alignItems: 'center', '& > *': { flex: 1, minWidth: 0 } }}>
-                        <PluginFeatures scenario={scenario} />
-                    </Box>
-                </Card>
+                <AgentPluginsCard scenario={scenario} />
 
                 {quickStart && (
                     // Embedded where it always was, above the rules; gone once done.

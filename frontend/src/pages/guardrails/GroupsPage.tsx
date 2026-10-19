@@ -248,30 +248,19 @@ const GuardrailsGroupsPage = () => {
     );
 
     return (
-        <PageLayout loading={loading}>
+        <PageLayout
+            loading={loading}
+            // A page header like Guardrails' Overview and Secrets, not a card of its own.
+            title="Policy Groups"
+            subtitle="Groups are collections of policies: a policy can appear in several groups, and a group only takes effect when it is enabled. Built-in is a policy label, not a group type."
+            rightAction={
+                <Button variant="contained" size="small" startIcon={<Add />} onClick={openNewGroupDialog}>
+                    New Group
+                </Button>
+            }
+        >
             <Stack spacing={3}>
-                <UnifiedCard
-                    title="Policy Groups"
-                    titleHeadingLevel={1}
-                    subtitle="Groups organize policies and control whether those policy sets participate in evaluation. Built-in is a policy label, not a group type."
-                    size="full"
-                    rightAction={
-                        <Stack direction="row" spacing={1}>
-                            <Button variant="contained" size="small" startIcon={<Add />} onClick={openNewGroupDialog}>
-                                New Group
-                            </Button>
-                        </Stack>
-                    }
-                >
-                    <Stack spacing={1.5}>
-                        {loadError && <Alert severity="error">{loadError}</Alert>}
-                        <Typography variant="body2" sx={{
-                            color: "text.secondary"
-                        }}>
-                            Groups are collections. A policy can appear in multiple groups, and a group only contributes activation when it is enabled.
-                        </Typography>
-                    </Stack>
-                </UnifiedCard>
+                {loadError && <Alert severity="error">{loadError}</Alert>}
 
                 <UnifiedCard title={`Groups (${groups.length})`} size="full">
                     <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, py: 0, overflow: 'hidden' }}>

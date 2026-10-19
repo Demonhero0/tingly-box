@@ -9,7 +9,8 @@ import ProfileSetupDialog from './components/ProfileSetupDialog';
 import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
 import { isCredentialProvider } from '@/utils/providers';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
-import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './components/ScenarioCardHeader';
+import { SCENARIO_HEADER_CONTENT_MAX_WIDTH, agentPageHeaderSx } from './components/ScenarioCardHeader';
+import AgentPluginsCard from './components/AgentPluginsCard';
 import ProviderConfigCard from "@/components/ProviderConfigCard.tsx";
 import ConfigRow from "@/components/ConfigRow.tsx";
 import { ChoiceToggle } from "@/components/ChoiceToggle";
@@ -254,16 +255,7 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                         </Button>
                     </>
                 )}
-                sx={{
-                    pb: 0,
-                    borderBottom: 0,
-                    flexDirection: { xs: 'column', md: 'row' },
-                    alignItems: { xs: 'flex-start', md: 'center' },
-                    '& h1': { whiteSpace: 'nowrap' },
-                    // The buttons stay on one row (the primary one never drops to a line of its
-                    // own); the status text wraps under the title instead.
-                    '& > :last-child': { flexWrap: { md: 'nowrap' }, flexShrink: { md: 0 } },
-                }}
+                sx={agentPageHeaderSx()}
             />
                 <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
                   <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
@@ -392,9 +384,13 @@ const ClaudeCodeProfilePageContent: React.FC = () => {
                         showApiKeyRow={true}
                         showBaseUrlRow={true}
                         compact={true}
+                        showPlugins={false}
                     />
                   </Box>
                 </AgentAccessSection>
+                {/* Page-level plugins: their own card, as on the Agent pages, shown whether
+                    the connection above is folded or not. */}
+                <AgentPluginsCard scenario={scenario} />
             <CardGrid>
 
                 <ClaudeCodeProfileOverrides

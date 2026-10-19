@@ -130,6 +130,11 @@ export default {
       "workbuddy": "通过 Tingly Box 代理使用腾讯 WorkBuddy，以自定义 OpenAI 兼容模型的方式接入",
       "dsh": "通过 Tingly Box 代理使用 DeepSeek Harness (dsh) 智能体框架",
       "imagegen": "通过 Tingly Box 代理进行 AI 图像生成与编辑，支持多种模型",
+      "openai": "让任意 OpenAI SDK（或 OpenAI 兼容客户端）使用这里的 Base URL 和 Key",
+      "anthropic": "让任意 Anthropic SDK（或 Anthropic 兼容客户端）使用这里的 Base URL 和 Key",
+      "custom": "自带请求模型名：适用于任意客户端的通用兜底场景",
+      "embed": "通过 Tingly Box 把 Embedding 请求路由到你的服务商",
+      "decisions": "通过 Tingly Box 把决策请求路由到你的服务商",
     },
     "vscode": {
       "installDescription": "从 VS Code 或应用市场安装 Tingly Box 扩展。",

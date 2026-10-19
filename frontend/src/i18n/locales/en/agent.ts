@@ -131,7 +131,12 @@ export default {
       "pi": "Pi coding agent through Tingly Box proxy",
       "workbuddy": "Tencent WorkBuddy through Tingly Box proxy, added as a custom OpenAI-compatible model",
       "dsh": "DeepSeek Harness (dsh) agent harness through Tingly Box proxy",
-      "imagegen": "AI-powered image generation and editing through Tingly Box proxy with multiple model support"
+      "imagegen": "AI-powered image generation and editing through Tingly Box proxy with multiple model support",
+      "openai": "Point any OpenAI SDK (or OpenAI-compatible client) at this Base URL and Key",
+      "anthropic": "Point any Anthropic SDK (or Anthropic-compatible client) at this Base URL and Key",
+      "custom": "Bring your own request model name: a generic catch-all scenario for any client",
+      "embed": "Route embedding requests through Tingly Box to your provider",
+      "decisions": "Route decision requests through Tingly Box to your provider",
     },
     "vscode": {
       "installDescription": "Install the Tingly Box extension from VS Code or the Marketplace.",

@@ -320,7 +320,7 @@ const GuardrailsCredentialsPage = () => {
             subtitle="Keep real secrets local and replace them with alias tokens before content reaches the model."
             rightAction={
                 <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadCredentials}>
+                    <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={loadCredentials}>
                         Reload
                     </Button>
                 </Stack>

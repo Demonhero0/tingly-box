@@ -3,6 +3,7 @@ import { AgentPage, type AgentPageDescriptor } from './AgentPage';
 
 const decisions: AgentPageDescriptor = {
     scenario: 'decisions',
+    tooltipKey: 'scenarioPage.tooltip.decisions',
     title: 'Decisions API',
     rulesTitleKey: 'scenarioPage.decisionsModelRules',
     connection: { compact: true, apiKeyRow: true, baseUrlRow: true },

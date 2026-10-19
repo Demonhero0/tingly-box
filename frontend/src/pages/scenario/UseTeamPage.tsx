@@ -1,9 +1,8 @@
 import CardGrid from '@/components/CardGrid.tsx';
 import ProviderConfigCard from '@/components/ProviderConfigCard.tsx';
-import PluginFeatures from '@/components/PluginFeatures';
 import ConfirmDialog from '@/components/ConfirmDialog.tsx';
 import {
-    Alert, Box, Button, Card, CircularProgress, Dialog, DialogActions,
+    Alert, Box, Button, CircularProgress, Dialog, DialogActions,
     DialogContent, DialogTitle, FormControlLabel, IconButton, Stack, Switch,
     TextField, Tooltip,
 } from '@mui/material';
@@ -19,7 +18,8 @@ import AgentActivityDialog from './components/AgentActivityDialog';
 import AgentStatusRow, {AgentLooksIn} from './components/AgentStatusRow';
 import {useAgentObservation} from '@/pages/scenario/hooks/useAgentObservation';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
-import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './components/ScenarioCardHeader';
+import { SCENARIO_HEADER_CONTENT_MAX_WIDTH, agentPageHeaderSx } from './components/ScenarioCardHeader';
+import AgentPluginsCard from './components/AgentPluginsCard';
 import TemplatePage from './components/TemplatePage.tsx';
 import TeamKeysOverview, {useTeamKeysOverviewExpanded} from './components/TeamKeysOverview';
 import {useSharingKeyActions} from '@/hooks/useSharingKeyActions';
@@ -229,16 +229,8 @@ const UseTeamPageContent: React.FC = () => {
                                 />
                             </>
                         )}
-                        sx={{
-                            pb: 0,
-                            borderBottom: 0,
-                            flexDirection: {xs: 'column', lg: 'row'},
-                            alignItems: {xs: 'flex-start', lg: 'center'},
-                            '& h1': {whiteSpace: 'nowrap'},
-                            // One row of buttons on desktop (more of them than an Agent page, so the
-                            // breakpoint is lg); the status text wraps under the title.
-                            '& > :last-child': {flexWrap: {lg: 'nowrap'}, flexShrink: {lg: 0}},
-                        }}
+                        // More buttons than an Agent page, so they share the title's row from lg up.
+                        sx={agentPageHeaderSx('lg')}
                     />
                     {/* Part of the header: the Team's keys stay in view for handing out, and are managed here. */}
                     <TeamKeysOverview
@@ -262,16 +254,10 @@ const UseTeamPageContent: React.FC = () => {
                         </Box>
                     </AgentAccessSection>
 
-                    {/* Page-level plugins: their own card, shown whether the connection above is folded or not. */}
-                    <Card sx={{borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper'}}>
-                        {/* Same height and left inset as the folded connection card above. */}
-                        <Box sx={{px: 2, py: 0.5, minHeight: 58, display: 'flex', alignItems: 'center', '& > *': {flex: 1, minWidth: 0}}}>
-                            <PluginFeatures scenario={scenario} />
-                        </Box>
-                    </Card>
+                    <AgentPluginsCard scenario={scenario} />
 
                     <CardGrid>
-                    <TemplatePage key={scenario} scenario={scenario} collapsible allowDeleteRule />
+                    <TemplatePage key={scenario} scenario={scenario} collapsible allowDeleteRule hideTroubleshoot />
                     </CardGrid>
                 </Stack>
             )}
