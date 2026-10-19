@@ -72,12 +72,21 @@ func (t *VendorTransform) applyResponses(ctx *TransformContext, req *responses.R
 	return req
 }
 
-// isClaudeCodeBackend: Anthropic's host, or a Claude Code OAuth provider on
-// any host (a relay still needs the identity rewrite).
-func isClaudeCodeBackend(ctx *TransformContext, host string) bool {
+// isAnthropicBackend: Anthropic's host, or a Claude Code OAuth provider on
+// any host (a relay in front of Anthropic). Anthropic's wire rules apply to
+// both.
+func isAnthropicBackend(ctx *TransformContext, host string) bool {
 	if host == "api.anthropic.com" || host == "claude.ai" {
 		return true
 	}
+	return isClaudeCodeOAuth(ctx)
+}
+
+// isClaudeCodeOAuth: only the Claude Code OAuth chain carries the Claude Code
+// identity (billing header + metadata). An API-key provider on Anthropic's
+// host is plain API usage; the billing header would have Anthropic bill it as
+// Claude Code, which the API credits of Max/Team plans do not cover.
+func isClaudeCodeOAuth(ctx *TransformContext) bool {
 	return ctx != nil && ctx.Provider != nil && ctx.Provider.IsClaudeCodeProvider()
 }
 
@@ -87,7 +96,7 @@ func (t *VendorTransform) applyAnthropicV1(ctx *TransformContext, req *anthropic
 	}
 	host, _ := ops.SplitProviderHostPath(providerURL)
 	switch {
-	case isClaudeCodeBackend(ctx, host):
+	case isAnthropicBackend(ctx, host):
 		// Anthropic's wire rules for thinking, before model-specific thinking
 		// reconciliation. Only here: a third-party Anthropic-compatible
 		// provider gets the request as the client sent it, since rewriting
@@ -97,7 +106,9 @@ func (t *VendorTransform) applyAnthropicV1(ctx *TransformContext, req *anthropic
 		// where it is produced (request.applyOpenAIEffortAsThinking).
 		thinking.ReconcileV1WithRequest(req)
 		req = ops.ApplyAnthropicV1ModelTransform(req, string(req.Model))
-		req = ops.ApplyAnthropicV1MetadataTransform(req, ctx.configExtraForMetadata())
+		if isClaudeCodeOAuth(ctx) {
+			req = ops.ApplyAnthropicV1MetadataTransform(req, ctx.configExtraForMetadata())
+		}
 	case host == "api.deepseek.com":
 		ops.SanitizeAnthropicV1ThinkingConfig(req)
 		ops.ApplyAnthropicV1DeepSeekThinkingPatch(req)
@@ -111,7 +122,7 @@ func (t *VendorTransform) applyAnthropicBeta(ctx *TransformContext, req *anthrop
 	}
 	host, _ := ops.SplitProviderHostPath(providerURL)
 	switch {
-	case isClaudeCodeBackend(ctx, host):
+	case isAnthropicBackend(ctx, host):
 		// Anthropic's wire rules for thinking, before model-specific thinking
 		// reconciliation. Only here: a third-party Anthropic-compatible
 		// provider gets the request as the client sent it, since rewriting
@@ -121,7 +132,9 @@ func (t *VendorTransform) applyAnthropicBeta(ctx *TransformContext, req *anthrop
 		// where it is produced (request.applyOpenAIEffortAsThinking).
 		thinking.ReconcileBetaWithRequest(req)
 		req = ops.ApplyAnthropicBetaModelTransform(req, string(req.Model))
-		req = ops.ApplyAnthropicBetaMetadataTransform(req, ctx.configExtraForMetadata())
+		if isClaudeCodeOAuth(ctx) {
+			req = ops.ApplyAnthropicBetaMetadataTransform(req, ctx.configExtraForMetadata())
+		}
 	case host == "api.deepseek.com":
 		ops.SanitizeAnthropicBetaThinkingConfig(req)
 		ops.ApplyAnthropicBetaDeepSeekThinkingPatch(req)
