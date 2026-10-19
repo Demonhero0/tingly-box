@@ -12,6 +12,8 @@ export default {
       "approve": "Allow",
       "background": "background",
       "callFailed": "failed",
+      "checklist": "Progress",
+      "checklistCount": "{{done}} of {{total}} done",
       "decline": "Decline",
       "deny": "Deny",
       "details": "Details",

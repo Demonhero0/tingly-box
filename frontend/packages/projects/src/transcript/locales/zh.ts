@@ -12,6 +12,8 @@ export default {
       "approve": "允许",
       "background": "后台",
       "callFailed": "失败",
+      "checklist": "进度",
+      "checklistCount": "已完成 {{done}}/{{total}}",
       "decline": "拒绝",
       "deny": "不允许",
       "details": "详情",

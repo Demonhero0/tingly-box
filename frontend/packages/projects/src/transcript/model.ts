@@ -388,6 +388,38 @@ export const workingState = (blocks: TranscriptBlock[]): {verb: WorkingVerb; sin
     return {verb, since};
 };
 
+// Todo is one item of the agent's own progress list (Claude Code's TodoWrite).
+export interface Todo {
+    content: string;
+    // The present-tense form shown while the item is in progress.
+    activeForm?: string;
+    status: 'pending' | 'in_progress' | 'completed';
+}
+
+// latestTodos is the progress list as of the last TodoWrite call: each call
+// rewrites the whole list, so the last one is the current state. Undefined
+// when the agent never wrote one.
+export const latestTodos = (blocks: TranscriptBlock[]): Todo[] | undefined => {
+    for (let i = blocks.length - 1; i >= 0; i--) {
+        const b = blocks[i];
+        if (b.type !== 'activity') continue;
+        for (let j = b.steps.length - 1; j >= 0; j--) {
+            const s = b.steps[j];
+            if (s.type !== 'tool' || s.name !== 'TodoWrite') continue;
+            const raw = (s.input as {todos?: unknown} | null)?.todos;
+            if (!Array.isArray(raw)) continue;
+            const todos = raw.flatMap((x): Todo[] => {
+                const r = x as Partial<Todo> | null;
+                if (!r || typeof r.content !== 'string' || r.content.trim() === '') return [];
+                const status = r.status === 'completed' || r.status === 'in_progress' ? r.status : 'pending';
+                return [{content: r.content, activeForm: typeof r.activeForm === 'string' ? r.activeForm : undefined, status}];
+            });
+            return todos.length > 0 ? todos : undefined;
+        }
+    }
+    return undefined;
+};
+
 // RequestOutcome is how a request ended, or that it still waits.
 export type RequestOutcome = 'pending' | 'allowed' | 'denied' | 'answered' | 'declined' | 'unanswered';
 

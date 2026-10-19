@@ -125,6 +125,16 @@ implemented.
   waiting on a subagent, thinking) and the time since the last message to
   the agent, ticking each second. A stuck turn reads differently from a slow
   one without opening anything.
+- **The agent's own checklist.** When the agent keeps a progress list
+  (Claude Code's `TodoWrite`), the transcript pins it as a card above the
+  conversation: done items struck through, the one in progress in its
+  present-tense form with a spinner while the turn runs, the rest muted.
+  The data is the last `TodoWrite` call's `todos` (each call rewrites the
+  whole list), read in the shared transcript, so project threads and folder
+  sessions both get it with no API change. It starts open while work
+  remains and folds to one line ("3 of 5 done · Writing tests") once
+  everything is done or the reader folds it. Tracked in
+  [#2118](https://github.com/tingly-dev/tingly-box/issues/2118).
 
 ## Step 3c: one message box
 

@@ -9,8 +9,8 @@ import {Fragment, useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import type {AttachmentsComponent, CodeBlockComponent, DraftStorage} from './context';
 import {TranscriptHostProvider, useDraft, useTranscriptHost} from './context';
-import type {ActivityStep, RequestBlock, RequestOutcome, TaskState, ThinkingStep, ToolStep, TranscriptBlock, TranscriptEntry, WorkingVerb} from './model';
-import {agentReport, agentStatus, approvalSubject, askQuestions, firstNewBlock, formatTokens, requestOutcome, toolSummary, workingState} from './model';
+import type {ActivityStep, RequestBlock, RequestOutcome, TaskState, ThinkingStep, Todo, ToolStep, TranscriptBlock, TranscriptEntry, WorkingVerb} from './model';
+import {agentReport, agentStatus, approvalSubject, askQuestions, firstNewBlock, formatTokens, latestTodos, requestOutcome, toolSummary, workingState} from './model';
 import Markdown from './Markdown';
 import QuestionCard from './QuestionCard';
 
@@ -642,6 +642,58 @@ const WorkingLine = ({blocks}: {blocks: TranscriptBlock[]}) => {
     );
 };
 
+// ChecklistCard shows the agent's own progress list (its last TodoWrite),
+// pinned above the conversation: what is done, what runs now, what is left.
+// It starts open while work remains and folded once everything is done.
+const ChecklistCard = ({todos, working}: {todos: Todo[]; working: boolean}) => {
+    const {t} = useTranslation();
+    const done = todos.filter((x) => x.status === 'completed').length;
+    const finished = done === todos.length;
+    const [choice, setChoice] = useState<boolean | undefined>();
+    const open = choice ?? !finished;
+    const current = todos.find((x) => x.status === 'in_progress');
+    return (
+        <Paper variant="outlined" data-checklist sx={{borderRadius: 1.5, overflow: 'hidden', bgcolor: 'background.paper'}}>
+            <Stack
+                direction="row" spacing={1} role="button" aria-expanded={open} onClick={() => setChoice(!open)}
+                sx={{alignItems: 'center', px: 1.5, py: 0.75, cursor: 'default', userSelect: 'none', '&:hover': {bgcolor: 'action.hover'}}}
+            >
+                <Typography variant="body2" sx={{fontWeight: 600, color: 'text.primary', flexShrink: 0}}>{t('projects.transcript.checklist', {defaultValue: 'Progress'})}</Typography>
+                <Typography variant="body2" sx={{color: 'text.secondary', flexShrink: 0, fontVariantNumeric: 'tabular-nums'}}>
+                    {t('projects.transcript.checklistCount', {defaultValue: '{{done}} of {{total}} done', done, total: todos.length})}
+                </Typography>
+                {!open && current && <Typography variant="body2" noWrap sx={{color: 'text.secondary', minWidth: 0}}>· {current.activeForm || current.content}</Typography>}
+                <Box sx={{flex: 1}}/>
+                {open ? <ExpandMore sx={{fontSize: 16, color: 'text.secondary'}}/> : <ChevronRight sx={{fontSize: 16, color: 'text.secondary'}}/>}
+            </Stack>
+            <Collapse in={open} unmountOnExit>
+                <Stack component="ul" spacing={0.5} sx={{m: 0, listStyle: 'none', px: 1.5, pb: 1, pt: 0.5, borderTop: 1, borderColor: 'divider'}}>
+                    {todos.map((x, i) => (
+                        <Stack component="li" key={i} direction="row" spacing={1} sx={{alignItems: 'flex-start'}}>
+                            <Box sx={{width: 16, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>
+                                {x.status === 'completed'
+                                    ? <CheckCircle sx={{fontSize: 16, color: 'success.main'}}/>
+                                    : x.status === 'in_progress' && working
+                                        ? <CircularProgress size={12}/>
+                                        : <Box sx={{width: 12, height: 12, borderRadius: '50%', border: 1.5, borderColor: x.status === 'in_progress' ? 'primary.main' : 'text.disabled'}}/>}
+                            </Box>
+                            <Typography variant="body2" sx={{
+                                color: x.status === 'pending' ? 'text.secondary' : 'text.primary',
+                                fontWeight: x.status === 'in_progress' ? 600 : 400,
+                                textDecoration: x.status === 'completed' ? 'line-through' : 'none',
+                                textDecorationColor: 'text.disabled',
+                                wordBreak: 'break-word',
+                            }}>
+                                {x.status === 'in_progress' ? x.activeForm || x.content : x.content}
+                            </Typography>
+                        </Stack>
+                    ))}
+                </Stack>
+            </Collapse>
+        </Paper>
+    );
+};
+
 const VERB_DEFAULTS: Record<WorkingVerb, string> = {
     thinking: 'Thinking', running: 'Running a command', reading: 'Reading', editing: 'Editing',
     searching: 'Searching the web', delegating: 'Waiting on a subagent', working: 'Working',
@@ -651,10 +703,12 @@ const Transcript = ({blocks, pendingRequestId, working, expandAll = false, onRes
     // While a request waits, its card is the live part; otherwise the turn
     // gets a line saying what it does and for how long.
     const showWorking = working && !pendingRequestId;
+    const todos = latestTodos(blocks);
 
     return (
         <TranscriptHostProvider drafts={drafts} codeBlock={codeBlock} attachments={attachments} rememberLabel={rememberLabel}>
             <Stack spacing={2.5}>
+                {todos && <Box sx={{position: 'sticky', top: 0, zIndex: 1}}><ChecklistCard todos={todos} working={working}/></Box>}
                 <BlockList anchored blocks={blocks} pendingRequestId={pendingRequestId} working={working} expandAll={expandAll} onRespond={onRespond} newFrom={firstNewBlock(blocks, newSince)}/>
                 {showWorking && <WorkingLine blocks={blocks}/>}
             </Stack>

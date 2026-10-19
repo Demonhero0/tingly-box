@@ -311,3 +311,23 @@ describe('host extensions', () => {
         expect(screen.getAllByText('Do it')).toHaveLength(2);
     });
 });
+
+describe('checklist card', () => {
+    const write = (todos: unknown) => buildTranscript([
+        {role: 'user', content: 'go', timestamp: '2026-10-04T00:00:00Z'},
+        {kind: 'tool_use', content: 'TodoWrite', request_id: 't', payload: {todos}, timestamp: '2026-10-04T00:00:01Z'},
+    ]);
+
+    it('pins the progress list, open while work remains', () => {
+        render(<Transcript blocks={write([{content: 'Plan', status: 'completed'}, {content: 'Build', activeForm: 'Building', status: 'in_progress'}, {content: 'Ship', status: 'pending'}])} working onRespond={vi.fn()} drafts={drafts}/>);
+        expect(screen.getByText('{{done}} of {{total}} done')).toBeInTheDocument();
+        expect(screen.getByText('Building')).toBeInTheDocument();
+        expect(screen.getByText('Ship')).toBeInTheDocument();
+    });
+
+    it('folds once everything is done', () => {
+        render(<Transcript blocks={write([{content: 'Plan', status: 'completed'}])} working={false} onRespond={vi.fn()} drafts={drafts}/>);
+        expect(screen.getByText('{{done}} of {{total}} done')).toBeInTheDocument();
+        expect(screen.queryByText('Plan')).not.toBeInTheDocument();
+    });
+});

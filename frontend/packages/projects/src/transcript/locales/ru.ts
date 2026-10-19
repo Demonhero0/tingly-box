@@ -12,6 +12,8 @@ export default {
       "approve": "Разрешить",
       "background": "в фоне",
       "callFailed": "сбой",
+      "checklist": "Ход работы",
+      "checklistCount": "Готово {{done}} из {{total}}",
       "decline": "Отклонить",
       "deny": "Запретить",
       "details": "Подробности",

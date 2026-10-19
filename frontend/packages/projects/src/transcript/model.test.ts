@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {TranscriptEntry} from './model';
-import {agentReport, approvalSubject, buildTranscript, firstNewBlock, formatTokens, pendingRequestId, requestOutcome, toolSummary, workingState} from './model';
+import {agentReport, approvalSubject, buildTranscript, firstNewBlock, formatTokens, latestTodos, pendingRequestId, requestOutcome, toolSummary, workingState} from './model';
 
 const msg = (m: Partial<TranscriptEntry>): TranscriptEntry => ({content: '', timestamp: '2026-01-01T00:00:00Z', ...m});
 
@@ -235,5 +235,26 @@ describe('workingState', () => {
         expect(at(msg({kind: 'tool_use', content: 'mcp__x__y', request_id: 't1'})).verb).toBe('working');
         expect(at(msg({kind: 'tool_use', content: 'Edit', request_id: 't1'}), msg({kind: 'tool_result', content: 'ok', request_id: 't1'})).verb).toBe('thinking');
         expect(at(msg({kind: 'thinking', content: 'hmm'})).verb).toBe('thinking');
+    });
+});
+
+describe('latestTodos', () => {
+    const write = (id: string, todos: unknown) => msg({kind: 'tool_use', content: 'TodoWrite', request_id: id, payload: {todos}});
+
+    it('reads the last TodoWrite, which rewrites the whole list', () => {
+        const blocks = buildTranscript([
+            msg({role: 'user', content: 'go'}),
+            write('a', [{content: 'one', status: 'pending'}, {content: 'two', status: 'pending'}]),
+            write('b', [{content: 'one', status: 'completed'}, {content: 'two', activeForm: 'Doing two', status: 'in_progress'}, {content: '', status: 'pending'}]),
+        ]);
+        expect(latestTodos(blocks)).toEqual([
+            {content: 'one', activeForm: undefined, status: 'completed'},
+            {content: 'two', activeForm: 'Doing two', status: 'in_progress'},
+        ]);
+    });
+
+    it('is undefined without a usable list', () => {
+        expect(latestTodos(buildTranscript([msg({role: 'user', content: 'go'}), write('a', 'nope')]))).toBeUndefined();
+        expect(latestTodos(buildTranscript([msg({role: 'user', content: 'go'})]))).toBeUndefined();
     });
 });
