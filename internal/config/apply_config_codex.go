@@ -49,17 +49,24 @@ const codexModelCatalogSchema = "https://raw.githubusercontent.com/tingly-dev/ti
 // TOML. Scope is deliberately limited to model/reasoning knobs (not
 // approval_policy / sandbox_mode safety toggles).
 type CodexPrefs struct {
-	ModelReasoningEffort            string `json:"model_reasoning_effort,omitempty"`
-	ModelReasoningSummary           string `json:"model_reasoning_summary,omitempty"`
-	ModelVerbosity                  string `json:"model_verbosity,omitempty"`
-	ModelSupportsReasoningSummaries string `json:"model_supports_reasoning_summaries,omitempty"`
+	ModelReasoningEffort  string `json:"model_reasoning_effort,omitempty"`
+	ModelReasoningSummary string `json:"model_reasoning_summary,omitempty"`
+	ModelVerbosity        string `json:"model_verbosity,omitempty"`
 
 	// Catalog-only tunables: they are not config.toml keys (toConfig skips
-	// them) but shape the generated tingly-model-catalog.json. Decimal percent
-	// strings; "" or an out-of-range value means the built-in default.
+	// them) but shape the generated tingly-model-catalog.json. The percent
+	// fields are decimal strings ("" or out of range = built-in default);
+	// SupportsReasoningSummaries is "true" or "" and sets each catalog entry's
+	// supports_reasoning_summaries (Codex's config.toml no longer has a
+	// model_supports_reasoning_summaries key).
+	SupportsReasoningSummaries    string `json:"supports_reasoning_summaries,omitempty"`
 	EffectiveContextWindowPercent string `json:"effective_context_window_percent,omitempty"`
 	AutoCompactPercent            string `json:"auto_compact_percent,omitempty"`
 }
+
+// codexLegacySupportsSummariesKey is the config.toml key older versions wrote;
+// removed from Codex's config schema, now expressed per catalog entry.
+const codexLegacySupportsSummariesKey = "model_supports_reasoning_summaries"
 
 // Bounds for the catalog headroom percentages. Below the floor a session would
 // compact almost immediately; above 100 is meaningless.
@@ -124,9 +131,6 @@ func (p *CodexPrefs) toConfig() map[string]interface{} {
 	setEnum("model_reasoning_effort", p.ModelReasoningEffort)
 	setEnum("model_reasoning_summary", p.ModelReasoningSummary)
 	setEnum("model_verbosity", p.ModelVerbosity)
-	if strings.TrimSpace(p.ModelSupportsReasoningSummaries) == "true" {
-		out["model_supports_reasoning_summaries"] = true
-	}
 	return out
 }
 
@@ -172,15 +176,16 @@ func CodexPrefsFromConfig(cfg map[string]interface{}) *CodexPrefs {
 			prefs.ModelVerbosity = val
 		}
 	}
-	// model_supports_reasoning_summaries maps true -> "true"; anything else
-	// (false, missing, non-bool) leaves it unset, matching toConfig's stance
-	// that only an explicit "true" opts in. Accept both a native TOML bool and
-	// the string form (older files / hand-edits).
-	if v, ok := cfg["model_supports_reasoning_summaries"]; ok {
+	// Legacy: older tingly-box versions wrote model_supports_reasoning_summaries
+	// to config.toml (the key is no longer in Codex's schema). Read it so an
+	// existing opt-in survives the move to the catalog; the next apply drops it.
+	// true -> "true"; anything else leaves it unset. Accept both a native TOML
+	// bool and the string form (older files / hand-edits).
+	if v, ok := cfg[codexLegacySupportsSummariesKey]; ok {
 		if b, ok := v.(bool); ok && b {
-			prefs.ModelSupportsReasoningSummaries = "true"
+			prefs.SupportsReasoningSummaries = "true"
 		} else if s, ok := v.(string); ok && strings.TrimSpace(s) == "true" {
-			prefs.ModelSupportsReasoningSummaries = "true"
+			prefs.SupportsReasoningSummaries = "true"
 		}
 	}
 	return prefs
@@ -271,8 +276,7 @@ func ApplyCodexConfig(baseURL string, models []string, prefs *CodexPrefs, writeC
 //   - `[profiles.<sanitized(model)>]` for each model — overwritten unconditionally
 //     under that key; `agent restore codex` recovers the previous file if needed
 //   - the whitelisted user prefs (see codexPrefSpec, e.g.
-//     `model_reasoning_effort`, `model_reasoning_summary`,
-//     `model_supports_reasoning_summaries`, `model_verbosity`) at the top level
+//     `model_reasoning_effort`, `model_reasoning_summary`, `model_verbosity`) at the top level
 //     and inside each managed profile
 //
 // Note: Codex's `model_catalog_json` REPLACES the bundled catalog (it does not
@@ -412,6 +416,7 @@ func mergeCodexConfig(cfg map[string]interface{}, baseURL string, models []strin
 	// self-contained. Converted first so it can never carry a managed key.
 	coerced := prefs.toConfig()
 	maps.Copy(cfg, coerced)
+	delete(cfg, codexLegacySupportsSummariesKey)
 
 	// Managed fields — written after prefs so they always win, guaranteeing
 	// prefs cannot clobber them (defense in depth on top of the whitelist).
@@ -498,6 +503,7 @@ func RenderCodexModelCatalog(models []string, contextWindows map[string]int) ([]
 // effective-window and auto-compact percentages taken from prefs (nil = defaults).
 func RenderCodexModelCatalogWithPrefs(models []string, contextWindows map[string]int, prefs *CodexPrefs) ([]byte, error) {
 	effectivePct, compactPct := prefs.contextHeadroom()
+	supportsSummaries := prefs != nil && strings.TrimSpace(prefs.SupportsReasoningSummaries) == "true"
 	// supported_reasoning_levels is Vec<ReasoningEffortPreset>, not a bare
 	// string list — each element is an {effort, description} object. Values
 	// mirror Codex's bundled catalog for GPT-5 so /model shows the familiar
@@ -529,7 +535,7 @@ func RenderCodexModelCatalogWithPrefs(models []string, contextWindows map[string
 			"supported_in_api":                 true,
 			"priority":                         0,
 			"base_instructions":                "",
-			"supports_reasoning_summaries":     false,
+			"supports_reasoning_summaries":     supportsSummaries,
 			"default_reasoning_summary":        "none",
 			"support_verbosity":                false,
 			"truncation_policy":                map[string]interface{}{"mode": "tokens", "limit": 10000},
@@ -564,15 +570,19 @@ func restoreCodexCatalogHeadroom(prefs *CodexPrefs, cfg map[string]interface{}) 
 	}
 	var catalog struct {
 		Models []struct {
-			ContextWindow    int `json:"context_window"`
-			AutoCompactLimit int `json:"auto_compact_token_limit"`
-			EffectivePercent int `json:"effective_context_window_percent"`
+			ContextWindow     int  `json:"context_window"`
+			AutoCompactLimit  int  `json:"auto_compact_token_limit"`
+			EffectivePercent  int  `json:"effective_context_window_percent"`
+			SupportsSummaries bool `json:"supports_reasoning_summaries"`
 		} `json:"models"`
 	}
 	if json.Unmarshal(raw, &catalog) != nil || len(catalog.Models) == 0 {
 		return
 	}
 	m := catalog.Models[0]
+	if m.SupportsSummaries {
+		prefs.SupportsReasoningSummaries = "true"
+	}
 	if m.EffectivePercent != codexEffectiveContextWindowPercent && m.EffectivePercent >= codexMinContextPercent && m.EffectivePercent <= codexMaxContextPercent {
 		prefs.EffectiveContextWindowPercent = strconv.Itoa(m.EffectivePercent)
 	}

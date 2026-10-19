@@ -11633,13 +11633,13 @@
             "type": "string",
             "description": "Field model_reasoning_summary"
           },
-          "model_supports_reasoning_summaries": {
-            "type": "string",
-            "description": "Field model_supports_reasoning_summaries"
-          },
           "model_verbosity": {
             "type": "string",
             "description": "Field model_verbosity"
+          },
+          "supports_reasoning_summaries": {
+            "type": "string",
+            "description": "Field supports_reasoning_summaries"
           }
         }
       },

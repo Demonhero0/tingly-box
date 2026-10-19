@@ -539,10 +539,9 @@ func TestApplyCodexConfig_PrefsAppliedTopLevelAndPerProfile(t *testing.T) {
 	t.Setenv("HOME", tempDir)
 
 	prefs := &CodexPrefs{
-		ModelReasoningEffort:            "high",
-		ModelReasoningSummary:           "detailed",
-		ModelVerbosity:                  "low",
-		ModelSupportsReasoningSummaries: "true",
+		ModelReasoningEffort:  "high",
+		ModelReasoningSummary: "detailed",
+		ModelVerbosity:        "low",
 	}
 	if _, err := ApplyCodexConfig("http://h/tingly/codex", []string{"tingly-codex"}, prefs, true); err != nil {
 		t.Fatalf("ApplyCodexConfig: %v", err)
@@ -558,9 +557,6 @@ func TestApplyCodexConfig_PrefsAppliedTopLevelAndPerProfile(t *testing.T) {
 	}
 	if cfg["model_verbosity"] != "low" {
 		t.Errorf("top model_verbosity = %v, want low", cfg["model_verbosity"])
-	}
-	if cfg["model_supports_reasoning_summaries"] != true {
-		t.Errorf("top model_supports_reasoning_summaries = %v, want true", cfg["model_supports_reasoning_summaries"])
 	}
 	// Per-profile (self-contained)
 	profiles, _ := cfg["profiles"].(map[string]interface{})
@@ -578,8 +574,7 @@ func TestApplyCodexConfig_PrefsRejectInvalidEnumAndCannotClobberManaged(t *testi
 	t.Setenv("HOME", tempDir)
 
 	prefs := &CodexPrefs{
-		ModelReasoningEffort:            "bogus", // invalid enum -> dropped
-		ModelSupportsReasoningSummaries: "yes",   // not "true" -> dropped
+		ModelReasoningEffort: "bogus", // invalid enum -> dropped
 	}
 	if _, err := ApplyCodexConfig("http://h/tingly/codex", []string{"m1"}, prefs, true); err != nil {
 		t.Fatalf("ApplyCodexConfig: %v", err)
@@ -588,9 +583,6 @@ func TestApplyCodexConfig_PrefsRejectInvalidEnumAndCannotClobberManaged(t *testi
 	cfg := loadCodexConfigForTest(t, filepath.Join(tempDir, ".codex", "config.toml"))
 	if _, ok := cfg["model_reasoning_effort"]; ok {
 		t.Errorf("invalid enum should be dropped, got %v", cfg["model_reasoning_effort"])
-	}
-	if _, ok := cfg["model_supports_reasoning_summaries"]; ok {
-		t.Errorf("non-true bool should be dropped, got %v", cfg["model_supports_reasoning_summaries"])
 	}
 	// Managed fields remain controlled by tingly-box.
 	if cfg["model_provider"] != "tingly-box" {
@@ -619,7 +611,7 @@ func TestCodexPrefsFromConfig(t *testing.T) {
 	assert.Equal(t, "high", prefs.ModelReasoningEffort)
 	assert.Equal(t, "detailed", prefs.ModelReasoningSummary)
 	assert.Equal(t, "low", prefs.ModelVerbosity)
-	assert.Equal(t, "true", prefs.ModelSupportsReasoningSummaries)
+	assert.Equal(t, "true", prefs.SupportsReasoningSummaries) // legacy key still read
 }
 
 // Enum values outside the allowed set are dropped (forward-compatible,
@@ -636,7 +628,7 @@ func TestCodexPrefsFromConfig_DropsInvalidEnum(t *testing.T) {
 	assert.Empty(t, prefs.ModelReasoningEffort)
 	assert.Equal(t, "concise", prefs.ModelReasoningSummary)
 	assert.Empty(t, prefs.ModelVerbosity)
-	assert.Empty(t, prefs.ModelSupportsReasoningSummaries)
+	assert.Empty(t, prefs.SupportsReasoningSummaries)
 }
 
 // max / ultra are advertised by current Codex models (models.json
@@ -660,9 +652,8 @@ func TestCodexPrefs_RoundTrip(t *testing.T) {
 	cases := []*CodexPrefs{
 		{},
 		DefaultCodexPrefs(),
-		{ModelReasoningEffort: "high", ModelReasoningSummary: "detailed", ModelVerbosity: "low", ModelSupportsReasoningSummaries: "true"},
+		{ModelReasoningEffort: "high", ModelReasoningSummary: "detailed", ModelVerbosity: "low"},
 		{ModelReasoningEffort: "none", ModelReasoningSummary: "none"},
-		{ModelSupportsReasoningSummaries: "true"},
 	}
 	for i, original := range cases {
 		out := CodexPrefsFromConfig(original.toConfig())
@@ -932,4 +923,42 @@ func TestReadCodexConfig_RestoresCatalogHeadroom(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, prefs.EffectiveContextWindowPercent)
 	assert.Empty(t, prefs.AutoCompactPercent)
+}
+
+// Codex's config.toml schema no longer has model_supports_reasoning_summaries:
+// the toggle now lands on each catalog entry, and a legacy key left by older
+// versions is removed on the next apply.
+func TestApplyCodexConfig_SupportsSummariesMovesToCatalog(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+	codexDir := filepath.Join(tempDir, ".codex")
+	require.NoError(t, os.MkdirAll(codexDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(codexDir, "config.toml"), []byte("model_supports_reasoning_summaries = true\n"), 0644))
+
+	_, err := ApplyCodexConfig("http://h/tingly/codex", []string{"m"}, &CodexPrefs{SupportsReasoningSummaries: "true"}, true)
+	require.NoError(t, err)
+
+	cfg := loadCodexConfigForTest(t, filepath.Join(codexDir, "config.toml"))
+	_, hasLegacy := cfg["model_supports_reasoning_summaries"]
+	assert.False(t, hasLegacy, "legacy config.toml key must be removed")
+	profiles, _ := cfg["profiles"].(map[string]interface{})
+	profile, _ := profiles["m"].(map[string]interface{})
+	_, profileHasLegacy := profile["model_supports_reasoning_summaries"]
+	assert.False(t, profileHasLegacy)
+
+	raw, err := os.ReadFile(filepath.Join(codexDir, "tingly-model-catalog.json"))
+	require.NoError(t, err)
+	var catalog struct {
+		Models []struct {
+			Supports bool `json:"supports_reasoning_summaries"`
+		} `json:"models"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &catalog))
+	require.Len(t, catalog.Models, 1)
+	assert.True(t, catalog.Models[0].Supports)
+
+	// Reads back from the catalog even without the legacy key.
+	prefs, _, _, err := ReadCodexConfig()
+	require.NoError(t, err)
+	assert.Equal(t, "true", prefs.SupportsReasoningSummaries)
 }

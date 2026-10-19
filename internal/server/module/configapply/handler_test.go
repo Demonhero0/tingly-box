@@ -110,7 +110,7 @@ wire_api = "responses"
 	assert.Equal(t, "high", response.Preferences.ModelReasoningEffort)
 	assert.Equal(t, "detailed", response.Preferences.ModelReasoningSummary)
 	assert.Equal(t, "low", response.Preferences.ModelVerbosity)
-	assert.Equal(t, "true", response.Preferences.ModelSupportsReasoningSummaries)
+	assert.Equal(t, "true", response.Preferences.SupportsReasoningSummaries)
 }
 
 // A config.toml with no tingly footprint reads as not-applied: the form falls

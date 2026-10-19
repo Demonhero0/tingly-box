@@ -23,7 +23,7 @@ export interface CodexPrefs {
     model_reasoning_effort?: string;
     model_reasoning_summary?: string;
     model_verbosity?: string;
-    model_supports_reasoning_summaries?: string; // "true" | ""
+    supports_reasoning_summaries?: string; // "true" | "" — catalog-only
     // Catalog-only (tingly-model-catalog.json, not config.toml keys): decimal
     // percent strings, "" = tingly-box default.
     effective_context_window_percent?: string;
@@ -50,7 +50,7 @@ const CODEX_PREF_KEYS = [
     'model_reasoning_effort',
     'model_reasoning_summary',
     'model_verbosity',
-    'model_supports_reasoning_summaries',
+    'supports_reasoning_summaries',
     'effective_context_window_percent',
     'auto_compact_percent',
 ] as const satisfies readonly (keyof CodexPrefs)[];
@@ -94,7 +94,7 @@ const FIELD_STRUCT: FieldStruct[] = [
     { key: 'model_reasoning_effort', kind: 'enum', enumValues: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
     { key: 'model_reasoning_summary', kind: 'enum', enumValues: ['auto', 'concise', 'detailed', 'none'] },
     { key: 'model_verbosity', kind: 'enum', enumValues: ['low', 'medium', 'high'] },
-    { key: 'model_supports_reasoning_summaries', kind: 'bool' },
+    { key: 'supports_reasoning_summaries', kind: 'bool' },
     { key: 'effective_context_window_percent', kind: 'percent' },
     { key: 'auto_compact_percent', kind: 'percent' },
 ];
@@ -125,10 +125,10 @@ const FIELDS_TEXT_ZH: FieldTextMap = {
         purpose: '控制回复的啰嗦程度',
         tooltip: 'low 适合简洁的编码助手；high 会给更多解释。留空则用 Codex 默认（medium）。',
     },
-    model_supports_reasoning_summaries: {
+    supports_reasoning_summaries: {
         label: '强制推理摘要',
         purpose: '在非 OpenAI 模型上强制开启推理摘要',
-        tooltip: '经 tingly-box 转发的模型需要打开此项才能正常返回推理摘要。tb 默认开启。',
+        tooltip: '经 tingly-box 转发的模型需要打开此项才能正常返回推理摘要。写入模型目录每个条目的 supports_reasoning_summaries（Codex 的 config.toml 已无对应键），需开启“写入模型目录”才生效。',
     },
     effective_context_window_percent: {
         label: '可用窗口比例 (%)',
@@ -158,10 +158,10 @@ const FIELDS_TEXT_EN: FieldTextMap = {
         purpose: 'How chatty the reply is',
         tooltip: 'low suits a concise coding assistant; high gives more explanation. Empty = Codex default (medium).',
     },
-    model_supports_reasoning_summaries: {
+    supports_reasoning_summaries: {
         label: 'Force reasoning summaries',
         purpose: 'Force reasoning summaries on non-OpenAI models',
-        tooltip: 'Models proxied through tingly-box need this on to return reasoning summaries. tb enables it by default.',
+        tooltip: 'Models proxied through tingly-box need this on to return reasoning summaries. Written to each model catalog entry as supports_reasoning_summaries (Codex\'s config.toml no longer has a matching key), so it only takes effect with "Write model catalog" on.',
     },
     effective_context_window_percent: {
         label: 'Usable window (%)',
@@ -191,10 +191,10 @@ const FIELDS_TEXT_RU: FieldTextMap = {
         purpose: 'Насколько развёрнуто отвечает модель',
         tooltip: 'low подходит для лаконичного помощника по коду; high даёт больше пояснений. Пусто — значение Codex по умолчанию (medium).',
     },
-    model_supports_reasoning_summaries: {
+    supports_reasoning_summaries: {
         label: 'Сводки принудительно',
         purpose: 'Включить сводки рассуждений для моделей не от OpenAI',
-        tooltip: 'Моделям, проксируемым через tingly-box, эта опция нужна, чтобы возвращать сводки рассуждений. tb включает её по умолчанию.',
+        tooltip: 'Моделям, проксируемым через tingly-box, эта опция нужна, чтобы возвращать сводки рассуждений. Записывается в каждую запись каталога как supports_reasoning_summaries (в config.toml Codex такого ключа больше нет), поэтому работает только при включённом «Каталоге моделей».',
     },
     effective_context_window_percent: {
         label: 'Доступное окно (%)',

@@ -66,7 +66,10 @@ type CodexPrefs struct {
     ModelReasoningEffort            string `json:"model_reasoning_effort,omitempty"`
     ModelReasoningSummary           string `json:"model_reasoning_summary,omitempty"`
     ModelVerbosity                  string `json:"model_verbosity,omitempty"`
-    ModelSupportsReasoningSummaries string `json:"model_supports_reasoning_summaries,omitempty"`
+    // Catalog-only (not config.toml keys; see §"Schema alignment" below):
+    SupportsReasoningSummaries      string `json:"supports_reasoning_summaries,omitempty"`
+    EffectiveContextWindowPercent   string `json:"effective_context_window_percent,omitempty"`
+    AutoCompactPercent              string `json:"auto_compact_percent,omitempty"`
 }
 ```
 
@@ -85,7 +88,8 @@ self-contained.
 
 ## 4. Conservative defaults (the third-party decision)
 
-The original code hardcoded `model_supports_reasoning_summaries = true` and
+The original code hardcoded `model_supports_reasoning_summaries = true` (a key
+Codex's schema has since dropped; see "Schema alignment") and
 `model_reasoning_summary = "auto"`. That is correct for OpenAI o-series
 models, which natively return reasoning summaries via the Responses API's
 `reasoning.summary` field. It is **wrong by default for third-party models**
@@ -202,7 +206,7 @@ what changed:
     "model_reasoning_effort": "high",
     "model_reasoning_summary": "",
     "model_verbosity": "",
-    "model_supports_reasoning_summaries": ""
+    "supports_reasoning_summaries": ""
   },
   "writeCatalog": true          // null → true
 }
@@ -267,7 +271,18 @@ and `auto_compact_percent` (decimal strings, range 50–100, `""` = default) but
 `model_reasoning_effort` accepts `max` and `ultra` in addition to the older
 tiers — current Codex models advertise them in `supported_reasoning_levels`.
 
-Open schema finding: the current upstream `config.schema.json` no longer lists
-`model_supports_reasoning_summaries` at the root or under profiles (it lives on
-the per-model catalog entry as `supports_reasoning_summaries`). We still emit
-the key; Codex ignores unknown keys at runtime but schema validators flag it.
+## Schema alignment: `supports_reasoning_summaries` (2026-10-19)
+
+The current upstream `config.schema.json` (root and `ConfigProfile` are
+`additionalProperties: false`) no longer has `model_supports_reasoning_summaries`.
+The per-model equivalent is the catalog entry's `supports_reasoning_summaries`,
+so the "Force reasoning summaries" toggle is now the catalog-only pref
+`supports_reasoning_summaries`: it sets that field on every entry of
+`tingly-model-catalog.json` and is never written to `config.toml`.
+
+- It therefore only takes effect when "Write model catalog" is on.
+- Migration: `CodexPrefsFromConfig` still reads the legacy
+  `model_supports_reasoning_summaries` key so an existing opt-in is not lost, and
+  `mergeCodexConfig` deletes it from the top level on the next apply (managed
+  profiles are rebuilt, so they never carry it). `ReadCodexConfig` also restores
+  the pref from the applied catalog.
