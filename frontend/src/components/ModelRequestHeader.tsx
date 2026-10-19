@@ -373,7 +373,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
 
                 {onEndpointSelect && (
                     <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
-                        <Tooltip title={endpointApplicable ? 'Choose the upstream OpenAI endpoint for this rule' : t('ruleHeader.endpointNotApplicable')}>
+                        <Tooltip title={endpointApplicable ? 'Choose the upstream endpoint for this rule' : t('ruleHeader.endpointNotApplicable')}>
                             <span>
                                 <Button
                                     size="small"
@@ -381,13 +381,13 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                                     color={endpointSelection === 'auto' ? 'inherit' : 'primary'}
                                     endIcon={responsesProbing ? <CircularProgress size={12} /> : <ExpandMoreIcon sx={{fontSize: 14}} />}
                                     disabled={!active || responsesProbing}
-                                    aria-label={`OpenAI endpoint: ${endpointSelection}`}
+                                    aria-label={`Upstream endpoint: ${endpointSelection}`}
                                     aria-haspopup="menu"
                                     aria-expanded={Boolean(endpointMenuAnchor)}
                                     onClick={(e) => setEndpointMenuAnchor(e.currentTarget)}
                                     sx={endpointSelection === 'auto' ? strategyButtonSx : highlightedStrategyButtonSx}
                                 >
-                                    Endpoint: {endpointSelection === 'auto' ? 'Auto' : endpointSelection === 'chat' ? 'Chat' : 'Responses'}
+                                    Endpoint: {endpointSelection === 'auto' ? 'Auto' : endpointSelection === 'chat' ? 'Chat' : endpointSelection === 'anthropic' ? 'Anthropic' : 'Responses'}
                                 </Button>
                             </span>
                         </Tooltip>
@@ -402,6 +402,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                                 ['auto', 'Auto', 'Use the model Catalog, then the provider setting; default to Chat. When both are supported, follow the client request.'],
                                 ['chat', 'Chat', 'Always send Chat Completions to the upstream provider.'],
                                 ['responses', 'Responses', 'Always send Responses to the upstream provider. Support is checked before saving.'],
+                                ['anthropic', 'Anthropic', 'Always send Anthropic Messages to the upstream provider, converting OpenAI clients. Providers without an Anthropic endpoint fall back to Auto.'],
                             ] as const).map(([value, label, description]) => (
                                 <MenuItem
                                     key={value}
