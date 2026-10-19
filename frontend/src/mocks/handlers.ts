@@ -1161,7 +1161,8 @@ const mockQuotas: Record<string, any> = {
         },
     },
 
-    // The key limit caps lifetime usage, not the month.
+    // The balance is the account's credits (/api/v1/credits), not the key's
+    // cap; the key limit caps lifetime usage, not the month.
     'mock-provider-openrouter': {
         provider_uuid: 'mock-provider-openrouter',
         provider_name: 'OpenRouter',
@@ -1169,6 +1170,19 @@ const mockQuotas: Record<string, any> = {
         fetched_at: now.toISOString(),
         expires_at: inOneHour,
         windows: [
+            {
+                key: 'balance',
+                type: 'balance',
+                kind: 'resource',
+                available: 11.9,
+                used: 8.1,
+                limit: 20,
+                used_percent: 40.5,
+                unit: 'currency',
+                currency_code: 'USD',
+                label: 'Balance',
+                description: 'Balance: $11.90 (purchased $20.00, used $8.10)',
+            },
             {
                 key: 'monthly',
                 type: 'monthly',
@@ -1182,19 +1196,22 @@ const mockQuotas: Record<string, any> = {
                 description: 'This month: $8.1000 (no limit set)',
             },
         ],
-        account: { id: 'user_xxx', tier: 'free' },
+        account: { id: 'user_xxx', tier: 'paid' },
         raw_response: {
-            data: {
-                label: 'sk-or-v1-c1a...5a2',
-                limit: null,
-                limit_remaining: null,
-                usage: 8.1,
-                usage_daily: 0.4,
-                usage_weekly: 2.2,
-                usage_monthly: 8.1,
-                is_free_tier: true,
-                creator_user_id: 'user_xxx',
+            key: {
+                data: {
+                    label: 'sk-or-v1-c1a...5a2',
+                    limit: null,
+                    limit_remaining: null,
+                    usage: 8.1,
+                    usage_daily: 0.4,
+                    usage_weekly: 2.2,
+                    usage_monthly: 8.1,
+                    is_free_tier: false,
+                    creator_user_id: 'user_xxx',
+                },
             },
+            credits: { data: { total_credits: 20, total_usage: 8.1 } },
         },
     },
 

@@ -134,14 +134,17 @@ export function QuotaCell({ quota, refreshing, onRefresh }: QuotaCellProps) {
 
     // Allowances are named by period ("5h", "7d") when that tells them apart —
     // short and scannable down a column. Two of the same period (e.g.
-    // per-model daily limits) need their own labels instead. Money reads as
-    // "Balance" (the currency is in the figure), a spend by its period.
+    // per-model daily limits) need their own labels instead. A balance reads
+    // as "Balance" (the currency is in the figure); other money, such as a
+    // key's spending cap, keeps its own label; a spend reads by its period.
     const periods = allowanceLines.map(({ item }) => periodLabel(item.window.window_minutes));
     const periodsDistinct = periods.every(p => p) && new Set(periods).size === periods.length;
     const nameOf = (line: CellLine, i: number): string | undefined => {
         if (line.kind === 'allowance') return periodsDistinct ? periods[i] : line.item.label;
         if (line.kind === 'spend') return periodLabel(line.item.window.window_minutes) ?? line.item.label;
-        return isMoney(line.item.window) ? t('providerTable.quota.balance') : line.item.label;
+        return isMoney(line.item.window) && line.item.window.type === 'balance'
+            ? t('providerTable.quota.balance')
+            : line.item.label;
     };
 
     const now = Date.now();
