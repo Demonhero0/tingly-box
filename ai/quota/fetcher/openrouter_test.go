@@ -71,8 +71,8 @@ func TestOpenRouterFetcher_Fetch(t *testing.T) {
 	if balance.Available == nil || *balance.Available != 84.5 {
 		t.Errorf("Balance.Available = %v, want 84.5", balance.Available)
 	}
-	if balance.Limit != 120 || balance.Used != 35.5 {
-		t.Errorf("Balance = %v/%v, want 35.5 used of 120 purchased", balance.Used, balance.Limit)
+	if !balance.Unknown || balance.Countable() {
+		t.Error("all-time spent/purchased is not a runway figure; the balance must carry no percentage")
 	}
 
 	// Key limit window: a cap on the key, not a balance
@@ -277,6 +277,25 @@ func TestOpenRouterBalanceIsTheAccountsCredits(t *testing.T) {
 	}
 }
 
+// After several top-ups the all-time totals read 89% spent while $110 is left.
+// That ratio must not become the provider's figure: it would raise the 80%
+// warning and colour the ring red on an account with money in it.
+func TestOpenRouterBalanceAfterTopUpsIsNotNearlyExhausted(t *testing.T) {
+	usage := openrouterUsageWithCredits(t,
+		`{"data":{"limit":null,"usage":890,"creator_user_id":"u1"}}`,
+		`{"data":{"total_credits":1000,"total_usage":890}}`)
+
+	checkInvariants(t, usage)
+
+	balance := findWindow(t, usage, "balance")
+	if balance.Available == nil || *balance.Available != 110 {
+		t.Errorf("balance Available = %v, want 110", balance.Available)
+	}
+	if pct, ok := usage.Pct(); ok {
+		t.Errorf("Pct() = %v, %v; want no figure: neither the balance nor uncapped spend has a cap", pct, ok)
+	}
+}
+
 // limit - usage misses what OpenRouter itself counts against the cap (resets,
 // BYOK accounting); limit_remaining is its own figure, so it wins.
 func TestOpenRouterKeyLimitPrefersLimitRemaining(t *testing.T) {
@@ -312,8 +331,8 @@ func TestOpenRouterNoKeyLimitMeansUncapped(t *testing.T) {
 }
 
 func TestOpenRouterMonthlySpendNeverPosesAsACap(t *testing.T) {
-	// The key limit caps lifetime usage, not the month, so the monthly window
-	// has no cap even when a key limit is set. Left unflagged it read as
+	// The key limit is read as a lifetime cap, not a monthly one, so the
+	// monthly window has no cap even when a key limit is set. Left unflagged it read as
 	// "$8.10 of $0.00" and, being an allowance, sorted ahead of the real one.
 	usage := openrouterUsage(t,
 		`{"data":{"limit":20,"usage":8.1,"usage_monthly":8.1,"creator_user_id":"u1"}}`)

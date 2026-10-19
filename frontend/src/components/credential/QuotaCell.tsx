@@ -118,7 +118,11 @@ export function QuotaCell({ quota, refreshing, onRefresh }: QuotaCellProps) {
     };
     const described = windows.map(describe).filter((line): line is CellLine => !!line);
     const allowances = described.filter(line => line.kind === 'allowance');
-    const values = described.filter(line => line.kind !== 'allowance');
+    // A balance takes the first money slot, so a cap or a spend line is what
+    // "+N" hides, never the balance (see MAX_ALLOWANCE_LINES). The sort is stable.
+    const values = described
+        .filter(line => line.kind !== 'allowance')
+        .sort((a, b) => Number(b.item.window.type === 'balance') - Number(a.item.window.type === 'balance'));
     const allowanceLines = allowances.slice(0, MAX_ALLOWANCE_LINES);
     const primary = [...allowanceLines, ...values.slice(0, allowanceLines.length ? 1 : MAX_VALUE_LINES_ALONE)];
     const resources: CellLine[] = resourceItems

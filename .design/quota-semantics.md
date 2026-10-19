@@ -61,7 +61,7 @@ statusline 将可计量窗口写成 `Quota: … left`，余额窗口单独写成
 | MiniMax | 每模型两个区间（自己的 interval + 共享周），**counts 常为 0/0**，此时只有 `*_remaining_percent`；套餐捆绑视频/语音/图片/音乐 | — |
 | Kimi Code | 周额度 + N 个 limit（**部分不给时长**）；booster 钱包 | — |
 | Kimi K2 | `consumed` / `remaining` | 原始总额（只能合成） |
-| OpenRouter | 账户 credits（`/api/v1/credits`：累计充值、累计花费）；key 花费上限（可为 null，剩余见 `limit_remaining`）；日/周/月花费（**月花费永远无上限**——key limit 管终身不管当月） | 账户余额对普通 key 不保证（文档称仅 management key，普通 key 实测也有返回） |
+| OpenRouter | 账户 credits（`/api/v1/credits`：累计充值、累计花费）；key 花费上限（可为 null，剩余见 `limit_remaining`，`limit_reset` 可设日/周/月重置）；日/周/月花费 | 账户余额对普通 key 不保证（文档称仅 management key，普通 key 实测也有返回） |
 | OpenCode | Go 订阅三个窗口（5h 滚动 / 周 / 月）的百分比 + 重置时间 + `status` | 限额绝对值、窗口长度、**按量付费余额（无公开端点）**、免费额度（按 IP 计） |
 | OpenAI | 花费时序（`/v1/usage` 常 404） | 上限 |
 | Copilot / Cursor / VertexAI | 无配额 API | 一切 |
@@ -107,7 +107,7 @@ ResetsAt   什么时候回满。nil = 不会自己回来（要充钱）
 | | 会重置吗 | 耗尽意味着 | 例子 |
 |---|---|---|---|
 | **额度** `limit` | 会 | **等一会** | Anthropic 5h/7d、Codex 周窗口、MiniMax 区间/周 |
-| **资源** `resource` | 不会 | **得充钱** | OpenRouter 账户余额与 key 上限、KimiK2 credits、booster、重置券 |
+| **资源** `resource` | 不会 | **得充钱** | OpenRouter 账户余额、KimiK2 credits、booster、重置券；OpenRouter key 上限同属此类，但要调高上限而不是充钱 |
 
 区别只有一条：**耗尽后会不会自愈**。资源天然没有 `ResetsAt`，不需要更多枚举。
 
@@ -226,7 +226,7 @@ return w != nil && !w.Unknown && !w.Unlimited && w.Limit > 0
 | minimax | 只有文本模型答账户级，视频/语音/图片/音乐 → `feature`（判据 §3.5）；每模型两个窗口（自己的 interval + 共享周）；counts 0/0 时读 `*_remaining_percent`；两者皆无 → 不产出该窗口 |
 | kimi_code | booster → `resource`；weekly 补 7d；无时长 limit 保持 `custom` |
 | kimik2 | credits → `resource` |
-| openrouter | 账户余额（`/api/v1/credits`，拿不到就不出窗口）→ `balance`；key 上限 → `custom` + `resource`、标签 `Key Limit`、剩余取 `limit_remaining`（原先是 `balance`，界面把花费上限显示成余额）；月度花费两个分支都标 `Unlimited`（key limit 管终身不管当月）；去掉重复的第二个 monthly 窗口 |
+| openrouter | 账户余额（`/api/v1/credits`，拿不到就不出窗口）→ `balance` + `Unknown`，只报金额不报百分比（两项都是累计值，花费/充值不是余量，同 Codex credits）；key 上限 → `custom` + `resource`、标签 `Key Limit`、剩余取 `limit_remaining`（原先是 `balance`，界面把花费上限显示成余额）；`limit_reset`（日/周/月重置的上限）未建模，仍按终身上限报，所以月度花费两个分支都标 `Unlimited`；去掉重复的第二个 monthly 窗口 |
 | opencode | 三个窗口都是账户级 gate（网关任一打满即拒），交给 `Tightest()`；只有百分比 → 0-100 标度；滚动窗口长度上游不给，按其超限文案的 "5 hour" 取 300min；无 Go 订阅的 403 `EntitlementError` → `MarkUnreadable`（好 key，不是错误，更不是 0%）。详见 `.design/opencode-quota.md` |
 | openai | 有花费无上限 → `Unknown` 窗口（数值可见）；404 → 只记 `LastError` |
 | copilot / cursor / vertex_ai | 只记 `LastError`，不产出窗口 |
@@ -290,7 +290,7 @@ return w != nil && !w.Unknown && !w.Unlimited && w.Limit > 0
                      溢价额度：不可知（上游不肯说）
   MiniMax            区间(5h) 60% ←最紧 / 周 12%        60%    18:00
                      ·video 100%（feature，不替账户回答）
-  OpenRouter         余额 $8.10/$20 = 40% ←最紧         40%    nil（要充钱）
+  OpenRouter         key 上限 $8.10/$20 = 40% ←最紧     40%    nil（要调高上限）
                      月度花费：无上限（不算百分比）
   Copilot            无配额 API                         不可知  —
 ```

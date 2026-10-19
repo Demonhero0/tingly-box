@@ -127,18 +127,20 @@ func (f *OpenRouterFetcher) Fetch(ctx context.Context, provider *ai.Provider) (*
 		Tier: tier,
 	}
 
-	// The account's credits are the money requests are paid from. The balance
-	// can dip below zero, which OpenRouter answers with 402 even for free
-	// models; the window clamps at zero and the description keeps the sign.
+	// The account's credits are the money requests are paid from. Both totals
+	// are all-time, so spent/purchased is not a runway figure (after a few
+	// top-ups it reads nearly exhausted with plenty left); like Codex's
+	// credits, the balance is an amount without a percentage. It can dip
+	// below zero, which OpenRouter answers with 402 even for free models; the
+	// window clamps at zero and the description keeps the sign.
 	if credits != nil {
 		purchased, spent := credits.Data.TotalCredits, credits.Data.TotalUsage
 		balance := purchased - spent
 		available := max(balance, 0)
 		usage.AddWindow("balance", &quota.UsageWindow{
 			Type:         quota.WindowTypeBalance,
-			Used:         spent,
-			Limit:        purchased,
 			Available:    &available,
+			Unknown:      true,
 			Unit:         quota.UsageUnitCurrency,
 			CurrencyCode: "USD",
 			Label:        "Balance",
@@ -173,9 +175,10 @@ func (f *OpenRouterFetcher) Fetch(ctx context.Context, provider *ai.Provider) (*
 		})
 	}
 
-	// Monthly spend is never capped — the key limit caps lifetime usage, not
-	// the month — so this window has no cap in either branch and says so.
-	// A bare Limit of 0 would be read as a budget with nothing spent.
+	// Monthly spend is reported uncapped: the key limit is read as a lifetime
+	// cap (limit_reset is not modelled), so this window has no cap in either
+	// branch and says so. A bare Limit of 0 would be read as a budget with
+	// nothing spent.
 	monthly := &quota.UsageWindow{
 		Type:          quota.WindowTypeMonthly,
 		Used:          data.UsageMonthly,
