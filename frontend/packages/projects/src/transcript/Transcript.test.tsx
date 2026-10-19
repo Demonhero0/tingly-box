@@ -3,10 +3,10 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {DraftStorage} from './context';
 import {createMemoryDraftStorage} from './context';
 import Transcript from './Transcript';
-import type {TranscriptBlock, TranscriptEntry} from './model';
+import type {ActivityStep, TranscriptBlock, TranscriptEntry} from './model';
 import {buildTranscript} from './model';
 
-vi.mock('react-i18next', () => ({useTranslation: () => ({t: (_key: string, opts: {defaultValue: string}) => opts.defaultValue})}));
+vi.mock('react-i18next', () => ({useTranslation: () => ({t: (_key: string, opts: {defaultValue: string; count?: number}) => opts.defaultValue.replace('{{count}}', String(opts.count)).replace('Read 1 files', 'Read 1 file').replace('ran 1 commands', 'ran 1 command').replace('edited 1 files', 'edited 1 file')})}));
 // A fresh store per test; within one, it outlives unmounts like the host's does.
 let drafts: DraftStorage;
 beforeEach(() => {drafts = createMemoryDraftStorage();});
@@ -164,7 +164,7 @@ describe('settled requests', () => {
             msg({kind: 'tool_result', content: 'denied by user', request_id: 't2', payload: {is_error: true}}),
             msg({kind: 'tool_use', content: 'Edit', request_id: 't3', payload: {file_path: 'a.go'}}),
             msg({kind: 'approval_request', content: 'Edit', request_id: 'r3', payload: {file_path: 'a.go'}}),
-        ]);
+        ], {expandAll: true});
         expect(screen.getAllByText('make test')).toHaveLength(1);
         const allowed = document.querySelector<HTMLElement>('[data-call-ids="t1"]')!;
         expect(allowed).toHaveAttribute('data-request-id', 'r1');
@@ -208,6 +208,7 @@ describe('tool calls', () => {
 
     it('get one line each, with thinking folded into one Thought line', () => {
         renderEntries(run);
+        fireEvent.click(screen.getByRole('button', {name: /Read 1 file, ran 1 command/}));
         expect(screen.getAllByText('Thought')).toHaveLength(1);
         expect(screen.queryByText(/Used \d/)).not.toBeInTheDocument();
         const read = document.querySelector<HTMLElement>('[data-call-ids="t1"]')!;
@@ -220,6 +221,7 @@ describe('tool calls', () => {
 
     it('open to their input and output one at a time', () => {
         renderEntries(run);
+        fireEvent.click(screen.getByRole('button', {name: /Read 1 file, ran 1 command/}));
         const bash = document.querySelector<HTMLElement>('[data-call-ids="t2"]')!;
         fireEvent.click(within(bash).getByRole('button'));
         expect(within(bash).getByText(/"command": "go test/)).toBeInTheDocument();
@@ -329,5 +331,38 @@ describe('checklist card', () => {
         render(<Transcript blocks={write([{content: 'Plan', status: 'completed'}])} working={false} onRespond={vi.fn()} drafts={drafts}/>);
         expect(screen.getByText('{{done}} of {{total}} done')).toBeInTheDocument();
         expect(screen.queryByText('Plan')).not.toBeInTheDocument();
+    });
+});
+
+describe('run of calls', () => {
+    const call = (id: string, name: string, input: unknown, isError = false): ActivityStep => ({type: 'tool', id, name, input, isError, timestamp: '2026-10-04T00:00:00Z'});
+    const run = (...steps: ActivityStep[]): TranscriptBlock => ({type: 'activity', steps});
+    const shown = (blocks: TranscriptBlock[], working = false) =>
+        render(<Transcript blocks={blocks} working={working} onRespond={vi.fn()} drafts={drafts}/>);
+    const calls = [call('a', 'Read', {file_path: '/x/a.ts'}), call('b', 'Read', {file_path: '/x/b.ts'}), call('c', 'Bash', {command: 'go test'}), call('d', 'Edit', {file_path: '/x/a.ts'})];
+
+    it('folds a settled run into one line that says what it did, and opens to the calls', () => {
+        shown([run(...calls), {type: 'assistant', message: {content: 'done', timestamp: '2026-10-04T00:01:00Z'}}]);
+        const fold = screen.getByRole('button', {name: /Read 2 files, ran 1 command, edited 1 file/});
+        expect(screen.queryByText('go test')).not.toBeInTheDocument();
+        fireEvent.click(fold);
+        expect(screen.getByText('go test')).toBeInTheDocument();
+    });
+
+    it('keeps the run in progress open, and shows a failure on the fold', () => {
+        const {rerender} = shown([run(...calls)], true);
+        expect(screen.getByText('go test')).toBeInTheDocument();
+        rerender(<Transcript blocks={[run(call('a', 'Read', {}), call('b', 'Bash', {command: 'make'}, true)), {type: 'assistant', message: {content: 'x', timestamp: '2026-10-04T00:01:00Z'}}]} working={false} onRespond={vi.fn()} drafts={drafts}/>);
+        expect(screen.getByText('1 failed')).toBeInTheDocument();
+    });
+
+    it('leaves a lone call as its own row', () => {
+        shown([run(call('a', 'Bash', {command: 'ls'}))]);
+        expect(screen.getByText('ls')).toBeInTheDocument();
+    });
+
+    it('opens every fold under expand all', () => {
+        render(<Transcript blocks={[run(...calls), {type: 'assistant', message: {content: 'x', timestamp: '2026-10-04T00:01:00Z'}}]} working={false} expandAll onRespond={vi.fn()} drafts={drafts}/>);
+        expect(screen.getByText('go test')).toBeInTheDocument();
     });
 });

@@ -1,16 +1,16 @@
-import {Block, Build, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Help, Psychology, Robot, Terminal} from '@tingly/ui/icons';
+import {Block, Build, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Help, Info, Psychology, Robot, Terminal} from '@tingly/ui/icons';
 import {Alert, Box, Button, Chip, CircularProgress, Collapse, Paper, Stack, Typography} from '@mui/material';
 import type {Theme} from '@mui/material/styles';
 import {getReadableAccent} from '@tingly/ui/theme/status';
 import {fontMono, fontSizes} from '@tingly/ui/theme/fonts';
 import type {TFunction} from 'i18next';
 import type {ReactNode} from 'react';
-import {Fragment, useEffect, useState} from 'react';
+import {Fragment, useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import type {AttachmentsComponent, CodeBlockComponent, DraftStorage} from './context';
 import {TranscriptHostProvider, useDraft, useTranscriptHost} from './context';
 import type {ActivityStep, RequestBlock, RequestOutcome, TaskState, ThinkingStep, Todo, ToolStep, TranscriptBlock, TranscriptEntry, WorkingVerb} from './model';
-import {agentReport, agentStatus, approvalSubject, askQuestions, firstNewBlock, formatTokens, latestTodos, requestOutcome, toolSummary, workingState} from './model';
+import {CHECKLIST_TOOL, FOLD_MIN_CALLS, agentReport, agentStatus, approvalSubject, askQuestions, firstNewBlock, formatTokens, latestTodos, requestOutcome, summarizeRun, toolSummary, workingState} from './model';
 import Markdown from './Markdown';
 import QuestionCard from './QuestionCard';
 
@@ -90,11 +90,12 @@ const statusLabel = (t: TFunction, status: TaskState['status']) => ({
     failed: t('projects.transcript.taskFailed', {defaultValue: 'failed'}),
 }[status]);
 
-// useExpanded is a row's open state: it follows "expand all", and a row's own
-// toggle holds until "expand all" is flipped again.
-const useExpanded = (expandAll: boolean): [boolean, () => void] => {
+// useExpanded is a row's open state: it follows "expand all" (or `auto`, for
+// what should be open until the user says otherwise), and a row's own toggle
+// holds until "expand all" is flipped again.
+const useExpanded = (expandAll: boolean, auto = false): [boolean, () => void] => {
     const [toggled, setToggled] = useState<{under: boolean; open: boolean} | null>(null);
-    const open = toggled?.under === expandAll ? toggled.open : expandAll;
+    const open = toggled?.under === expandAll ? toggled.open : expandAll || auto;
     return [open, () => setToggled({under: expandAll, open: !open})];
 };
 
@@ -249,12 +250,12 @@ const ThoughtRow = ({steps, live, expandAll}: {steps: ThinkingStep[]; live: bool
     );
 };
 
-// ActivityRun is a run of thinking and tool calls: one line per call, and
-// each run of thinking folded into one "Thought" line. While the turn runs,
-// the last line carries the spinner.
-const ActivityRun = ({steps, live, expandAll, pendingRequestId}: {steps: ActivityStep[]; live: boolean; expandAll: boolean; pendingRequestId?: string}) => {
+// RunRows lists a run's steps: one line per call, and each run of thinking
+// folded into one "Thought" line. `live` puts the spinner on the last line.
+const RunRows = ({steps, live, expandAll, pendingRequestId}: {steps: ActivityStep[]; live: boolean; expandAll: boolean; pendingRequestId?: string}) => {
     const rows: (ToolStep | ThinkingStep[])[] = [];
     for (const s of steps) {
+        if (s.type === 'tool' && s.name === CHECKLIST_TOOL) continue;
         if (s.type === 'tool') rows.push(s);
         else if (Array.isArray(rows[rows.length - 1])) (rows[rows.length - 1] as ThinkingStep[]).push(s);
         else rows.push([s]);
@@ -271,7 +272,56 @@ const ActivityRun = ({steps, live, expandAll, pendingRequestId}: {steps: Activit
     );
 };
 
+// ActivityRun is a run of thinking and calls with no reply in between. Once it
+// has a few calls it folds into one line saying what it did, so a long turn
+// reads as its replies, not as a wall of tool rows. The run still going (or
+// holding a call that waits for an approval) stays open, and settles shut when
+// the turn moves on. Opened, it is the per-call rows.
+const ActivityRun = ({steps, live, hold = false, expandAll, pendingRequestId}: {steps: ActivityStep[]; live: boolean; hold?: boolean; expandAll: boolean; pendingRequestId?: string}) => {
+    const {t} = useTranslation();
+    const sum = useMemo(() => summarizeRun(steps), [steps]);
+    const calls = sum.read + sum.searched + sum.commands + sum.edited + sum.other;
+    const [open, toggle] = useExpanded(expandAll, live || hold);
+    if (calls < FOLD_MIN_CALLS) return <RunRows steps={steps} live={live} expandAll={expandAll} pendingRequestId={pendingRequestId}/>;
+
+    const parts = [
+        sum.read > 0 && t('projects.transcript.runRead', {defaultValue: 'Read {{count}} files', count: sum.read}),
+        sum.searched > 0 && t('projects.transcript.runSearched', {defaultValue: 'searched {{count}} times', count: sum.searched}),
+        sum.commands > 0 && t('projects.transcript.runCommands', {defaultValue: 'ran {{count}} commands', count: sum.commands}),
+        sum.edited > 0 && t('projects.transcript.runEdited', {defaultValue: 'edited {{count}} files', count: sum.edited}),
+        sum.other > 0 && t('projects.transcript.runOther', {defaultValue: '{{count}} other calls', count: sum.other}),
+    ].filter(Boolean) as string[];
+    // Sentence case: only the first part is capitalised.
+    const text = parts.map((p, i) => i === 0 ? p.charAt(0).toUpperCase() + p.slice(1) : p).join(t('projects.transcript.runJoin', {defaultValue: ', '}));
+    const ids = steps.flatMap((s) => (s.type === 'tool' && s.id ? [s.id] : []));
+    return (
+        <Box>
+            <Box data-call-ids={open ? undefined : ids.join(' ') || undefined}>
+                <RowLine open={open} onToggle={toggle} error={!open && sum.failed > 0 && !live}>
+                    {/* The spinner belongs to the call that is running, in the rows below. */}
+                    <Info sx={{fontSize: 14, flexShrink: 0}}/>
+                    <Typography variant="body2" noWrap sx={{flex: 1, minWidth: 0, color: 'inherit'}}>
+                        {text}
+                        {sum.durationMs !== undefined && <Box component="span" sx={{ml: 0.75}}>· {formatDuration(sum.durationMs)}</Box>}
+                    </Typography>
+                    {sum.failed > 0 && (
+                        <Typography variant="body2" sx={{flexShrink: 0, color: (theme) => getReadableAccent(theme, 'error')}}>
+                            {t('projects.transcript.runFailed', {defaultValue: '{{count}} failed', count: sum.failed})}
+                        </Typography>
+                    )}
+                </RowLine>
+            </Box>
+            <Collapse in={open} unmountOnExit>
+                <Box sx={{mt: 0.5, mb: 1, pl: 1.5, borderLeft: 2, borderColor: 'divider'}}>
+                    <RunRows steps={steps} live={live} expandAll={expandAll} pendingRequestId={pendingRequestId}/>
+                </Box>
+            </Collapse>
+        </Box>
+    );
+};
+
 interface ApprovalDraft {status: 'idle' | 'sending' | 'accepted'}
+
 const decodeApproval = (value: unknown): ApprovalDraft => {
     const saved = value && typeof value === 'object' ? value as Record<string, unknown> : {};
     return {status: saved.status === 'accepted' ? 'accepted' : 'idle'};
@@ -447,6 +497,11 @@ const shownBlocks = (blocks: TranscriptBlock[], pendingRequestId?: string): {blo
     return out;
 };
 
+// holdsPending is whether a block is the approval or question still waiting on
+// the user: the run of calls right before it stays open.
+const holdsPending = (block: TranscriptBlock | undefined, pendingRequestId?: string): boolean =>
+    block?.type === 'request' && !!pendingRequestId && block.message.request_id === pendingRequestId;
+
 // BlockList renders a run of blocks: the conversation, or a subagent's own
 // work inside its card.
 const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anchored = false, newFrom = -1}: BlockListProps) => {
@@ -454,7 +509,7 @@ const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anc
     // A merged run of calls keeps its first index, so the divider goes
     // before the first item at or past newFrom.
     const dividerAt = newFrom >= 0 ? items.find((x) => x.index >= newFrom)?.index : undefined;
-    const render = ({block: b, index: i, last}: (typeof items)[number]) => {
+    const render = ({block: b, index: i, last}: (typeof items)[number], at: number) => {
             const anchor = anchored ? {'data-block': i} : {};
             switch (b.type) {
                 case 'user':
@@ -462,7 +517,7 @@ const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anc
                 case 'assistant':
                     return <Box key={i} {...anchor}><AssistantText message={b.message}/></Box>;
                 case 'activity':
-                    return <ActivityRun key={i} steps={b.steps} live={working && last} expandAll={expandAll} pendingRequestId={pendingRequestId}/>;
+                    return <ActivityRun key={i} steps={b.steps} live={working && last} hold={holdsPending(items[at + 1]?.block, pendingRequestId)} expandAll={expandAll} pendingRequestId={pendingRequestId}/>;
                 case 'agent':
                     return <AgentCard key={i} block={b} turnLive={working} expandAll={expandAll} pendingRequestId={pendingRequestId} onRespond={onRespond}/>;
                 case 'request':
@@ -501,9 +556,9 @@ const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anc
     };
     return (
         <>
-            {items.map((item) => item.index === dividerAt
-                ? <Fragment key={`new-${item.index}`}><NewDivider/>{render(item)}</Fragment>
-                : render(item))}
+            {items.map((item, at) => item.index === dividerAt
+                ? <Fragment key={`new-${item.index}`}><NewDivider/>{render(item, at)}</Fragment>
+                : render(item, at))}
         </>
     );
 };

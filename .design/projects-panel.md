@@ -135,6 +135,14 @@ implemented.
   remains and folds to one line ("3 of 5 done · Writing tests") once
   everything is done or the reader folds it. Tracked in
   [#2118](https://github.com/tingly-dev/tingly-box/issues/2118).
+- **A run of calls is one line.** Calls and thoughts with no reply between
+  them are one run; from two calls on it folds into a line saying what it did
+  ("Read 3 files, ran 2 commands, edited 1 file · 30s") with failures in red,
+  and opens to the per-call rows. The run still going, or the one right before a
+  request waiting on the user, stays open and settles shut when the turn moves
+  on; "expand all" opens every fold. The fold carries its calls' ids while
+  shut, so the trajectory still leads to them. `TodoWrite` calls are left out
+  of runs: the todo list has its own card.
 
 ## Step 3c: one message box
 
