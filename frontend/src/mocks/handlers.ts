@@ -1162,7 +1162,7 @@ const mockQuotas: Record<string, any> = {
     },
 
     // The balance is the account's credits (/api/v1/credits), not the key's
-    // cap; the key limit is read as a lifetime cap, not a monthly one.
+    // cap; the key limit caps lifetime usage, not the month.
     'mock-provider-openrouter': {
         provider_uuid: 'mock-provider-openrouter',
         provider_name: 'OpenRouter',

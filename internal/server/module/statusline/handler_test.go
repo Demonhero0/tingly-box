@@ -641,11 +641,6 @@ func TestFormatQuotaWindowShowsRemaining(t *testing.T) {
 	assert.Equal(t, "70/100", formatQuotaWindow(&quota.UsageWindow{Used: 30, Limit: 100, Unit: quota.UsageUnitRequests}))
 	assert.Equal(t, "0/100", formatQuotaWindow(&quota.UsageWindow{Used: 120, Limit: 100, Unit: quota.UsageUnitRequests}))
 	assert.Equal(t, "70%", formatQuotaWindow(&quota.UsageWindow{Used: 30, Limit: 100, Unit: quota.UsageUnitPercent}))
-	// A spending cap that is not a balance (OpenRouter's key limit) keeps its
-	// cents: $0.40 left of $1 must not round to "0/1".
-	capLeft := 0.4
-	assert.Equal(t, "$0.40/$1.00", formatQuotaWindow(&quota.UsageWindow{Type: quota.WindowTypeCustom, Used: 0.6, Limit: 1, Available: &capLeft, Unit: quota.UsageUnitCurrency, CurrencyCode: "USD"}))
-	assert.Equal(t, "8.00/20.00 CNY", formatQuotaWindow(&quota.UsageWindow{Used: 12, Limit: 20, Unit: quota.UsageUnitCurrency, CurrencyCode: "CNY"}))
 }
 
 func TestFormatQuotaInlineSeparatesAllowanceAndBalance(t *testing.T) {

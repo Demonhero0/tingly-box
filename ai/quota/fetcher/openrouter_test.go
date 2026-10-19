@@ -75,19 +75,9 @@ func TestOpenRouterFetcher_Fetch(t *testing.T) {
 		t.Error("all-time spent/purchased is not a runway figure; the balance must carry no percentage")
 	}
 
-	// Key limit window: a cap on the key, not a balance
-	keyLimit := findWindow(t, usage, "key_limit")
-	if keyLimit.Type == quota.WindowTypeBalance {
-		t.Errorf("KeyLimit.Type = %q, want a non-balance type", keyLimit.Type)
-	}
-	if keyLimit.Used != 35.50 {
-		t.Errorf("KeyLimit.Used = %f, want 35.50", keyLimit.Used)
-	}
-	if keyLimit.Limit != 100.0 {
-		t.Errorf("KeyLimit.Limit = %f, want 100.0", keyLimit.Limit)
-	}
-	if keyLimit.Unit != quota.UsageUnitCurrency {
-		t.Errorf("KeyLimit.Unit = %q, want currency", keyLimit.Unit)
+	// The key's spending cap is not money and gets no window
+	if len(usage.Windows) != 2 {
+		t.Errorf("expected only the balance and monthly windows, got %d", len(usage.Windows))
 	}
 
 	// Monthly window
@@ -106,8 +96,8 @@ func TestOpenRouterFetcher_Fetch(t *testing.T) {
 	if usage.Cost.Used != 35.50 {
 		t.Errorf("Cost.Used = %f, want 35.50", usage.Cost.Used)
 	}
-	if usage.Cost.Limit != 100.0 {
-		t.Errorf("Cost.Limit = %f, want 100.0", usage.Cost.Limit)
+	if usage.Cost.Limit != 0 {
+		t.Errorf("Cost.Limit = %f, want 0: the key cap is not money", usage.Cost.Limit)
 	}
 
 	// Account
@@ -217,28 +207,18 @@ func openrouterUsageWithCredits(t *testing.T, response, credits string) *quota.P
 	return usage
 }
 
-func TestOpenRouterKeyLimitIsAResource(t *testing.T) {
+// The key's spending cap used to be shown as the balance. It is not money, so
+// it gets no window; with no credits answer there is no balance either.
+func TestOpenRouterKeyLimitIsNotShownAsBalance(t *testing.T) {
 	usage := openrouterUsage(t,
 		`{"data":{"limit":20,"usage":8.1,"usage_monthly":8.1,"creator_user_id":"u1"}}`)
 
 	checkInvariants(t, usage)
 
-	keyLimit := findWindow(t, usage, "key_limit")
-	if keyLimit.Kind != quota.WindowKindResource {
-		t.Errorf("key_limit Kind = %q, want resource", keyLimit.Kind)
-	}
-	if keyLimit.Available == nil || *keyLimit.Available != 11.9 {
-		t.Errorf("key_limit Available = %v, want 11.9", keyLimit.Available)
-	}
-	if keyLimit.CurrencyCode != "USD" {
-		t.Errorf("key_limit CurrencyCode = %q, want USD", keyLimit.CurrencyCode)
-	}
-	if pct, ok := usage.Pct(); !ok || pct < 40.4 || pct > 40.6 {
-		t.Fatalf("Pct() = %v, %v; want ~40.5, true", pct, ok)
-	}
-	// Raising the cap is the only way back, so waiting brings nothing back.
-	if usage.RecoversAt() != nil {
-		t.Error("RecoversAt() should be nil when the binding entry is a spending cap")
+	for _, w := range usage.Windows {
+		if w.Key == "key_limit" || w.Type == quota.WindowTypeBalance {
+			t.Errorf("window %q (%s) is shown; the key cap must not appear", w.Key, w.Type)
+		}
 	}
 }
 
@@ -264,16 +244,8 @@ func TestOpenRouterBalanceIsTheAccountsCredits(t *testing.T) {
 	if !strings.Contains(balance.Description, "-$0.01") {
 		t.Errorf("balance Description = %q, want the signed balance -$0.01", balance.Description)
 	}
-
-	keyLimit := findWindow(t, usage, "key_limit")
-	if keyLimit.Type == quota.WindowTypeBalance {
-		t.Error("the key limit is a cap on the key, not a balance")
-	}
-	if keyLimit.Available == nil || *keyLimit.Available != 50 {
-		t.Errorf("key_limit Available = %v, want 50", keyLimit.Available)
-	}
-	if strings.Contains(keyLimit.Description, "Balance") {
-		t.Errorf("key_limit Description = %q, must not call the cap a balance", keyLimit.Description)
+	if len(usage.Windows) != 2 {
+		t.Errorf("expected only the balance and monthly windows, got %d", len(usage.Windows))
 	}
 }
 
@@ -293,21 +265,6 @@ func TestOpenRouterBalanceAfterTopUpsIsNotNearlyExhausted(t *testing.T) {
 	}
 	if pct, ok := usage.Pct(); ok {
 		t.Errorf("Pct() = %v, %v; want no figure: neither the balance nor uncapped spend has a cap", pct, ok)
-	}
-}
-
-// limit - usage misses what OpenRouter itself counts against the cap (resets,
-// BYOK accounting); limit_remaining is its own figure, so it wins.
-func TestOpenRouterKeyLimitPrefersLimitRemaining(t *testing.T) {
-	usage := openrouterUsage(t,
-		`{"data":{"limit":20,"limit_remaining":15,"usage":8.1,"creator_user_id":"u1"}}`)
-
-	keyLimit := findWindow(t, usage, "key_limit")
-	if keyLimit.Available == nil || *keyLimit.Available != 15 {
-		t.Errorf("key_limit Available = %v, want 15", keyLimit.Available)
-	}
-	if keyLimit.Used != 5 {
-		t.Errorf("key_limit Used = %v, want 5", keyLimit.Used)
 	}
 }
 
@@ -331,8 +288,8 @@ func TestOpenRouterNoKeyLimitMeansUncapped(t *testing.T) {
 }
 
 func TestOpenRouterMonthlySpendNeverPosesAsACap(t *testing.T) {
-	// The key limit is read as a lifetime cap, not a monthly one, so the
-	// monthly window has no cap even when a key limit is set. Left unflagged it read as
+	// The key limit caps lifetime usage, not the month, so the monthly window
+	// has no cap even when a key limit is set. Left unflagged it read as
 	// "$8.10 of $0.00" and, being an allowance, sorted ahead of the real one.
 	usage := openrouterUsage(t,
 		`{"data":{"limit":20,"usage":8.1,"usage_monthly":8.1,"creator_user_id":"u1"}}`)
@@ -343,11 +300,8 @@ func TestOpenRouterMonthlySpendNeverPosesAsACap(t *testing.T) {
 	if monthly.Countable() {
 		t.Error("monthly spend has no cap; it must not contribute a usage figure")
 	}
-	if got := usage.Tightest().Key; got != "key_limit" {
-		t.Errorf("Tightest() = %q; want key_limit, the window that actually has a cap", got)
-	}
-	if usage.Windows[0].Key != "key_limit" {
-		t.Errorf("first window = %q; want key_limit ahead of the uncapped one", usage.Windows[0].Key)
+	if tight := usage.Tightest(); tight != nil {
+		t.Errorf("Tightest() = %q; want none, nothing here has a cap", tight.Key)
 	}
 }
 

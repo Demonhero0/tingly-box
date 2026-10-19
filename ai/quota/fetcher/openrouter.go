@@ -13,8 +13,8 @@ import (
 )
 
 // OpenRouterFetcher retrieves OpenRouter quota data.
-// Uses: GET https://openrouter.ai/api/v1/key (the key's spending cap and usage)
-// and GET https://openrouter.ai/api/v1/credits (the account's credits).
+// Uses: GET https://openrouter.ai/api/v1/key (key info with usage) and
+// GET https://openrouter.ai/api/v1/credits (the account's credits, the balance).
 type OpenRouterFetcher struct{}
 
 func NewOpenRouterFetcher() *OpenRouterFetcher {
@@ -149,36 +149,9 @@ func (f *OpenRouterFetcher) Fetch(ctx context.Context, provider *ai.Provider) (*
 		})
 	}
 
-	// A key limit is a spending cap on this key, not money: the key stops at
-	// the cap even with credits left, and running out of credits stops it
-	// under the cap. Raising the cap is the only way back, so it is a
-	// resource. limit_remaining is OpenRouter's own figure (it leaves BYOK
-	// usage out unless include_byok_in_limit); usage is the fallback.
-	// limit_reset (daily/weekly/monthly caps) is not modelled yet.
-	if data.Limit != nil && *data.Limit > 0 {
-		limit := *data.Limit
-		available := limit - data.Usage
-		if data.LimitRemaining != nil {
-			available = *data.LimitRemaining
-		}
-		available = min(max(available, 0), limit)
-		usage.AddWindow("key_limit", &quota.UsageWindow{
-			Type:         quota.WindowTypeCustom,
-			Kind:         quota.WindowKindResource,
-			Used:         limit - available,
-			Limit:        limit,
-			Available:    &available,
-			Unit:         quota.UsageUnitCurrency,
-			CurrencyCode: "USD",
-			Label:        "Key Limit",
-			Description:  fmt.Sprintf("Key limit: $%.2f left of $%.2f", available, limit),
-		})
-	}
-
-	// Monthly spend is reported uncapped: the key limit is read as a lifetime
-	// cap (limit_reset is not modelled), so this window has no cap in either
-	// branch and says so. A bare Limit of 0 would be read as a budget with
-	// nothing spent.
+	// Monthly spend is never capped — the key limit caps lifetime usage, not
+	// the month — so this window has no cap in either branch and says so.
+	// A bare Limit of 0 would be read as a budget with nothing spent.
 	monthly := &quota.UsageWindow{
 		Type:          quota.WindowTypeMonthly,
 		Used:          data.UsageMonthly,
@@ -195,14 +168,12 @@ func (f *OpenRouterFetcher) Fetch(ctx context.Context, provider *ai.Provider) (*
 	}
 	usage.AddWindow("monthly", monthly)
 
-	// Cost
+	// Cost: the key's all-time spend. The key's cap stays out: shown as
+	// "left of" it reads as money, which it is not.
 	usage.Cost = &quota.UsageCost{
 		Used:         data.Usage,
 		CurrencyCode: "USD",
 		Label:        "Total Usage",
-	}
-	if data.Limit != nil {
-		usage.Cost.Limit = *data.Limit
 	}
 
 	return usage, nil

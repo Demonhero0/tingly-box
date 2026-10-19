@@ -47,7 +47,7 @@ func (w *UsageWindow) Countable() bool {
 //
 // With no kinds given, every countable window is eligible regardless of Kind
 // — the display question, "how much pressure is on this account, from
-// whatever source": a resource (OpenRouter's key cap, KimiK2's only
+// whatever source": a resource (Kimi's booster wallet, KimiK2's only
 // window) is meant to win here just as readily as a periodic allowance.
 // Pass WindowKindLimit to instead answer the automated-decision question,
 // "what will recover on its own" (smart-routing's service_quota is the

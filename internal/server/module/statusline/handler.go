@@ -578,15 +578,6 @@ func formatQuotaWindow(window *quota.UsageWindow) string {
 		return fmt.Sprintf("%.0f%%", remaining)
 	}
 
-	// Money keeps its unit and cents: "$0.40/$1.00", where rounding would
-	// print "0/1" and read as nothing left.
-	if window.Unit == quota.UsageUnitCurrency {
-		if window.CurrencyCode == "USD" {
-			return fmt.Sprintf("$%.2f/$%.2f", remaining, limit)
-		}
-		return strings.TrimSpace(fmt.Sprintf("%.2f/%.2f %s", remaining, limit, window.CurrencyCode))
-	}
-
 	// Requests and credits always show actual numbers, never a K/M suffix.
 	if window.Unit == quota.UsageUnitRequests || window.Unit == quota.UsageUnitCredits {
 		return fmt.Sprintf("%.0f/%.0f", remaining, limit)
