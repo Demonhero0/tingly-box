@@ -1182,7 +1182,7 @@ const mockQuotas: Record<string, any> = {
                 unit: 'currency',
                 currency_code: 'USD',
                 label: 'Balance',
-                description: 'Balance: $11.90 (purchased $20.00, used $8.10)',
+                description: '$11.90 remaining',
             },
             {
                 key: 'monthly',

@@ -68,6 +68,9 @@ func TestOpenRouterFetcher_Fetch(t *testing.T) {
 	if balance.Type != quota.WindowTypeBalance {
 		t.Errorf("Balance.Type = %q, want balance", balance.Type)
 	}
+	if balance.Unit != quota.UsageUnitCurrency || balance.CurrencyCode != "USD" {
+		t.Errorf("Balance unit = %q %q, want currency USD", balance.Unit, balance.CurrencyCode)
+	}
 	if balance.Available == nil || *balance.Available != 84.5 {
 		t.Errorf("Balance.Available = %v, want 84.5", balance.Available)
 	}
@@ -207,6 +210,43 @@ func openrouterUsageWithCredits(t *testing.T, response, credits string) *quota.P
 	return usage
 }
 
+// A /credits answer that cannot be read (an error status, or a page that is
+// not JSON) leaves the balance out; the key's figures still come through.
+func TestOpenRouterUnreadableCreditsLeaveTheBalanceOut(t *testing.T) {
+	for name, reply := range map[string]func(http.ResponseWriter){
+		"server error": func(w http.ResponseWriter) { w.WriteHeader(http.StatusInternalServerError) },
+		"not JSON":     func(w http.ResponseWriter) { _, _ = w.Write([]byte("<html>busy</html>")) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v1/credits" {
+					reply(w)
+					return
+				}
+				_, _ = w.Write([]byte(`{"data":{"limit":null,"usage":1,"usage_monthly":1,"creator_user_id":"u1"}}`))
+			}))
+			defer server.Close()
+
+			usage, err := (&OpenRouterFetcher{}).Fetch(context.Background(),
+				&ai.Provider{UUID: "u", Name: "OpenRouter", Token: "k", APIBase: server.URL})
+			if err != nil {
+				t.Fatalf("Fetch() error: %v", err)
+			}
+			for _, w := range usage.Windows {
+				if w.Key == "balance" {
+					t.Error("unreadable credits must not produce a balance")
+				}
+			}
+			var raw struct {
+				Credits json.RawMessage `json:"credits"`
+			}
+			if err := json.Unmarshal(usage.RawResponse, &raw); err != nil || string(raw.Credits) != "null" {
+				t.Errorf("raw credits = %s (%v), want null", raw.Credits, err)
+			}
+		})
+	}
+}
+
 // The key's spending cap used to be shown as the balance. It is not money, so
 // it gets no window; with no credits answer there is no balance either.
 func TestOpenRouterKeyLimitIsNotShownAsBalance(t *testing.T) {
@@ -223,7 +263,7 @@ func TestOpenRouterKeyLimitIsNotShownAsBalance(t *testing.T) {
 }
 
 // The reported case: a $50 cap on the key showed as "Balance: $50.00 / $50.00"
-// on an account that never bought credits and had spent slightly below zero.
+// on an account that never bought credits and is slightly below zero.
 func TestOpenRouterBalanceIsTheAccountsCredits(t *testing.T) {
 	usage := openrouterUsageWithCredits(t,
 		`{"data":{"limit":50,"limit_remaining":50,"usage":0,"is_free_tier":true,"creator_user_id":"u1"}}`,
@@ -239,10 +279,10 @@ func TestOpenRouterBalanceIsTheAccountsCredits(t *testing.T) {
 		t.Errorf("balance Available = %v, want 0 (clamped)", balance.Available)
 	}
 	if balance.Countable() {
-		t.Error("nothing was purchased, so there is no share of credits to report")
+		t.Error("the balance is an amount, never a share")
 	}
-	if !strings.Contains(balance.Description, "-$0.01") {
-		t.Errorf("balance Description = %q, want the signed balance -$0.01", balance.Description)
+	if balance.Description != "$0.00 remaining" {
+		t.Errorf("balance Description = %q, want only the balance: $0.00 remaining", balance.Description)
 	}
 	if len(usage.Windows) != 2 {
 		t.Errorf("expected only the balance and monthly windows, got %d", len(usage.Windows))

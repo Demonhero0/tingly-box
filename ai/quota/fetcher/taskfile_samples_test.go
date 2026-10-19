@@ -132,8 +132,8 @@ func TestTaskfileSamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A free key has no cap at all and no credits were bought, so there is
-	// no percentage to report — only the balance and the monthly spend.
+	// A free key has no cap and the balance is an amount, never a share, so
+	// there is no percentage to report — only the balance and the monthly spend.
 	check(t, "openrouter", u, want{ok: false, windows: 2})
 
 	// ── codex (fresh) ──

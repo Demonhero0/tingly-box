@@ -127,16 +127,13 @@ func (f *OpenRouterFetcher) Fetch(ctx context.Context, provider *ai.Provider) (*
 		Tier: tier,
 	}
 
-	// The account's credits are the money requests are paid from. Both totals
-	// are all-time, so spent/purchased is not a runway figure (after a few
-	// top-ups it reads nearly exhausted with plenty left); like Codex's
-	// credits, the balance is an amount without a percentage. It can dip
-	// below zero, which OpenRouter answers with 402 even for free models; the
-	// window clamps at zero and the description keeps the sign.
+	// The account's credits are the money requests are paid from: what was
+	// bought minus what was spent. Both totals are all-time, so spent/purchased
+	// is not a runway figure; like Codex's credits, the balance is an amount
+	// without a percentage. Below zero (OpenRouter then answers 402 even for
+	// free models) it reads as nothing left.
 	if credits != nil {
-		purchased, spent := credits.Data.TotalCredits, credits.Data.TotalUsage
-		balance := purchased - spent
-		available := max(balance, 0)
+		available := max(credits.Data.TotalCredits-credits.Data.TotalUsage, 0)
 		usage.AddWindow("balance", &quota.UsageWindow{
 			Type:         quota.WindowTypeBalance,
 			Available:    &available,
@@ -144,8 +141,7 @@ func (f *OpenRouterFetcher) Fetch(ctx context.Context, provider *ai.Provider) (*
 			Unit:         quota.UsageUnitCurrency,
 			CurrencyCode: "USD",
 			Label:        "Balance",
-			Description: fmt.Sprintf("Balance: %s (purchased $%.2f, used $%.2f)",
-				signedUSD(balance), purchased, spent),
+			Description:  fmt.Sprintf("$%.2f remaining", available),
 		})
 	}
 
@@ -203,12 +199,4 @@ func openrouterGet(ctx context.Context, client *http.Client, url, token string) 
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 	return body, nil
-}
-
-// signedUSD formats an amount that may be negative as "-$0.01", not "$-0.01".
-func signedUSD(v float64) string {
-	if v < 0 {
-		return fmt.Sprintf("-$%.2f", -v)
-	}
-	return fmt.Sprintf("$%.2f", v)
 }
