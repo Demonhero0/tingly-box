@@ -95,6 +95,44 @@ func TestNewClaudeClient_StripV1FromBase(t *testing.T) {
 	require.NotNil(t, c)
 }
 
+// TestNewClaudeClient_UsesProviderProxyURL pins that Claude Code OAuth traffic
+// goes through provider.ProxyURL, as the other vendor OAuth clients do, instead
+// of the SDK's default client (which follows HTTP(S)_PROXY and ignores
+// proxy_url). The stub acts as the forward proxy for a plain-HTTP upstream that
+// does not resolve, so a request that skips the proxy fails.
+func TestNewClaudeClient_UsesProviderProxyURL(t *testing.T) {
+	var proxied []string
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxied = append(proxied, r.Host+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-6",` +
+			`"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn",` +
+			`"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	t.Cleanup(proxy.Close)
+
+	provider := newOAuthProvider()
+	provider.UUID = "test-claude-proxy-url"
+	provider.APIBase = "http://claude-upstream.invalid"
+	provider.ProxyURL = proxy.URL
+	provider.OAuthDetail.Issuer = ai.IssuerClaudeCode
+
+	c, err := NewClaudeClient(context.Background(), provider, "claude-sonnet-4-6", typ.SessionID{Value: "s"})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, c.Close()) })
+
+	req := &anthropic.MessageNewParams{
+		Model:     "claude-sonnet-4-6",
+		MaxTokens: 16,
+		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("hi"))},
+	}
+	req.Metadata.UserID = param.NewOpt(`{"device_id":"d","account_uuid":"a","session_id":"sess-1"}`)
+
+	_, err = c.MessagesNew(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"claude-upstream.invalid/v1/messages"}, proxied)
+}
+
 // ===================================================================
 // ListModels
 // ===================================================================
