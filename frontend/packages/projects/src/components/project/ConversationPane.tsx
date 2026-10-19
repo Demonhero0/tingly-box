@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, Paper, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Collapse, Paper, Typography } from '@mui/material';
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -7,10 +7,12 @@ import type { Attachment, ProjectMessage, Thread } from '../../client';
 import { AttachmentChips, uploadAttachments } from '../attachments';
 import { Composer } from '../Composer';
 import { Markdown } from '../Markdown';
-import { DiffIcon, PlayArrow } from '../icons';
+import { readLocal, writeLocal } from '../../utils/storage';
+import { ChevronRight, DiffIcon, ExpandMore, PlayArrow } from '../icons';
 import { DiffDialog } from './DiffDialog';
 import { StatusIcon, statusColor, ThreadBadges, ThreadSubtitle, toneColor } from './threadStatus';
 
+const REPORTS_KEY = 'conversation.threadReports';
 const COLUMN = { maxWidth: 760, mx: 'auto', width: '100%', px: { xs: 2, md: 3 } } as const;
 
 function parse<T>(payload?: string): T | null {
@@ -68,6 +70,66 @@ export function ThreadCard({ thread, onOpen }: { thread: Thread; onOpen: (id: st
             </Box>
             {canReview && <DiffDialog thread={thread} open={reviewing} onClose={() => setReviewing(false)} />}
         </>
+    );
+}
+
+interface UpdatePayload {
+    thread_id: string;
+    title: string;
+    kind: string;
+    status: string;
+}
+
+/**
+ * What a thread reported to the coordinator, as its own quiet entry where it
+ * happened: the thread, how the turn ended, and the report one click away.
+ * The thread's line above keeps the live state; this keeps the history.
+ */
+export function ThreadUpdateRow({ message, onOpen }: { message: ProjectMessage; onOpen: (id: string) => void }) {
+    const { t } = useTranslation('projects');
+    const [open, setOpen] = useState(false);
+    const pl = parse<UpdatePayload>(message.payload);
+    if (!pl) return null;
+    const hasText = message.content.trim() !== '';
+    const toggle = () => hasText && setOpen((v) => !v);
+    return (
+        <Box sx={{ my: 0.75 }}>
+            <Box
+                role="button"
+                tabIndex={0}
+                aria-expanded={hasText ? open : undefined}
+                onClick={toggle}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggle();
+                    }
+                }}
+                sx={{
+                    display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, py: 0.25, px: 0.5, mx: -0.5, borderRadius: 1,
+                    cursor: 'default', userSelect: 'none', color: 'text.secondary', fontSize: fontSizes.md, outline: 'none',
+                    '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+                    '&:focus-visible': { boxShadow: (th) => `inset 0 0 0 2px ${th.palette.primary.main}` },
+                }}
+            >
+                <Box component="span" title={t(`thread.status.${pl.status}`)} sx={{ display: 'inline-flex', flexShrink: 0, color: toneColor(statusColor(pl.status)) }}>
+                    <StatusIcon status={pl.status} />
+                </Box>
+                <Typography noWrap component="span" sx={{ minWidth: 0, fontSize: 'inherit', fontWeight: 600, color: 'text.primary' }}>{pl.title}</Typography>
+                <Typography noWrap component="span" sx={{ flexShrink: 0, fontSize: 'inherit' }}>{t(`conversation.updateKind.${pl.kind}`, { defaultValue: pl.kind })}</Typography>
+                {hasText && (open ? <ExpandMore sx={{ fontSize: 16, flexShrink: 0 }} /> : <ChevronRight sx={{ fontSize: 16, flexShrink: 0 }} />)}
+                <Box sx={{ flex: 1 }} />
+                <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onOpen(pl.thread_id); }}
+                    sx={{ flexShrink: 0, p: 0, border: 0, bgcolor: 'transparent', font: 'inherit', color: 'text.disabled', cursor: 'pointer', '&:hover': { color: 'text.primary', textDecoration: 'underline' } }}>
+                    {t('conversation.openThread')}
+                </Box>
+            </Box>
+            <Collapse in={open} unmountOnExit>
+                <Box sx={{ mt: 0.5, ml: 0.5, pl: 1.5, borderLeft: 2, borderColor: 'divider', color: 'text.secondary', fontSize: fontSizes.md }}>
+                    <Markdown text={message.content} />
+                </Box>
+            </Collapse>
+        </Box>
     );
 }
 
@@ -143,6 +205,9 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
     const scrollRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
     const [seed, setSeed] = useState('');
+    // Thread reports are history, not news: shown by default, hideable per browser.
+    const [showReports, setShowReports] = useState(() => readLocal(REPORTS_KEY) !== '0');
+    const hasReports = messages.some((m) => m.kind === 'thread_update');
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -205,9 +270,10 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
                             }
                             case 'suggestions':
                                 return <SuggestionsCard key={m.id} message={m} threads={threads} onStart={onStartSuggestions} onOpen={onOpenThread} disabled={disabled} />;
-                            // A thread's change shows on its line above, not as a note.
+                            // A thread's line above is its live state; each report is also its
+                            // own folded entry here, in the order things happened.
                             case 'thread_update':
-                                return null;
+                                return showReports ? <ThreadUpdateRow key={m.id} message={m} onOpen={onOpenThread} /> : null;
                             case 'error':
                                 return (
                                     <Alert key={m.id} severity="error" sx={{ my: 1.5, '& .MuiAlert-message': { minWidth: 0, wordBreak: 'break-word' } }}
@@ -230,6 +296,19 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
             </Box>
             <Box sx={{ ...COLUMN, pb: 2 }}>
                 {disabledReason}
+                {hasReports && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 0.5 }}>
+                        <Button size="small" color="inherit" aria-pressed={showReports}
+                            sx={{ minWidth: 0, py: 0, fontSize: fontSizes.sm, fontWeight: 400, color: 'text.secondary' }}
+                            onClick={() => {
+                                const next = !showReports;
+                                setShowReports(next);
+                                writeLocal(REPORTS_KEY, next ? '1' : '0');
+                            }}>
+                            {t(showReports ? 'conversation.hideReports' : 'conversation.showReports')}
+                        </Button>
+                    </Box>
+                )}
                 <Composer
                     autoFocus
                     disabled={disabled}

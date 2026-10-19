@@ -81,6 +81,7 @@ threads/<thread-id>.settings.json  线程的 Claude Code 设置（additionalDire
 ### 4.2 数据模型
 - `projects`: id, name, goal, instructions, repos(JSON `[{path, base_branch}]`), coordinator_model, thread_model, thread_permission_mode, paused, starred, archived_at, timestamps。
 - `project_messages`: 项目对话。role(user|assistant|system), kind(text|thread_started|suggestions|thread_update|error), content, payload(JSON), created_at。
+- 线程回报（`thread_update`）照常传给协调者；对话里按发生的先后各占一条很淡的折叠行（状态、线程名、结果，点开看回报正文），线程卡片只负责实时状态；对话下方有前端开关可隐藏这些行（仅存本机 localStorage）。
 - `threads`: id, project_id, title, task, status, wait_reason, repo_path, base_branch, branch, worktree, session_id, model, last_report, commits_ahead, files_changed, input/output tokens, origin(coordinator|suggestion|user), timestamps, resolved_at。
 - `thread_events`: 线程过程。kind(user|assistant|tool_use|tool_result|approval|ask|system|error|report), content, payload, created_at。
 
