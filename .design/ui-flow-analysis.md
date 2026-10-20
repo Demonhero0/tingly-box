@@ -367,3 +367,30 @@
 | `buildTimeParams` 的 5 个位置参数改成 filters 对象 | 动到既有签名与所有调用点，另议 |
 | 两个 `AgentActivityDialog` 合成一个实例 | 会失去关闭时的淡出动画 |
 | 去掉 `wasAllDone` 自动隐藏 | 是行为取舍，不是纯简化 |
+
+## 9. 第 3 轮：Dashboard 排第一，落地页是 Agent（未定）
+
+**发现（F15）**：rail 第一项是 Dashboard，落地页却固定是 `/agent`，打开后亮的是第二个图标，"从上往下读"和"我现在在哪"对不上。
+
+**人工打标反馈（2026-10-19 / 10-20）**：反馈"默认开 agents，但 dashboard 在第一，这个交互再评审下"。评审中试过三个方案，都没有定：
+- Agent 排第一、Dashboard 跟在使用组后：被否，"dashboard 放最开始是因为常用"。
+- 落地页改为回到上次所在的栏目：没有采用，问题不在落地页。
+- Dashboard 停靠到 rail 底部：做过，随后撤回，"暂时放回 dashboard，这次只改其他几个，dashboard 我再想想"。
+
+**结论**：本轮不动 Dashboard 的位置和落地页，保持现状（Dashboard 第一、落地页 `/agent`），F15 留作待定。已有的取舍：rail 按使用频率排，Dashboard 常用，所以排前面有理由；而落地页是起点，二者的冲突要靠别的办法解决，不是简单换顺序。
+
+## 10. 第 4 轮：Power-ups 收成一个 rail 项
+
+**发现（F16）**：rail 上一级项太多、没有收束。Guardrails、Prompt（User Request / Skills）、Bench 都是在 Power-ups 菜单里打开的可选功能，打开后却各占一个 rail 图标，和 Agent、Dashboard 这类"在这里干活"的入口同级。
+
+**人工打标反馈（2026-10-19）**："把 guardrails、skills、prompt、bench 收敛到 power up……别的先不动"；并明确："不是 power up 那个菜单，而是新开一个项叫 power up，原来那个菜单是用来控制打开的，而不是用来管理 layout 的"。
+
+**结论**：新增 rail 项 Power-ups（闪电图标），放在原 Prompt 的位置（Remote 之后、Tools 之前）；sidebar 按功能分组，组间用分隔线：Guardrails（概览行改名为 Guardrails，其余子页不变）→ Prompt 的 User Request / Skills → Bench。只列已打开的功能，全部关闭时整个 rail 项消失。Power-ups 菜单（偏好菜单里）职责不变，仍只管开关。Team、Image、Remote、Tools 本轮不动。同一个词指同一组东西：菜单里打开的，就出现在这个 rail 项里。
+
+## 11. 第 5 轮：System 从设置齿轮进
+
+**发现（F17）**：rail 底部的人像按钮打开的是偏好菜单（语言、主题、Power-ups、全部设置、反馈），里面没有任何"人"的内容；System 又作为一个 rail 项单独占位，和菜单里的"全部设置"指向同一处。
+
+**人工打标反馈（2026-10-20）**："菜单其实收到了人像里，倒不如下面放齿轮对应设置菜单，然后真的 system 以后从这里开？"
+
+**结论**：底部按钮的人像换成齿轮，它就是设置入口；System 不再占 rail 位置，从齿轮菜单的"全部设置"进入，进入 System 各页时齿轮高亮。System 的 sidebar（General / Access Control / Experimental / Develop / Logs）不变（`ActivityItem.railHidden`：不画 rail 图标，但仍拥有自己的 sidebar 和路由高亮）。菜单内容不变。
