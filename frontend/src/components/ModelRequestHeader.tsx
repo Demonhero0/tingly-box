@@ -197,9 +197,13 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
         }
     };
 
-    const handleCopy = () => {
-        void writeToClipboard(modelName);
-        notify.success(`Model name "${modelName}" copied to clipboard`);
+    const handleCopy = async () => {
+        try {
+            await writeToClipboard(modelName);
+            notify.success(`Model name "${modelName}" copied to clipboard`);
+        } catch {
+            notify.error('Failed to copy to clipboard');
+        }
     };
 
     const isWildcard = isWildcardModelName(modelName);
