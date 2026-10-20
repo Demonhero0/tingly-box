@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import {useCallback, useEffect, useState} from 'react';
 import {PLATFORM_BRAND_ICONS} from '@/constants/platformGuides';
+import {writeToClipboard} from '@/utils/clipboard';
 import {useTranslation} from 'react-i18next';
 
 // BotNotifyGroup is one bot's panel on the IM Notify page: a header (name +
@@ -179,7 +180,7 @@ const BotNotifyGroup: React.FC<BotNotifyGroupProps> = ({bot, onToggle, isTogglin
 
     const handleCopy = useCallback(async (targetID: string) => {
         try {
-            await navigator.clipboard.writeText(targetID);
+            await writeToClipboard(targetID);
             notify.success(t('notify.chat.copied', {defaultValue: 'Target UUID copied'}));
         } catch {
             notify.error(t('notify.chat.copyFailed', {defaultValue: 'Copy failed — check clipboard permissions'}));

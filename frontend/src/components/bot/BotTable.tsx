@@ -22,6 +22,7 @@ import {
 import {useCallback, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import { fontMono } from '@/theme/fonts';
+import { writeToClipboard } from '@/utils/clipboard';
 
 // BotTable is the RESOURCE table for connected bots — the table counterpart
 // of ApiKeyTable, replacing the former BotCard. Every bot, across every
@@ -89,7 +90,7 @@ const BotTable: React.FC<BotTableProps> = ({
     const handleCopyUuid = useCallback(async (uuid: string) => {
         if (!uuid) return;
         try {
-            await navigator.clipboard.writeText(uuid);
+            await writeToClipboard(uuid);
             notify.success(t('bots.table.uuidCopied', {defaultValue: 'Bot UUID copied'}));
         } catch {
             notify.error(t('bots.table.uuidCopyFailed', {defaultValue: 'Copy failed — check clipboard permissions'}));

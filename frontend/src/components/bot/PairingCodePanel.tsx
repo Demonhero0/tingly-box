@@ -19,6 +19,7 @@ import { notify } from '@/utils/notify';
 import { isPairingRequired } from '@/types/bot';
 import type { BotSettings } from '@/types/bot';
 import { fontMono, fontSizes } from '@/theme/fonts';
+import { writeToClipboard } from '@/utils/clipboard';
 
 // formatRemaining returns null once expired so the caller can render a localized label.
 const formatRemaining = (expiresAt: string): string | null => {
@@ -86,7 +87,7 @@ const PairingCodePanel: React.FC<Props> = ({ bot, revealByDefault = false }) => 
     const handleCopy = useCallback(async () => {
         if (!code) return;
         try {
-            await navigator.clipboard.writeText(`/bind ${code}`);
+            await writeToClipboard(`/bind ${code}`);
             notify.success(t('remoteControl.pairing.copied', { defaultValue: 'Pairing command copied' }));
         } catch {
             notify.error(t('remoteControl.pairing.copyFailed', { defaultValue: 'Copy failed — check clipboard permissions' }));

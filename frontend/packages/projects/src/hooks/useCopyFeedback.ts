@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { writeToClipboard } from '@tingly/ui';
 
 /** Copies text and exposes a `copied` flag that resets after ~2s. */
 export function useCopyFeedback() {
@@ -7,7 +8,7 @@ export function useCopyFeedback() {
     useEffect(() => () => window.clearTimeout(timer.current), []);
     const copy = useCallback(async (text: string) => {
         try {
-            await navigator.clipboard.writeText(text);
+            await writeToClipboard(text);
         } catch {
             return;
         }
