@@ -3,10 +3,8 @@ import {
     Alert, Autocomplete, Box, Button, Dialog, DialogContent, DialogTitle, Divider, IconButton, MenuItem, Stack,
     Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, TextField, Typography,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api, unwrap, type MemoryFile, type paths, type Project, type ProjectRuntime, type Usage } from '../../client';
-import { ConfirmDialog } from '../ConfirmDialog';
 import { TextEditDialog } from '../TextEditDialog';
 import { Add, Close, Delete, Description } from '../icons';
 import { useModels } from '../../hooks/useModels';
@@ -43,15 +41,11 @@ function ModelField({ label, value, onChange, help }: { label: string; value: st
 
 function General({ project, patch }: { project: Project; patch: (p: Patch) => Promise<void> }) {
     const { t } = useTranslation('projects');
-    const navigate = useNavigate();
-    const notify = useNotify();
-    const { onProjectsChanged, paths: routes } = useProjectsHost();
     const [name, setName] = useState(project.name);
     const [goal, setGoal] = useState(project.goal);
     const [coord, setCoord] = useState(project.coordinator_model);
     const [threadModel, setThreadModel] = useState(project.thread_model);
     const [mode, setMode] = useState<Mode>((project.thread_permission_mode || 'acceptEdits') as Mode);
-    const [deleting, setDeleting] = useState(false);
     const dirty = name !== project.name || goal !== project.goal || coord !== project.coordinator_model || threadModel !== project.thread_model || mode !== (project.thread_permission_mode || 'acceptEdits');
 
     return (
@@ -83,29 +77,6 @@ function General({ project, patch }: { project: Project; patch: (p: Patch) => Pr
                 </Box>
                 <Button variant="outlined" onClick={() => void patch({ archived: !project.archived_at })}>{project.archived_at ? t('projectSettings.unarchive') : t('projectSettings.archive')}</Button>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontWeight: 600, color: 'error.main' }}>{t('projectSettings.delete')}</Typography>
-                    <Typography variant="body2" color="text.secondary">{t('projectSettings.deleteHelp')}</Typography>
-                </Box>
-                <Button variant="outlined" color="error" onClick={() => setDeleting(true)}>{t('common.delete')}</Button>
-            </Box>
-            <ConfirmDialog
-                open={deleting}
-                title={t('projectSettings.deleteTitle', { name: project.name })}
-                message={t('projectSettings.deleteHelp')}
-                confirmLabel={t('projectSettings.deleteConfirm')}
-                danger
-                onClose={() => setDeleting(false)}
-                onConfirm={() => {
-                    unwrap(api.DELETE('/api/v1/projects/{id}', { params: { path: { id: project.id } } }))
-                        .then(() => {
-                            onProjectsChanged();
-                            navigate(routes.list);
-                        })
-                        .catch((e: Error) => notify(e.message, 'error'));
-                }}
-            />
         </Stack>
     );
 }

@@ -9,7 +9,7 @@ import { useNotify } from '../../hooks/useNotify';
 import { formatBytes, formatTokens, timeAgo } from '../../utils/format';
 import type { BackgroundTaskRow } from './backgroundTasks';
 
-type TaskOutput = components['schemas']['SessionTaskOutputResponse'];
+type TaskOutput = components['schemas']['TaskOutputResponse'];
 
 interface Props {
     sessionId: string;
@@ -118,7 +118,7 @@ function TaskRow({ sessionId, task, open, onToggle, onChanged, onReveal }: {
     const stop = async () => {
         setStopping(true);
         try {
-            await unwrap(api.POST('/api/v1/projects/sessions/{sid}/tasks/{task_id}/stop', { params: { path: { sid: sessionId, task_id: task.taskId } } }));
+            await unwrap(api.POST('/api/v1/threads/{id}/tasks/{task_id}/stop', { params: { path: { id: sessionId, task_id: task.taskId } } }));
             onChanged();
         } catch (e) {
             notify((e as Error).message, 'error');
@@ -198,8 +198,8 @@ function CommandDetail({ sessionId, task, running }: { sessionId: string; task: 
     useEffect(() => {
         if (!task.outputFile || snapshot) return;
         let live = true;
-        const load = () => unwrap(api.GET('/api/v1/projects/sessions/{sid}/tasks/{task_id}/output', {
-            params: { path: { sid: sessionId, task_id: task.taskId }, query: { tail: OUTPUT_TAIL } },
+        const load = () => unwrap(api.GET('/api/v1/threads/{id}/tasks/{task_id}/output', {
+            params: { path: { id: sessionId, task_id: task.taskId }, query: { tail: OUTPUT_TAIL } },
         }))
             .then((o) => {
                 if (live) {

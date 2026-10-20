@@ -8,6 +8,7 @@ import { zh as projectsZh } from '@tingly/projects/locales/zh';
 import i18n from '@/i18n';
 import { notify } from '@/utils/notify';
 import { notifyProjectsChanged, projectsFetch } from '@/services/projectsApi';
+import { imHost } from './imHost';
 import { sessionSlots } from './session/sessionSlots';
 
 // The package's own strings live in the `projects` namespace, apart from
@@ -28,6 +29,7 @@ export const projectsHost: ProjectsHost = {
         list: '/projects',
         project: (id) => `/projects/${id}`,
         folder: (path) => (path ? `/projects/folder?path=${encodeURIComponent(path)}` : '/projects/folder'),
+        im: '/projects/im',
     },
     // The rail's waiting dot is the nav that reflects projects.
     onProjectsChanged: notifyProjectsChanged,
@@ -37,4 +39,6 @@ export const projectsHost: ProjectsHost = {
     embedded: true,
     // Folder sessions run through Claude Code profiles and show their route.
     session: sessionSlots,
+    // Chat bots and their chats come from Remote; bindings are Projects' own.
+    im: imHost,
 };

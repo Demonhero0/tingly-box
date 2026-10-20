@@ -26,6 +26,8 @@ export interface ComposerProps {
      * paste becomes a text file).
      */
     attach?: (files: File[]) => Promise<Attachment[]>;
+    /** Why attaching is unavailable right now; shows the button disabled with this hint, and ignores paste and drop of files. */
+    attachBlocked?: string;
     /** A turn runs: Stop shows when onStop is set, and Send waits unless sendWhileStreaming. */
     streaming?: boolean;
     onStop?: () => void | Promise<void>;
@@ -68,7 +70,7 @@ export interface ComposerProps {
  * Enter (confirming a candidate) never sends, and a send never runs twice.
  */
 export function Composer({
-    onSend, attach, streaming, onStop, sendWhileStreaming, disabled, canSubmit = true, placeholder, autoFocus, model, onModelChange,
+    onSend, attach, attachBlocked, streaming, onStop, sendWhileStreaming, disabled, canSubmit = true, placeholder, autoFocus, model, onModelChange,
     context, leftSlot, minRows = 1, seed, keepUntilSent, text: controlled, onTextChange, onAccepted, keysHint,
 }: ComposerProps) {
     const { t } = useTranslation('projects');
@@ -94,7 +96,7 @@ export function Composer({
     useEffect(() => () => filesRef.current.forEach((f) => f.preview && URL.revokeObjectURL(f.preview)), []);
 
     const addFiles = async (list: File[], pastedLines?: number) => {
-        if (!attach || list.length === 0) return;
+        if (!attach || attachBlocked || list.length === 0) return;
         setAttachError('');
         const added: Pending[] = list.map((f) => ({
             key: nextKey.current++,
@@ -225,9 +227,9 @@ export function Composer({
     const inline = !leftSlot && !onModelChange && !hint;
 
     const attachButton = attach && (
-        <Tooltip title={t('composer.attach')}>
+        <Tooltip title={attachBlocked || t('composer.attach')}>
             <span>
-                <IconButton size="small" disabled={disabled} onClick={() => fileInput.current?.click()} aria-label={t('composer.attach')} sx={{ color: 'text.secondary' }}>
+                <IconButton size="small" disabled={disabled || !!attachBlocked} onClick={() => fileInput.current?.click()} aria-label={t('composer.attach')} sx={{ color: 'text.secondary' }}>
                     <Attach fontSize="small" />
                 </IconButton>
                 <input
@@ -282,7 +284,7 @@ export function Composer({
             placeholder={placeholder ?? t('composer.placeholder')}
             inputProps={{ 'aria-label': placeholder ?? t('composer.placeholder') }}
             onChange={(e) => setText(e.target.value)}
-            onPaste={attach ? (e) => {
+            onPaste={attach && !attachBlocked ? (e) => {
                 const pasted = Array.from(e.clipboardData.files);
                 if (pasted.length > 0) {
                     e.preventDefault();
@@ -318,13 +320,13 @@ export function Composer({
                 '&:focus-within': { borderColor: 'text.disabled' },
                 ...(dragging && { borderColor: 'primary.main', borderStyle: 'dashed' }),
             }}
-            onDragOver={attach ? (e) => {
+            onDragOver={attach && !attachBlocked ? (e) => {
                 if (!e.dataTransfer.types.includes('Files')) return;
                 e.preventDefault();
                 setDragging(true);
             } : undefined}
-            onDragLeave={attach ? () => setDragging(false) : undefined}
-            onDrop={attach ? (e) => {
+            onDragLeave={attach && !attachBlocked ? () => setDragging(false) : undefined}
+            onDrop={attach && !attachBlocked ? (e) => {
                 if (e.dataTransfer.files.length === 0) return;
                 e.preventDefault();
                 setDragging(false);

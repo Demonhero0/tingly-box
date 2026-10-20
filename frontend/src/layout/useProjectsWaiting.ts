@@ -4,9 +4,9 @@ import { anythingWaiting, PROJECTS_CHANGED_EVENT } from '@/services/projectsApi'
 const POLL_MS = 30_000;
 
 /**
- * Whether a project thread or a working-folder session waits on the user,
- * for the dot on the rail's Projects item. Reads the project and folder
- * lists (which carry waiting counts), again whenever the Projects pages report
+ * Whether a thread of a project or a working folder waits on the user,
+ * for the dot on the rail's Projects item. Reads the project list
+ * (folders included; it carries waiting counts), again whenever the Projects pages report
  * a change, on a slow poll while the tab is visible, and when the tab comes
  * back.
  */

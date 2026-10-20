@@ -18,19 +18,21 @@ export const pastedTextFile = (text: string): File => new File([text], 'pasted-t
 export const formatSize = (n: number): string => (n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : n >= 1 << 10 ? `${Math.round(n / (1 << 10))} KB` : `${n} B`);
 
 /**
- * Whose uploads: a project's (its library), a folder session's own, or none
- * yet (the first message of a session that is not started).
+ * Whose uploads: a project's (its library), a folder thread's own, or a
+ * folder's draft area (the first message of a thread that is not started).
  */
 export interface AttachOwner {
     projectId?: string;
-    sessionId?: string;
+    threadId?: string;
+    /** The folder project whose next thread the files are for. */
+    draftFolderId?: string;
 }
 
-const base = (o: AttachOwner) => (o.projectId ? `/api/v1/projects/${o.projectId}` : o.sessionId ? `/api/v1/projects/sessions/${o.sessionId}` : '/api/v1/projects/workdirs');
+const base = (o: AttachOwner) => (o.threadId ? `/api/v1/threads/${o.threadId}` : `/api/v1/projects/${o.projectId ?? o.draftFolderId ?? ''}`);
 
-const fileUrl = (o: AttachOwner, path: string) => (o.projectId
-    ? `${base(o)}/library/file?path=${encodeURIComponent(path)}`
-    : `${base(o)}/attachments/file?path=${encodeURIComponent(path)}`);
+const fileUrl = (o: AttachOwner, path: string) => (o.threadId
+    ? `${base(o)}/attachments/file?path=${encodeURIComponent(path)}`
+    : `${base(o)}/library/file?path=${encodeURIComponent(path)}`);
 
 /** Stores files for a message and returns what to send with it. */
 export async function uploadAttachments(owner: AttachOwner, files: File[]): Promise<Attachment[]> {

@@ -24,13 +24,13 @@ export function DiffDialog({ thread, open, onClose }: { thread: Thread; open: bo
         setDiff(null);
         setError(null);
         setBlocked(null);
-        unwrap(api.GET('/api/v1/projects/{id}/threads/{tid}/diff', { params: { path: { id: thread.project_id, tid: thread.id } } })).then(setDiff).catch((e: Error) => setError(e.message));
+        unwrap(api.GET('/api/v1/threads/{id}/diff', { params: { path: { id: thread.id } } })).then(setDiff).catch((e: Error) => setError(e.message));
     }, [open, thread.id]);
 
     const merge = async () => {
         setBusy(true);
         try {
-            await unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/merge', { params: { path: { id: thread.project_id, tid: thread.id } } }));
+            await unwrap(api.POST('/api/v1/threads/{id}/merge', { params: { path: { id: thread.id } } }));
             notify(t('thread.merged', { branch: thread.branch, base: thread.base_branch }), 'success');
             onClose();
         } catch (e) {

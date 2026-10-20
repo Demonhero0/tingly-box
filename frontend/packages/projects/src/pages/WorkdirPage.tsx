@@ -3,17 +3,20 @@ import { Alert, Box, Button, IconButton, Skeleton, Tooltip, Typography } from '@
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fontMono, fontSizes } from '@tingly/ui/theme/fonts';
-import { api, unwrap, type Attachment, type BackgroundTask, type SessionDetail, type Thread, type ThreadEvent } from '../client';
+import { api, unwrap, type Attachment, type BackgroundTask, type Project, type Thread, type ThreadEvent } from '../client';
 import { AddWorkdirDialog } from '../components/workdir/AddWorkdirDialog';
 import { NewSessionView } from '../components/workdir/NewSessionView';
 import { loadPermissionModes, PermissionModeSelect } from '../components/workdir/PermissionModeSelect';
-import { useWorkdirs } from '../components/workdir/useWorkdirs';
+import { uploadAttachments } from '../components/attachments';
+import { ProjectImTags, useProjectIm } from '../components/im/ProjectImBindings';
 import { ThreadPanel } from '../components/project/ThreadPanel';
 import { StatusGroups, type StatusGroup } from '../components/workspace/StatusGroups';
 import { WorkspaceLayout, useWorkspacePane } from '../components/workspace/WorkspaceLayout';
 import { Add, Close } from '../components/icons';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useNotify } from '../hooks/useNotify';
-import { useSessionEvents, type ProjectEvent } from '../hooks/useProjectEvents';
+import type { ProjectEvent } from '../hooks/useProjectEvents';
+import { useProjectList } from '../hooks/useProjectList';
 import { useProjectsHost, type SessionLaunch } from '../host/ProjectsHost';
 import { folderName, timeAgo } from '../utils/format';
 
@@ -44,10 +47,11 @@ const GROUPS: { key: string; color: StatusGroup['color']; collapsed?: boolean }[
 ];
 
 /**
- * A working folder: Claude Code sitting in a plain folder, no worktree or
- * coordinator. The side pane lists the folder's sessions the way a project
- * lists its threads (what needs you first); the main area is the open
- * session, or the prompt for a new one. Without a folder it lists them all.
+ * A working folder (a project of type folder): Claude Code sitting in a plain
+ * folder, no worktree or coordinator. The side pane lists the folder's threads
+ * the way a project lists its own (what needs you first); the main area is
+ * the open thread, or the prompt for a new one. Without a folder it lists
+ * them all. A folder has no goal, memory, library or review: only threads.
  */
 export default function WorkdirPage() {
     const { t, i18n } = useTranslation('projects');
@@ -57,7 +61,17 @@ export default function WorkdirPage() {
     const scope = params.get('path') ?? '';
     const sessionId = params.get('session') ?? '';
     const pane = useWorkspacePane('folder.');
-    const { workdirs, reload: reloadWorkdirs } = useWorkdirs();
+    // The folders are the folder-typed projects of the one project list (the
+    // sidebar's too); its stream also carries this page's thread events.
+    const onEvent = useRef<(ev: ProjectEvent) => void>(() => undefined);
+    const onOpen = useRef<() => void>(() => undefined);
+    const { folders, reload: reloadList } = useProjectList(true, (ev) => onEvent.current(ev), () => onOpen.current());
+    const folder = scope ? folders?.find((f) => f.path === scope) : undefined;
+    // Which folders' threads this page lists, as a stable key: the open folder, or every folder with threads.
+    const listed = !folders ? null
+        : scope ? (folder ? [folder.id] : [])
+            : folders.filter((f) => f.threads.waiting + f.threads.working + f.threads.ready + f.threads.idle + f.threads.resolved > 0).map((f) => f.id);
+    const listedKey = listed?.join(',') ?? null;
 
     const [sessions, setSessions] = useState<Thread[] | null>(null);
     const [events, setEvents] = useState<ThreadEvent[] | null>(null);
@@ -79,25 +93,29 @@ export default function WorkdirPage() {
     const sessionReq = useRef(0);
 
     const loadSessions = useCallback(async () => {
+        if (listedKey === null) return;
         const n = ++sessionsReq.current;
         try {
-            const r = await unwrap(api.GET('/api/v1/projects/sessions', { params: { query: { folder: scope || undefined } } }));
+            const lists = await Promise.all(listedKey.split(',').filter(Boolean).map((id) => unwrap(api.GET('/api/v1/projects/{id}/threads', { params: { path: { id } } }))));
             if (n !== sessionsReq.current) return;
-            setSessions(r.sessions);
+            setSessions(lists.flatMap((r) => r.threads).sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
             setError(null);
         } catch (e) {
             if (n === sessionsReq.current) setError((e as Error).message);
         }
-    }, [scope]);
+    }, [listedKey]);
 
     const loadSession = useCallback(async (sid: string) => {
         const n = ++sessionReq.current;
         try {
-            const d: SessionDetail = await unwrap(api.GET('/api/v1/projects/sessions/{sid}', { params: { path: { sid } } }));
+            const [d, ev] = await Promise.all([
+                unwrap(api.GET('/api/v1/threads/{id}', { params: { path: { id: sid } } })),
+                unwrap(api.GET('/api/v1/threads/{id}/events', { params: { path: { id: sid } } })),
+            ]);
             if (n !== sessionReq.current) return;
-            setEvents(d.events);
+            setEvents(ev.events);
             setLiveTasks(d.background_tasks ?? []);
-            setSessions((list) => upsert(list ?? [], d.session));
+            setSessions((list) => upsert(list ?? [], d.thread));
         } catch (e) {
             if (n !== sessionReq.current) return;
             notify((e as Error).message, 'error');
@@ -111,8 +129,12 @@ export default function WorkdirPage() {
         }
     }, [notify, setParams]);
 
+    // Another folder starts from an empty list; the same folder (or all of them) keeps what it shows while it refreshes.
     useEffect(() => {
         setSessions(null);
+    }, [scope]);
+
+    useEffect(() => {
         void loadSessions();
     }, [loadSessions]);
 
@@ -123,27 +145,35 @@ export default function WorkdirPage() {
         else sessionReq.current++;
     }, [sessionId, loadSession]);
 
-    useSessionEvents((ev: ProjectEvent) => {
-        if (ev.type === 'thread') {
-            const th = ev.data as Thread;
-            if (!scope || th.worktree === scope) setSessions((list) => upsert(list ?? [], th));
-            refresh();
-            reloadWorkdirs();
-        } else if (ev.type === 'thread_event') {
-            const e = ev.data as ThreadEvent;
-            if (e.thread_id !== sessionId) return;
-            setEvents((list) => (list ? upsert(list, e, true) : list));
-            // The live set changed: it comes with the session.
-            if (e.kind === 'task' && changesLiveTasks(e)) void loadSession(sessionId);
-        }
-    }, () => {
-        void loadSessions();
-        if (sessionId) void loadSession(sessionId);
+    // The list's stream calls these; they always see this render's folder, thread and loaders.
+    useEffect(() => {
+        onEvent.current = (ev: ProjectEvent) => {
+            if (ev.type === 'thread') {
+                const th = ev.data as Thread;
+                // Only the folders this page lists (the stream carries every project's).
+                const mine = scope ? th.project_id === folder?.id : !!folders?.some((f) => f.id === th.project_id);
+                // The list stream already refreshes the folder list for this event.
+                if (mine) setSessions((list) => upsert(list ?? [], th));
+            } else if (ev.type === 'thread_event') {
+                const e = ev.data as ThreadEvent;
+                if (e.thread_id !== sessionId) return;
+                setEvents((list) => (list ? upsert(list, e, true) : list));
+                // The live set changed: it comes with the session.
+                if (e.kind === 'task' && changesLiveTasks(e)) void loadSession(sessionId);
+            }
+        };
+        onOpen.current = () => {
+            void loadSessions();
+            if (sessionId) void loadSession(sessionId);
+        };
     });
 
     const selected = sessions?.find((s) => s.id === sessionId);
     const running = selected?.status === 'working'
         || (selected?.status === 'waiting' && !!events?.some((e) => (e.kind === 'approval' || e.kind === 'ask') && e.payload?.includes('"state":"pending"')));
+
+    // IM chats bound to the open thread: a folder is bound by one of its threads, never as a project.
+    const im = useProjectIm(selected ? { threadId: selected.id, name: selected.title } : null);
 
     const go = (next: Record<string, string>) => setParams(next);
     const openSession = (id: string) => {
@@ -157,23 +187,40 @@ export default function WorkdirPage() {
         else next.delete('add');
         return next;
     });
-    const known = workdirs?.find((w) => w.path === scope);
-    const removable = !!known?.saved;
+    // A folder in the list can be taken off the sidebar; its threads stay (archive, not delete).
+    const removable = !!folder;
 
-    const create = async (folder: string, content: string, permission_mode: string, launch: SessionLaunch, attachments: Attachment[]): Promise<boolean> => {
+    // The folder's project, opened first if it is new (the server returns the existing one otherwise).
+    const openFolder = (path: string): Promise<Project> => unwrap(api.POST('/api/v1/projects', { body: { type: 'folder', path } }));
+
+    // Uploads need a folder project to hang the files on (the server keeps a
+    // draft area per folder), so attaching opens the folder first. Side effect,
+    // accepted: a draft that is never sent still leaves the folder opened (or
+    // un-archived) in the list, which is why the list is reloaded here and
+    // Attach stays disabled until a folder is chosen. A draft owner that is
+    // independent of the folder would need a backend change.
+    const attach = async (path: string, files: File[]): Promise<Attachment[]> => {
+        const f = await openFolder(path);
+        reloadList();
+        return uploadAttachments({ draftFolderId: f.id }, files);
+    };
+
+    const create = async (path: string, content: string, permission_mode: string, launch: SessionLaunch, attachments: Attachment[]): Promise<boolean> => {
         try {
-            const s = await unwrap(api.POST('/api/v1/projects/sessions', {
-                body: { folder, content, attachments: attachments.map((a) => a.path), permission_mode: permission_mode || undefined, profile: launch.profile || undefined, model: launch.model || undefined },
+            const f = await openFolder(path);
+            const s = await unwrap(api.POST('/api/v1/projects/{id}/threads', {
+                params: { path: { id: f.id } },
+                body: { content, attachments: attachments.map((a) => a.path), permission_mode: permission_mode || undefined, profile: launch.profile || undefined, model: launch.model || undefined },
             }));
             // Picked another folder than the one open: go to that folder.
-            if (scope && s.worktree !== scope) {
-                go({ path: s.worktree, session: s.id });
+            if (scope && s.cwd !== scope) {
+                go({ path: s.cwd, session: s.id });
             } else {
                 setSessions((list) => upsert(list ?? [], s));
                 go({ ...(scope && { path: scope }), session: s.id });
             }
             refresh();
-            reloadWorkdirs();
+            reloadList();
             return true;
         } catch (e) {
             notify((e as Error).message, 'error');
@@ -184,7 +231,7 @@ export default function WorkdirPage() {
     const setMode = async (mode: string) => {
         if (!selected) return;
         try {
-            const s = await unwrap(api.PUT('/api/v1/projects/sessions/{sid}/permission-mode', { params: { path: { sid: selected.id } }, body: { permission_mode: mode } }));
+            const s = await unwrap(api.PUT('/api/v1/threads/{id}/permission-mode', { params: { path: { id: selected.id } }, body: { permission_mode: mode } }));
             setSessions((list) => upsert(list ?? [], s));
         } catch (e) {
             notify((e as Error).message, 'error');
@@ -194,16 +241,16 @@ export default function WorkdirPage() {
     // A profile change goes first: it may clear a model the profile cannot run.
     const setLaunch = async (next: SessionLaunch) => {
         if (!selected) return;
-        const path = { params: { path: { sid: selected.id } } };
+        const path = { params: { path: { id: selected.id } } };
         try {
             let s = selected;
             if (next.profile !== (s.profile ?? '')) {
                 // The server resets the model with the profile.
-                s = await unwrap(api.PUT('/api/v1/projects/sessions/{sid}/profile', { ...path, body: { profile: next.profile } }));
+                s = await unwrap(api.PUT('/api/v1/threads/{id}/profile', { ...path, body: { profile: next.profile } }));
                 setSessions((list) => upsert(list ?? [], s));
             }
             if (next.model !== (s.model ?? '')) {
-                s = await unwrap(api.PUT('/api/v1/projects/sessions/{sid}/model', { ...path, body: { model: next.model } }));
+                s = await unwrap(api.PUT('/api/v1/threads/{id}/model', { ...path, body: { model: next.model } }));
                 setSessions((list) => upsert(list ?? [], s));
             }
         } catch (e) {
@@ -211,11 +258,16 @@ export default function WorkdirPage() {
         }
     };
 
+    // Threads a removal would stop: the ones working or waiting on a request.
+    const stopCount = folder ? folder.threads.working + folder.threads.waiting : 0;
+    const [confirmRemove, setConfirmRemove] = useState(false);
+
     const removeFolder = async () => {
         try {
-            await unwrap(api.DELETE('/api/v1/projects/workdirs', { params: { query: { path: scope } } }));
+            if (!folder) return;
+            await unwrap(api.DELETE('/api/v1/projects/{id}', { params: { path: { id: folder.id } } }));
             refresh();
-            reloadWorkdirs();
+            reloadList();
             go({});
         } catch (e) {
             notify((e as Error).message, 'error');
@@ -227,7 +279,7 @@ export default function WorkdirPage() {
         id: s.id,
         group: s.status === 'ready' ? 'idle' : s.status,
         title: s.title,
-        subtitle: [scope ? '' : folderName(s.worktree), s.status === 'waiting' ? s.wait_reason : ''].filter(Boolean).join(' · ') || undefined,
+        subtitle: [scope ? '' : folderName(s.cwd), s.status === 'waiting' ? s.wait_reason : ''].filter(Boolean).join(' · ') || undefined,
         meta: timeAgo(s.updated_at, i18n.language),
         selected: s.id === sessionId,
     })), [sessions, scope, sessionId, i18n.language]);
@@ -248,19 +300,29 @@ export default function WorkdirPage() {
                 ) : <Typography variant="h5" noWrap>{t('workdir.title')}</Typography>}
                 actions={(
                     <>
+                        {im && <Box sx={{ display: { xs: 'none', md: 'flex' }, minWidth: 0, flexShrink: 1 }}><ProjectImTags im={im} /></Box>}
                         {removable && (
                             <Tooltip title={t('workdir.remove')}>
-                                <IconButton size="small" aria-label={t('workdir.remove')} onClick={() => void removeFolder()}><Close fontSize="small" /></IconButton>
+                                <IconButton size="small" aria-label={t('workdir.remove')} onClick={() => (stopCount > 0 ? setConfirmRemove(true) : void removeFolder())}><Close fontSize="small" /></IconButton>
                             </Tooltip>
                         )}
                         <Button size="small" startIcon={<Add />} onClick={() => openNew()}>{t('session.new')}</Button>
                     </>
                 )}
-                notice={error && (
-                    <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => void loadSessions()}>{t('common.retry')}</Button>}>
-                        {t('session.refreshFailed')}
-                        <Box component="span" sx={{ display: 'block', fontSize: fontSizes.md }}>{error}</Box>
-                    </Alert>
+                notice={(error || im) && (
+                    <>
+                        {error && (
+                            <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => void loadSessions()}>{t('common.retry')}</Button>}>
+                                {t('session.refreshFailed')}
+                                <Box component="span" sx={{ display: 'block', fontSize: fontSizes.md }}>{error}</Box>
+                            </Alert>
+                        )}
+                        {im && (
+                            <Box sx={{ display: { xs: 'flex', md: 'none' }, px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
+                                <ProjectImTags im={im} maxVisible={99} showLabel />
+                            </Box>
+                        )}
+                    </>
                 )}
                 side={(
                     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -277,7 +339,8 @@ export default function WorkdirPage() {
                 main={sessionId ? (
                     <ThreadPanel
                         key={sessionId}
-                        projectId=""
+                        projectId={selected?.project_id ?? folder?.id ?? ''}
+                        folder
                         threadId={sessionId}
                         thread={selected}
                         events={events}
@@ -299,20 +362,31 @@ export default function WorkdirPage() {
                         // Remount per folder so the form starts from that folder.
                         key={scope}
                         initialFolder={scope || undefined}
-                        folders={workdirs ?? []}
+                        folders={(folders ?? []).map((f) => f.path ?? '')}
                         permissionModes={modes}
                         onCreate={create}
                         onAddFolder={() => setAdding(true)}
+                        onAttach={attach}
                     />
                 )}
+            />
+            {im?.dialog}
+            <ConfirmDialog
+                open={confirmRemove}
+                title={t('workdir.removeTitle')}
+                message={t('workdir.removeRunning', { count: stopCount, name: folder ? folderName(folder.path ?? '') : '' })}
+                confirmLabel={t('workdir.removeConfirm')}
+                danger
+                onClose={() => setConfirmRemove(false)}
+                onConfirm={() => void removeFolder()}
             />
             {adding && (
                 <AddWorkdirDialog
                     onClose={() => setAdding(false)}
                     onAdded={(w) => {
                         refresh();
-                        reloadWorkdirs();
-                        go({ path: w.path, new: '1' });
+                        reloadList();
+                        go({ path: w.path ?? '', new: '1' });
                     }}
                 />
             )}

@@ -132,4 +132,12 @@ describe('Composer attachments', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('too big');
         expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
     });
+
+    it('disables Attach with its hint and ignores dropped files until it is allowed', () => {
+        const attach = vi.fn().mockResolvedValue([]);
+        render(<Composer placeholder="Reply" onSend={vi.fn()} attach={attach} attachBlocked="Choose a folder first" />);
+        expect(screen.getByRole('button', { name: 'composer.attach' })).toBeDisabled();
+        fireEvent.change(screen.getByTestId('composer-file-input'), { target: { files: [new File(['x'], 'a.txt')] } });
+        expect(attach).not.toHaveBeenCalled();
+    });
 });

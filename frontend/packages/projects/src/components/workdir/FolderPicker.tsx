@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Box, ButtonBase, Divider, InputBase, Menu, MenuItem, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { fontMono, fontSizes } from '@tingly/ui/theme/fonts';
-import type { Workdir } from '../../client';
 import { folderName } from '../../utils/format';
 import { composerPickerLabelSx, composerPickerSx } from '../composerPicker';
 import { Add, ExpandMore, FolderOpen } from '../icons';
@@ -10,7 +9,8 @@ import { Add, ExpandMore, FolderOpen } from '../icons';
 interface Props {
     value: string;
     onChange: (path: string) => void;
-    folders: Workdir[];
+    /** The known folders' paths. */
+    folders: string[];
     /** Shows "Add working folder" at the end of the list. */
     onAddFolder?: () => void;
 }
@@ -56,11 +56,11 @@ export function FolderPicker({ value, onChange, folders, onAddFolder }: Props) {
                 transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
                 slotProps={{ paper: { sx: { minWidth: 300, maxWidth: 440 } } }}
             >
-                {folders.map((f) => (
-                    <MenuItem key={f.path} selected={f.path === value} onClick={() => pick(f.path)}>
+                {folders.map((path) => (
+                    <MenuItem key={path} selected={path === value} onClick={() => pick(path)}>
                         <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>{folderName(f.path)}</Typography>
-                            <Typography noWrap sx={{ fontFamily: fontMono, fontSize: fontSizes.xs, color: 'text.secondary' }}>{f.path}</Typography>
+                            <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>{folderName(path)}</Typography>
+                            <Typography noWrap sx={{ fontFamily: fontMono, fontSize: fontSizes.xs, color: 'text.secondary' }}>{path}</Typography>
                         </Box>
                     </MenuItem>
                 ))}

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { apiFetch } from '../client';
 
 export interface ProjectEvent {
-    type: 'message' | 'message_delta' | 'thread' | 'thread_event' | 'project' | 'coordinator';
+    type: 'message_delta' | 'thread' | 'thread_event' | 'project' | 'coordinator';
     project_id: string;
     data: unknown;
 }
@@ -43,9 +43,47 @@ export function useProjectEvents(projectId: string, onEvent: (ev: ProjectEvent) 
     useEventStream(projectId ? `/api/v1/projects/${projectId}/events` : '', onEvent, onOpen);
 }
 
-/** Folder sessions' live events: the same stream, for sessions that belong to no project. */
-export function useSessionEvents(onEvent: (ev: ProjectEvent) => void, onOpen?: () => void) {
-    useEventStream('/api/v1/projects/sessions/events', onEvent, onOpen);
+/**
+ * Every project's live events in one stream (the sidebar's and the folder
+ * page's); streamed coordinator text is left out. Each event carries its
+ * `project_id`.
+ */
+export function useAllProjectEvents(onEvent: (ev: ProjectEvent) => void, onOpen?: () => void, enabled = true) {
+    useEventStream(enabled ? '/api/v1/projects/events' : '', onEvent, onOpen);
+}
+
+/**
+ * Opens a live event stream outside React, reconnecting when it drops, and
+ * returns the function that closes it. onOpen runs on every reconnect.
+ */
+export function openEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen?: () => void): () => void {
+    const abort = new AbortController();
+    const { signal } = abort;
+    void (async () => {
+        let first = true;
+        while (!signal.aborted) {
+            try {
+                const res = await apiFetch(url, {
+                    headers: { Accept: 'text/event-stream' },
+                    signal,
+                });
+                if (res.ok && !first) onOpen?.();
+                first = false;
+                await readEventStream(res, (data) => {
+                    try {
+                        onEvent(JSON.parse(data) as ProjectEvent);
+                    } catch {
+                        // ignore malformed frames
+                    }
+                });
+            } catch {
+                // offline or refused: retry below
+            }
+            if (signal.aborted) return;
+            await new Promise((r) => setTimeout(r, RETRY_MS));
+        }
+    })();
+    return () => abort.abort();
 }
 
 function useEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen?: () => void) {
@@ -56,32 +94,6 @@ function useEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen
 
     useEffect(() => {
         if (!url) return;
-        const abort = new AbortController();
-        const { signal } = abort;
-        void (async () => {
-            let first = true;
-            while (!signal.aborted) {
-                try {
-                    const res = await apiFetch(url, {
-                        headers: { Accept: 'text/event-stream' },
-                        signal,
-                    });
-                    if (res.ok && !first) opened.current?.();
-                    first = false;
-                    await readEventStream(res, (data) => {
-                        try {
-                            handler.current(JSON.parse(data) as ProjectEvent);
-                        } catch {
-                            // ignore malformed frames
-                        }
-                    });
-                } catch {
-                    // offline or refused: retry below
-                }
-                if (signal.aborted) return;
-                await new Promise((r) => setTimeout(r, RETRY_MS));
-            }
-        })();
-        return () => abort.abort();
+        return openEventStream(url, (ev) => handler.current(ev), () => opened.current?.());
     }, [url]);
 }

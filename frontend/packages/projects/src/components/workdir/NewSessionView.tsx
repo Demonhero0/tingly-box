@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import type { Attachment, Workdir } from '../../client';
-import { uploadAttachments } from '../attachments';
+import type { Attachment } from '../../client';
 import { Composer } from '../Composer';
 import { FolderPicker } from './FolderPicker';
 import { PermissionModeSelect } from './PermissionModeSelect';
@@ -11,10 +10,13 @@ import { useProjectsHost, type SessionLaunch } from '../../host/ProjectsHost';
 interface Props {
     /** The folder the page is scoped to; the last used one when empty. */
     initialFolder?: string;
-    folders: Workdir[];
+    /** The known folders' paths. */
+    folders: string[];
     permissionModes: string[];
     onCreate: (folder: string, prompt: string, permissionMode: string, launch: SessionLaunch, attachments: Attachment[]) => Promise<boolean>;
     onAddFolder?: () => void;
+    /** Stores files for the first message of a session in `folder`. */
+    onAttach: (folder: string, files: File[]) => Promise<Attachment[]>;
 }
 
 /**
@@ -22,14 +24,14 @@ interface Props {
  * text, so starting a task is type and Enter. The sidebar lists the folders,
  * so there is no second list of them here.
  */
-export function NewSessionView({ initialFolder, folders, permissionModes, onCreate, onAddFolder }: Props) {
+export function NewSessionView({ initialFolder, folders, permissionModes, onCreate, onAddFolder, onAttach }: Props) {
     const { t } = useTranslation('projects');
     const { session: slots } = useProjectsHost();
     const [launch, setLaunch] = useState<SessionLaunch>({ profile: '', model: '' });
     const [picked, setPicked] = useState<string | null>(null);
     const [mode, setMode] = useState('');
     const [text, setText] = useState('');
-    const folder = picked ?? initialFolder ?? folders[0]?.path ?? '';
+    const folder = picked ?? initialFolder ?? folders[0] ?? '';
 
     return (
         <Box sx={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', px: 2 }}>
@@ -45,7 +47,9 @@ export function NewSessionView({ initialFolder, folders, permissionModes, onCrea
                     text={text}
                     onTextChange={setText}
                     onAccepted={(sent) => setText((prev) => (prev === sent ? '' : prev))}
-                    attach={(files) => uploadAttachments({}, files)}
+                    attach={(files) => onAttach(folder.trim(), files)}
+                    // Files are stored under the folder's project, so there must be a folder first.
+                    attachBlocked={folder.trim() === '' ? t('session.attachNeedsFolder') : undefined}
                     onSend={(prompt, attachments) => onCreate(folder.trim(), prompt, mode, launch, attachments)}
                     leftSlot={(
                         <>

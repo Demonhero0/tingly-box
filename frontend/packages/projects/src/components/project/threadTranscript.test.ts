@@ -8,12 +8,12 @@ const ev = (kind: string, content: string, extra: Partial<ThreadEvent> = {}): Th
     id: `e${++n}`, thread_id: 't', kind, content, created_at: '2026-10-15T00:00:00Z', ...extra,
 });
 const request = (state: string, extra: Record<string, unknown> = {}) => JSON.stringify({ request_id: `r${n}`, tool: 'Bash', input: { command: 'make test' }, state, ...extra });
-const author = (from?: string) => from === 'coordinator' ? 'Coordinator' : undefined;
+const author = (e: ThreadEvent) => e.source === 'thread' ? 'Coordinator' : undefined;
 
 describe('threadTranscript', () => {
     it('pairs calls with their results and folds a settled approval into its call', () => {
         const { entries, pendingRequestId } = threadTranscript([
-            ev('user', 'Run the tests', { from: 'coordinator' }),
+            ev('user', 'Run the tests', { source: 'thread', source_ref: 'main' }),
             ev('tool_use', 'Bash', { payload: '{"command":"make test"}' }),
             ev('approval', 'Run make test', { payload: request('allowed', { scope: 'thread' }) }),
             ev('tool_result', 'ok', { payload: '{"is_error":false}' }),
@@ -71,7 +71,7 @@ describe('threadTranscript attachments', () => {
     it('carries the files of a user message', () => {
         const file = { name: 'a.png', path: 'uploads/x/a.png', type: 'image/png', size: 4 };
         const { entries } = threadTranscript([
-            { id: '1', thread_id: 't', kind: 'user', content: '', from: 'user', payload: JSON.stringify({ attachments: [file] }), created_at: '2026-10-18T00:00:00Z' },
+            { id: '1', thread_id: 't', kind: 'user', content: '', payload: JSON.stringify({ attachments: [file] }), created_at: '2026-10-18T00:00:00Z' },
         ], false, () => undefined);
         expect(entries[0].attachments).toEqual([file]);
     });

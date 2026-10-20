@@ -11,15 +11,15 @@ afterEach(() => {
 });
 
 const thread = (o: Partial<Thread>): Thread => ({
-    id: 't', project_id: 'p', title: 'Fix login', task: '', status: 'working', origin: 'user', worktree: '/work/app',
+    id: 't', project_id: 'p', title: 'Fix login', task: '', status: 'working', origin: 'user', agent: 'claude-code', seq: 1, cwd: '/work/app',
     commits_ahead: 0, files_changed: 0, uncommitted: false, turns: 0, input_tokens: 0, output_tokens: 0, created_at: '', updated_at: '', ...o,
 } as Thread);
 
 describe('ComposerStrip', () => {
     it('defaults to waiting ten minutes in a project thread and to off in a folder session', () => {
         expect(autoAnswerOf(thread({}))).toBe('delay');
-        expect(autoAnswerOf(thread({ project_id: '' }))).toBe('off');
-        expect(autoAnswerOf(thread({ project_id: '', auto_answer: 'now' }))).toBe('now');
+        expect(autoAnswerOf(thread({}), true)).toBe('off');
+        expect(autoAnswerOf(thread({ auto_answer: 'now' }), true)).toBe('now');
     });
 
     it('folds to the fact that matters now plus a count, and unfolds to one line per fact', () => {
@@ -43,7 +43,7 @@ describe('ComposerStrip', () => {
     });
 
     it('names a folder session’s branch, and drops auto-answer once resolved', () => {
-        render(<ComposerStrip thread={thread({ project_id: '', head_branch: 'main', status: 'resolved' })} onAutoAnswer={vi.fn()} />);
+        render(<ComposerStrip thread={thread({ head_branch: 'main', status: 'resolved' })} folder onAutoAnswer={vi.fn()} />);
         expect(screen.getByText('main')).toBeInTheDocument();
         expect(screen.queryByText('strip.autoAnswer.off')).toBeNull();
     });

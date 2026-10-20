@@ -14,28 +14,24 @@ vi.stubGlobal('Request', class extends NodeRequest {
     }
 });
 
-const respond = (projects: unknown, workdirs: unknown) =>
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-        const path = new URL((input as Request).url).pathname;
-        const body = path.endsWith('/workdirs') ? { workdirs } : { projects };
-        return new Response(JSON.stringify(body), { status: 200 });
-    });
+const respond = (projects: unknown) =>
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ projects }), { status: 200 }));
 
 describe('anythingWaiting', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('is true for a waiting project thread', async () => {
-        respond([{ threads: { waiting: 1 } }], [{ waiting: 0 }]);
+        respond([{ type: 'project', threads: { waiting: 1 } }, { type: 'folder', threads: { waiting: 0 } }]);
         expect(await anythingWaiting()).toBe(true);
     });
 
-    it('is true for a waiting folder session alone', async () => {
-        respond([{ threads: { waiting: 0 } }], [{ waiting: 2 }]);
+    it('is true for a waiting folder thread alone', async () => {
+        respond([{ type: 'project', threads: { waiting: 0 } }, { type: 'folder', threads: { waiting: 2 } }]);
         expect(await anythingWaiting()).toBe(true);
     });
 
-    it('is false when nothing waits, or a list is unreachable', async () => {
-        respond([], []);
+    it('is false when nothing waits, or the list is unreachable', async () => {
+        respond([]);
         expect(await anythingWaiting()).toBe(false);
         vi.restoreAllMocks();
         vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 503 }));

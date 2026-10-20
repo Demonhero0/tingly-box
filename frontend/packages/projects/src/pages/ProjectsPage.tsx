@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box, Button, Card, CardActionArea, InputAdornment, Skeleton, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type ProjectSummary } from '../client';
+import { api, isFolder, unwrap, type ProjectSummary } from '../client';
 import { Add, Branch, Folder, Pause, Search, Star } from '../components/icons';
 import { NewProjectDialog } from '../components/project/NewProjectDialog';
 import { useNotify } from '../hooks/useNotify';
@@ -82,8 +82,10 @@ export default function ProjectsPage() {
             unwrap(api.GET('/api/v1/projects', { params: { query: { q: q || undefined, archived: tab === 'archived' || undefined } } }))
                 .then((r) => {
                     if (!alive) return;
-                    setProjects(r.projects);
-                    if (!q) setMany(r.projects.length > SEARCH_FROM);
+                    // Folders live in the sidebar's Folders group, not here.
+                    const list = r.projects.filter((p) => !isFolder(p));
+                    setProjects(list);
+                    if (!q) setMany(list.length > SEARCH_FROM);
                 })
                 .catch((e: Error) => alive && notify(e.message, 'error'));
         }, q ? 200 : 0);

@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { fontMono } from '@tingly/ui/theme/fonts';
-import { api, unwrap, type Workdir } from '../../client';
+import { api, unwrap, type Project } from '../../client';
 
-/** Keeps an existing folder in the sidebar; the server checks that it is one. */
-export function AddWorkdirDialog({ onClose, onAdded }: { onClose: () => void; onAdded: (w: Workdir) => void }) {
+/** Opens an existing folder as a folder project, which puts it in the sidebar; the server checks that it is one. */
+export function AddWorkdirDialog({ onClose, onAdded }: { onClose: () => void; onAdded: (w: Project) => void }) {
     const { t } = useTranslation('projects');
     const [value, setValue] = useState('');
     const [error, setError] = useState('');
@@ -14,7 +14,7 @@ export function AddWorkdirDialog({ onClose, onAdded }: { onClose: () => void; on
     const submit = async () => {
         setBusy(true);
         try {
-            const w = await unwrap(api.POST('/api/v1/projects/workdirs', { body: { path: value.trim() } }));
+            const w = await unwrap(api.POST('/api/v1/projects', { body: { type: 'folder', path: value.trim() } }));
             onAdded(w);
         } catch (e) {
             setError((e as Error).message);

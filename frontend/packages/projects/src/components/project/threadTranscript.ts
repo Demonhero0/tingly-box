@@ -3,7 +3,7 @@
 // own. Threads record a little less than the engine's entries (no request id on a
 // tool call, a request's answer kept on the request itself), so this fills
 // the gaps: calls pair with their results in order, and a settled request
-// gets the answer entry the transcript expects. A folder session also keeps
+// gets the answer entry the transcript expects. A folder thread also keeps
 // the request id, the parent of a subagent's steps, task events and usage,
 // which pass through as they are.
 import type { ThreadEvent } from '../../client';
@@ -36,10 +36,11 @@ export interface ThreadTranscript {
 
 /**
  * threadTranscript converts a thread's events. author names who sent a
- * message to the thread when it is worth saying (the coordinator); running
+ * message to the thread when it is worth saying (the coordinator, which
+ * writes with source `thread`); running
  * is whether a turn is live, so a pending request is still answerable.
  */
-export function threadTranscript(events: ThreadEvent[], running: boolean, author: (from?: string) => string | undefined): ThreadTranscript {
+export function threadTranscript(events: ThreadEvent[], running: boolean, author: (e: ThreadEvent) => string | undefined): ThreadTranscript {
     const entries: TranscriptEntry[] = [];
     // Calls without a result yet, oldest first: a result belongs to the
     // latest of them, as the engine writes one right after its call.
@@ -51,7 +52,7 @@ export function threadTranscript(events: ThreadEvent[], running: boolean, author
         const first = entries.length;
         switch (e.kind) {
             case 'user':
-                entries.push({ role: 'user', content: e.content, author: author(e.from), attachments: parse<{ attachments?: TranscriptEntry['attachments'] }>(e.payload)?.attachments, timestamp });
+                entries.push({ role: 'user', content: e.content, author: author(e), attachments: parse<{ attachments?: TranscriptEntry['attachments'] }>(e.payload)?.attachments, timestamp });
                 break;
             case 'assistant':
                 entries.push({ role: 'assistant', content: e.content, timestamp });

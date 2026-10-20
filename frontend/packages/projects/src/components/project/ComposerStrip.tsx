@@ -17,10 +17,10 @@ const OPEN_KEY = 'thread.strip.open';
  * project thread (its owner is usually away) and off for a folder session
  * (its owner is usually watching). Mirrors the server's autoAnswerMode.
  */
-export function autoAnswerOf(thread: Thread): AutoAnswer {
+export function autoAnswerOf(thread: Thread, folder = false): AutoAnswer {
     const own = thread.auto_answer as AutoAnswer | undefined;
     if (own && AUTO_ANSWERS.includes(own)) return own;
-    return thread.project_id ? 'delay' : 'off';
+    return folder ? 'off' : 'delay';
 }
 
 const clip = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } as const;
@@ -40,6 +40,8 @@ function Row({ icon, name, children, action }: { icon: React.ReactNode; name: st
 
 interface Props {
     thread: Thread;
+    /** The thread sits in a working folder (not a project's thread). */
+    folder?: boolean;
     /** Saves the auto-answer setting; the row is left out without it. */
     onAutoAnswer?: (mode: AutoAnswer) => void;
     /** When the question waiting now answers itself, if it will. */
@@ -55,7 +57,7 @@ interface Props {
  * and the folder only when there is nothing else. Folded or open is
  * remembered per browser.
  */
-export function ComposerStrip({ thread, onAutoAnswer, autoAt }: Props) {
+export function ComposerStrip({ thread, folder = false, onAutoAnswer, autoAt }: Props) {
     const { t } = useTranslation('projects');
     const [open, setOpenState] = useState(() => readLocal(OPEN_KEY) === '1');
     const setOpen = (v: boolean) => {
@@ -64,12 +66,12 @@ export function ComposerStrip({ thread, onAutoAnswer, autoAt }: Props) {
     };
     const [menu, setMenu] = useState<HTMLElement | null>(null);
     const branch = thread.branch || thread.head_branch;
-    const mode = autoAnswerOf(thread);
+    const mode = autoAnswerOf(thread, folder);
     const own = (thread.auto_answer ?? '') !== '';
     const showAuto = !!onAutoAnswer && thread.status !== 'resolved';
-    if (!thread.worktree && !branch && !showAuto) return null;
+    if (!thread.cwd && !branch && !showAuto) return null;
 
-    const rows = [!!thread.worktree, !!branch, showAuto].filter(Boolean).length;
+    const rows = [!!thread.cwd, !!branch, showAuto].filter(Boolean).length;
     const item = (icon: React.ReactNode, text: React.ReactNode, mono = false, color?: string) => (
         <Box component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, color, '& svg': { fontSize: 14, flexShrink: 0 } }}>
             {icon}<Box component="span" sx={{ ...clip, fontFamily: mono ? fontMono : undefined }}>{text}</Box>
@@ -80,7 +82,7 @@ export function ComposerStrip({ thread, onAutoAnswer, autoAt }: Props) {
         ? item(<AutoFixHigh />, t('strip.autoAt', { time }), false, 'primary.main')
         : branch
             ? item(<Branch />, branch, true)
-            : thread.worktree ? item(<FolderOpen />, folderName(thread.worktree), true) : null;
+            : thread.cwd ? item(<FolderOpen />, folderName(thread.cwd), true) : null;
     const summary = (
         <>
             {lead}
@@ -98,17 +100,17 @@ export function ComposerStrip({ thread, onAutoAnswer, autoAt }: Props) {
                 sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 1.25, minHeight: ROW_H, px: 1.25, justifyContent: 'flex-start', font: 'inherit', color: 'inherit', textAlign: 'left', '&:hover': { color: 'text.primary' } }}
             >
                 {open
-                    ? <Box component="span" sx={{ flex: 1, fontWeight: 600 }}>{t(thread.project_id ? 'strip.title' : 'strip.sessionTitle')}</Box>
+                    ? <Box component="span" sx={{ flex: 1, fontWeight: 600 }}>{t(folder ? 'strip.sessionTitle' : 'strip.title')}</Box>
                     : <Box component="span" sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, overflow: 'hidden' }}>{summary}</Box>}
                 {open ? <ExpandMore sx={{ fontSize: 16 }} /> : <ExpandLess sx={{ fontSize: 16 }} />}
             </ButtonBase>
             <Collapse in={open} unmountOnExit>
                 <Box sx={{ pb: 0.5 }}>
-                    {thread.worktree && (
+                    {thread.cwd && (
                         <Row icon={<FolderOpen />} name={t('strip.folder')}
-                            action={<CopyIconButton value={`cd ${thread.worktree}`} label={t('strip.copyCd')} copiedLabel={t('common.copied')} iconSize={14} sx={{ p: 0.25 }} />}>
+                            action={<CopyIconButton value={`cd ${thread.cwd}`} label={t('strip.copyCd')} copiedLabel={t('common.copied')} iconSize={14} sx={{ p: 0.25 }} />}>
                             {/* A long path keeps its end, the part that tells folders apart. */}
-                            <Box component="span" title={thread.worktree} sx={{ ...clip, fontFamily: fontMono, direction: 'rtl', textAlign: 'left' }}><bdi>{thread.worktree}</bdi></Box>
+                            <Box component="span" title={thread.cwd} sx={{ ...clip, fontFamily: fontMono, direction: 'rtl', textAlign: 'left' }}><bdi>{thread.cwd}</bdi></Box>
                         </Row>
                     )}
                     {branch && (

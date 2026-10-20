@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, IconButton, Link, Skeleton, Tooltip, Typography } from '@mui/material';
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type Project, type ProjectMessage, type Thread, type ThreadEvent } from '../client';
+import { api, isFolder, unwrap, type Project, type Thread, type ThreadEvent } from '../client';
 import { ConversationPane } from '../components/project/ConversationPane';
 import { OverviewPane } from '../components/project/OverviewPane';
 import { ProjectSettingsDialog, type SettingsTab } from '../components/project/ProjectSettingsDialog';
+import { ProjectImTags, useProjectIm } from '../components/im/ProjectImBindings';
 import { ThreadPanel } from '../components/project/ThreadPanel';
 import { FloatingWindow } from '../components/workspace/FloatingWindow';
 import { OverviewBand } from '../components/workspace/OverviewBand';
@@ -38,11 +39,14 @@ export default function ProjectPage() {
 
     const [project, setProject] = useState<Project | null>(null);
     const [threads, setThreads] = useState<Thread[]>([]);
-    const [messages, setMessages] = useState<ProjectMessage[] | null>(null);
+    // The project conversation: the main thread's events.
+    const [messages, setMessages] = useState<ThreadEvent[] | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [threadEvents, setThreadEvents] = useState<ThreadEvent[] | null>(null);
     const pane = useWorkspacePane();
+    // IM chats bound to this project (null when the host has no IM).
+    const im = useProjectIm(project?.main_thread_id ? { threadId: project.main_thread_id, projectId: project.id, name: project.name } : null);
     const placement = usePlacement();
     // The Overview as a window or a band opens and closes with the header button; remembered per browser.
     const [windowOpen, setWindowOpen] = useState(() => readLocal('overviewWindowOpen') !== '0');
@@ -65,35 +69,50 @@ export default function ProjectPage() {
     const [memoryKey, setMemoryKey] = useState(0);
     const [libraryKey, setLibraryKey] = useState(0);
 
+    const mainThreadId = project?.main_thread_id ?? '';
+
+    const loadMessages = useCallback(async (main: string) => {
+        const m = await unwrap(api.GET('/api/v1/threads/{id}/events', { params: { path: { id: main }, query: { limit: 200 } } }));
+        // Merge, not replace: a thread_event that arrived after the snapshot was taken stays.
+        setMessages((list) => {
+            const ids = new Set(m.events.map((e) => e.id));
+            return [...m.events, ...(list ?? []).filter((e) => !ids.has(e.id))];
+        });
+    }, []);
+
     const load = useCallback(async () => {
         try {
-            const [d, m] = await Promise.all([
-                unwrap(api.GET('/api/v1/projects/{id}', { params: { path: { id } } })),
-                unwrap(api.GET('/api/v1/projects/{id}/messages', { params: { path: { id }, query: { limit: 200 } } })),
-            ]);
+            const d = await unwrap(api.GET('/api/v1/projects/{id}', { params: { path: { id } } }));
             setProject(d.project);
             setThreads(d.threads);
             setBusy(d.coordinator_busy);
-            setMessages(m.messages);
+            // A folder has no conversation: its page is the folder page.
+            if (d.project.main_thread_id) await loadMessages(d.project.main_thread_id);
             setError(null);
         } catch (e) {
             setError((e as Error).message);
         }
-    }, [id]);
+    }, [id, loadMessages]);
 
     const loadThread = useCallback(async (tid: string) => {
         try {
-            const d = await unwrap(api.GET('/api/v1/projects/{id}/threads/{tid}', { params: { path: { id, tid } } }));
-            setThreadEvents(d.events);
+            const [d, ev] = await Promise.all([
+                unwrap(api.GET('/api/v1/threads/{id}', { params: { path: { id: tid } } })),
+                unwrap(api.GET('/api/v1/threads/{id}/events', { params: { path: { id: tid } } })),
+            ]);
+            setThreadEvents(ev.events);
             setThreads((list) => upsert(list, d.thread));
         } catch (e) {
             notify((e as Error).message, 'error');
         }
-    }, [id, notify]);
+    }, [notify]);
 
     useEffect(() => {
         setProject(null);
         setMessages(null);
+        setThreads([]);
+        setThreadEvents(null);
+        setBusy(false);
         void load();
     }, [load]);
 
@@ -104,9 +123,6 @@ export default function ProjectPage() {
 
     const onEvent = useCallback((ev: ProjectEvent) => {
         switch (ev.type) {
-            case 'message':
-                setMessages((list) => (list ? upsert(list, ev.data as ProjectMessage) : list));
-                break;
             case 'message_delta': {
                 const d = ev.data as { id: string; text: string };
                 setMessages((list) => list?.map((m) => (m.id === d.id ? { ...m, content: m.content + d.text } : m)) ?? list);
@@ -114,14 +130,17 @@ export default function ProjectPage() {
             }
             case 'thread': {
                 const th = ev.data as Thread;
+                // The main thread is the conversation, not a row of the Overview.
+                if (th.id === mainThreadId) break;
                 setThreads((list) => upsert(list, th));
                 if (th.status !== 'working' && th.status !== 'waiting') setLibraryKey((k) => k + 1);
-                refresh();
+                // No refresh(): the shared list's own stream covers thread events.
                 break;
             }
             case 'thread_event': {
                 const e = ev.data as ThreadEvent;
-                if (e.thread_id === threadId) setThreadEvents((list) => (list ? upsert(list, e) : list));
+                if (e.thread_id === mainThreadId) setMessages((list) => (list ? upsert(list, e) : list));
+                else if (e.thread_id === threadId) setThreadEvents((list) => (list ? upsert(list, e) : list));
                 break;
             }
             case 'coordinator':
@@ -134,7 +153,7 @@ export default function ProjectPage() {
                 break;
             }
         }
-    }, [threadId, refresh]);
+    }, [threadId, mainThreadId]);
 
     useProjectEvents(id, onEvent, () => {
         void load();
@@ -177,6 +196,12 @@ export default function ProjectPage() {
             notify((e as Error).message, 'error');
         }
     };
+
+    // A folder is a project too, but its page is the folder page.
+    if (project && isFolder(project)) {
+        const to = routes.folder(project.path);
+        return <Navigate to={threadId ? `${to}${to.includes('?') ? '&' : '?'}session=${encodeURIComponent(threadId)}` : to} replace />;
+    }
 
     if (error) {
         return (
@@ -258,6 +283,8 @@ export default function ProjectPage() {
                 ) : <Skeleton width={200} />}
                 actions={project && (
                     <>
+                        {/* Wide screens keep the bound chats in the header; narrow ones get their own row below it. */}
+                        {im && <Box sx={{ display: { xs: 'none', md: 'flex' }, minWidth: 0, flexShrink: 1 }}><ProjectImTags im={im} /></Box>}
                         {canPlace && <PlacementMenu overview={placement.overview} thread={placement.thread} onOverview={placement.setOverview} onThread={placement.setThread} overviewFloat={placement.overviewFloat} onOverviewFloat={placement.setOverviewFloat} />}
                         <Tooltip title={project.starred ? t('common.unstar') : t('common.star')}>
                             <IconButton size="small" onClick={() => void patch({ starred: !project.starred })}>{project.starred ? <Star fontSize="small" color="primary" /> : <StarBorder fontSize="small" />}</IconButton>
@@ -266,6 +293,11 @@ export default function ProjectPage() {
                             <IconButton size="small" onClick={() => setSettingsTab('general')} aria-label={t('projectSettings.title')}><Settings fontSize="small" /></IconButton>
                         </Tooltip>
                     </>
+                )}
+                notice={im && (
+                    <Box sx={{ display: { xs: 'flex', md: 'none' }, px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
+                        <ProjectImTags im={im} maxVisible={99} showLabel />
+                    </Box>
                 )}
                 side={side}
                 sideAlwaysOpen={overviewAt !== 'side'}
@@ -284,11 +316,13 @@ export default function ProjectPage() {
                         disabled={blocked || !project}
                         disabledReason={banner}
                         onOpenThread={openThread}
+                        chatTitle={im?.chatTitle}
                         onSend={async (text, attachments) => {
                             try {
-                                const m = await unwrap(api.POST('/api/v1/projects/{id}/messages', { params: { path: { id } }, body: { content: text, attachments: attachments.map((a) => a.path) } }));
-                                setMessages((list) => (list ? upsert(list, m) : list));
+                                await unwrap(api.POST('/api/v1/threads/{id}/messages', { params: { path: { id: mainThreadId } }, body: { content: text, attachments: attachments.map((a) => a.path) } }));
                                 setBusy(true);
+                                // The message shows at once; the reply streams in over the event stream.
+                                await loadMessages(mainThreadId).catch(() => undefined);
                                 return true;
                             } catch (e) {
                                 notify((e as Error).message, 'error');
@@ -297,7 +331,7 @@ export default function ProjectPage() {
                         }}
                         onStartSuggestions={async (mid, indexes) => {
                             try {
-                                const m = await unwrap(api.POST('/api/v1/projects/{id}/messages/{mid}/start', { params: { path: { id, mid } }, body: { indexes } }));
+                                const m = await unwrap(api.POST('/api/v1/threads/{id}/events/{eid}/start', { params: { path: { id: mainThreadId, eid: mid } }, body: { indexes } }));
                                 setMessages((list) => (list ? upsert(list, m) : list));
                             } catch (e) {
                                 notify((e as Error).message, 'error');
@@ -340,6 +374,8 @@ export default function ProjectPage() {
             >
                 {threadEl}
             </FloatingWindow>
+
+            {im?.dialog}
 
             {project && settingsTab && (
                 <ProjectSettingsDialog

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectMessage } from '../../client';
+import type { ThreadEvent } from '../../client';
 import { ThreadUpdateRow } from './ConversationPane';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -8,8 +8,8 @@ vi.mock('../Markdown', () => ({ Markdown: ({ text }: { text: string }) => <div d
 
 afterEach(cleanup);
 
-const update = (content: string): ProjectMessage => ({
-    id: 'u', kind: 'thread_update', role: 'system', content, project_id: 'p', created_at: '',
+const update = (content: string): ThreadEvent => ({
+    id: 'u', kind: 'thread_update', content, thread_id: 'main', created_at: '',
     payload: JSON.stringify({ thread_id: 't', title: 'Fix login', kind: 'finished', status: 'ready' }),
 });
 

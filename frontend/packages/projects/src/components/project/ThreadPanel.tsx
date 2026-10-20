@@ -17,7 +17,7 @@ import { DiffDialog } from './DiffDialog';
 import { ComposerStrip } from './ComposerStrip';
 import { ThreadStatusChip, toneColor } from './threadStatus';
 import { threadTranscript } from './threadTranscript';
-import { projectThreadOps, sessionOps } from './threadOps';
+import { threadOps } from './threadOps';
 import { BackgroundTasksPanel } from '../workdir/BackgroundTasksPanel';
 import { backgroundTasks } from '../workdir/backgroundTasks';
 import { readLocal, removeLocal, writeLocal } from '../../utils/storage';
@@ -42,8 +42,10 @@ function MetaLine({ items }: { items: React.ReactNode[] }) {
 }
 
 interface Props {
-    /** The project the thread belongs to; empty for a folder session. */
+    /** The project (or folder) the thread belongs to. */
     projectId: string;
+    /** The thread is a working folder's: no branch, review or merge, and it can be handed off to a terminal. */
+    folder?: boolean;
     threadId: string;
     thread?: Thread;
     events: ThreadEvent[] | null;
@@ -72,7 +74,7 @@ const anchorSelector = (anchor: TrajectoryAnchor): string => {
     return `[data-block="${anchor.block}"]`;
 };
 
-export function ThreadPanel({ projectId, threadId, thread, events, running, disabled, onBack, hideTitle, actions, composerContext, belowComposer, liveTasks = [], onRefresh }: Props) {
+export function ThreadPanel({ projectId, folder = false, threadId, thread, events, running, disabled, onBack, hideTitle, actions, composerContext, belowComposer, liveTasks = [], onRefresh }: Props) {
     const { t } = useTranslation('projects');
     const notify = useNotify();
     const [diffOpen, setDiffOpen] = useState(false);
@@ -117,11 +119,11 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
     const [acting, setActing] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
-    // A folder session has no project: no branch, review or merge.
-    const session = !projectId;
-    const owner = useMemo<AttachOwner>(() => (session ? { sessionId: threadId } : { projectId }), [session, projectId, threadId]);
+    // A folder thread has no branch to review or merge; its uploads are its own.
+    const session = folder;
+    const owner = useMemo<AttachOwner>(() => (session ? { threadId } : { projectId }), [session, projectId, threadId]);
     const Attachments = useMemo(() => ({ items }: { items: Attachment[] }) => <AttachmentChips owner={owner} items={items} />, [owner]);
-    const ops = useMemo(() => session ? sessionOps(threadId) : projectThreadOps(projectId, threadId), [session, projectId, threadId]);
+    const ops = useMemo(() => threadOps(threadId), [threadId]);
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -130,7 +132,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
 
     const coordinator = t('thread.fromCoordinator');
     const { blocks, pendingRequestId } = useMemo(() => {
-        const { entries, pendingRequestId } = threadTranscript(events ?? [], running, (from) => from === 'coordinator' ? coordinator : undefined);
+        const { entries, pendingRequestId } = threadTranscript(events ?? [], running, (e) => e.source === 'thread' ? coordinator : undefined);
         return { blocks: buildTranscript(entries), pendingRequestId };
     }, [events, running, coordinator]);
 
@@ -293,7 +295,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                     ? <Skeleton variant="rounded" height={120} />
                     : view === 'chat'
                         ? <Transcript blocks={blocks} pendingRequestId={pendingRequestId} working={running} newSince={newSince.at} expandAll={expandAll} onRespond={respond} codeBlock={CodeBlock} attachments={Attachments} rememberLabel={rememberLabel} />
-                        : <Trajectory blocks={blocks} working={running} pendingRequestId={pendingRequestId} project={thread.worktree} onOpen={openInChat} />}
+                        : <Trajectory blocks={blocks} working={running} pendingRequestId={pendingRequestId} project={thread.cwd} onOpen={openInChat} />}
             </Box>
 
             <Box sx={{ px: 2, pb: 2 }}>
@@ -309,7 +311,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                         </Box>
                     </Alert>
                 )}
-                <ComposerStrip thread={thread} autoAt={pendingAutoAt} onAutoAnswer={(mode) => { void act(() => ops.setAutoAnswer(mode)).then((ok) => ok && onRefresh?.()); }} />
+                <ComposerStrip thread={thread} folder={session} autoAt={pendingAutoAt} onAutoAnswer={(mode) => { void act(() => ops.setAutoAnswer(mode)).then((ok) => ok && onRefresh?.()); }} />
                 <Composer
                     context={composerContext}
                     minRows={1}

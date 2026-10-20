@@ -3534,6 +3534,13 @@ export const handlers = [
     }),
 
     http.get('/api/v1/bots/:bot/chats', ({ params }) => {
+        // The Feishu bot has its own chat and the DingTalk bot has seen none.
+        if (params.bot === 'mock-bot-002') {
+            return HttpResponse.json({chats: [
+                {chat: {id: 'direct-f1', bot_uuid: 'mock-bot-002', platform: 'feishu', external_chat_id: 'feishu:oc_mock_chat_0001', peer_actor_id: 'actor-f1', blocked: false}, permissions: []},
+            ]})
+        }
+        if (params.bot === 'mock-bot-003') return HttpResponse.json({chats: []})
         // mock-bot-001 has one chat with full Remote Control so the Remote
         // page shows a ready bot next to ones that nobody can control yet.
         const remote = params.bot === 'mock-bot-001' ? [
@@ -3564,9 +3571,9 @@ export const handlers = [
     http.put('/api/v1/bots/:bot/chats/:chat/blocked', () => HttpResponse.json({ok: true})),
     http.delete('/api/v1/bots/:bot/chats/:chat', () => HttpResponse.json({ok: true})),
 
-    http.get('/api/v1/bots/:bot/groups', () => HttpResponse.json({groups: [
+    http.get('/api/v1/bots/:bot/groups', ({ params }) => HttpResponse.json({groups: params.bot !== 'mock-bot-002' && params.bot !== 'mock-bot-003' ? [
         {id: 'group-1', bot_uuid: 'mock-bot', platform: 'telegram', external_group_id: 'telegram:-10024681012', name: 'Release Crew', blocked: false},
-    ]})),
+    ] : []})),
     http.get('/api/v1/bots/:bot/groups/:group', () => HttpResponse.json({
         group: {id: 'group-1', bot_uuid: 'mock-bot', platform: 'telegram', external_group_id: 'telegram:-10024681012', name: 'Release Crew', blocked: false},
         capabilities: {notify: 'allow', remote_control: 'deny'},

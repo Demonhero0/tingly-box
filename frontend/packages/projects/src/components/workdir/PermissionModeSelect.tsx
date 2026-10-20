@@ -45,5 +45,5 @@ export function PermissionModeSelect({ value, modes, onChange, disabled }: Props
 
 /** The selectable modes, from the server. */
 export async function loadPermissionModes(): Promise<string[]> {
-    return (await unwrap(api.GET('/api/v1/projects/permission-modes'))).modes;
+    return (await unwrap(api.GET('/api/v1/threads/permission-modes'))).modes;
 }

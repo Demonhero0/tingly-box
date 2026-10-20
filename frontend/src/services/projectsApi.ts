@@ -38,30 +38,18 @@ export async function projectsFetch(input: RequestInfo | URL, init?: RequestInit
     });
 }
 
-/** The fields of GET /api/v1/projects the nav reads. */
+/** The fields of GET /api/v1/projects the nav reads (projects and folders share the list). */
 interface ProjectSummaryLite {
     threads?: { waiting?: number };
 }
 
-/** The fields of GET /api/v1/projects/workdirs the nav reads. */
-interface WorkdirLite {
-    waiting?: number;
-}
-
-async function readJSON<T>(path: string, signal?: AbortSignal): Promise<T | undefined> {
-    const res = await projectsFetch(path, { signal });
-    return res.ok ? ((await res.json()) as T) : undefined;
-}
-
 /**
- * Whether anything in Projects waits on the user: a project thread or a
- * working-folder session. One signal for the rail's dot, whichever kind it is.
+ * Whether anything in Projects waits on the user: a thread of a project or of
+ * a working folder, which are one list. One signal for the rail's dot.
  */
 export async function anythingWaiting(signal?: AbortSignal): Promise<boolean> {
-    const [projects, folders] = await Promise.all([
-        readJSON<{ projects?: ProjectSummaryLite[] }>('/api/v1/projects', signal),
-        readJSON<{ workdirs?: WorkdirLite[] }>('/api/v1/projects/workdirs', signal),
-    ]);
-    return (projects?.projects ?? []).some((p) => (p.threads?.waiting ?? 0) > 0)
-        || (folders?.workdirs ?? []).some((w) => (w.waiting ?? 0) > 0);
+    const res = await projectsFetch('/api/v1/projects', { signal });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { projects?: ProjectSummaryLite[] };
+    return (body.projects ?? []).some((p) => (p.threads?.waiting ?? 0) > 0);
 }

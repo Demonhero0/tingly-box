@@ -3,7 +3,8 @@ import { Alert, Box, Button, Chip, Collapse, Paper, Typography } from '@mui/mate
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { Attachment, ProjectMessage, Thread } from '../../client';
+import type { Attachment, Thread, ThreadEvent } from '../../client';
+import { ImSourceBadge } from '../im/ImSourceBadge';
 import { AttachmentChips, uploadAttachments } from '../attachments';
 import { Composer } from '../Composer';
 import { Markdown } from '../Markdown';
@@ -85,7 +86,7 @@ interface UpdatePayload {
  * happened: the thread, how the turn ended, and the report one click away.
  * The thread's line above keeps the live state; this keeps the history.
  */
-export function ThreadUpdateRow({ message, onOpen }: { message: ProjectMessage; onOpen: (id: string) => void }) {
+export function ThreadUpdateRow({ message, onOpen }: { message: ThreadEvent; onOpen: (id: string) => void }) {
     const { t } = useTranslation('projects');
     const [open, setOpen] = useState(false);
     const pl = parse<UpdatePayload>(message.payload);
@@ -141,7 +142,7 @@ interface Suggestion {
 }
 
 function SuggestionsCard({ message, threads, onStart, onOpen, disabled }: {
-    message: ProjectMessage;
+    message: ThreadEvent;
     threads: Map<string, Thread>;
     onStart: (messageId: string, indexes: number[]) => Promise<void>;
     onOpen: (id: string) => void;
@@ -190,7 +191,7 @@ const EXAMPLES = ['conversation.example1', 'conversation.example2', 'conversatio
 
 interface Props {
     projectId: string;
-    messages: ProjectMessage[];
+    messages: ThreadEvent[];
     threads: Map<string, Thread>;
     busy: boolean;
     disabled: boolean;
@@ -198,9 +199,11 @@ interface Props {
     onSend: (text: string, attachments: Attachment[]) => Promise<boolean>;
     onOpenThread: (id: string) => void;
     onStartSuggestions: (messageId: string, indexes: number[]) => Promise<void>;
+    /** A bound IM chat's name for a message's source line; unknown chats show their id. */
+    chatTitle?: (platform: string, chatId: string) => string | undefined;
 }
 
-export function ConversationPane({ projectId, messages, threads, busy, disabled, disabledReason, onSend, onOpenThread, onStartSuggestions }: Props) {
+export function ConversationPane({ projectId, messages, threads, busy, disabled, disabledReason, onSend, onOpenThread, onStartSuggestions, chatTitle }: Props) {
     const { t } = useTranslation('projects');
     const scrollRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
@@ -244,19 +247,22 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
                     )}
                     {messages.map((m) => {
                         switch (m.kind) {
-                            case 'text':
-                                return m.role === 'user' ? (
+                            case 'user':
+                                return (
                                     <Box key={m.id} sx={{ display: 'flex', justifyContent: 'flex-end', my: 2 }}>
                                         <Box sx={{ maxWidth: '85%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                             <AttachmentChips owner={{ projectId }} items={parse<{ attachments?: Attachment[] }>(m.payload)?.attachments ?? []} />
                                             {m.content.trim() !== '' && (
                                                 <Box sx={{ bgcolor: 'action.hover', borderRadius: 1.5, px: 1.75, py: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'text.primary', fontSize: '0.875rem', lineHeight: 1.65 }}>{m.content}</Box>
                                             )}
+                                            {m.source === 'im' && m.source_platform
+                                                ? <ImSourceBadge platform={m.source_platform} chat={chatTitle?.(m.source_platform, m.source_chat_id ?? '') ?? m.source_chat_id ?? ''} />
+                                                : null}
                                         </Box>
                                     </Box>
-                                ) : (
-                                    <Box key={m.id} sx={{ my: 2 }}><Markdown text={m.content} /></Box>
                                 );
+                            case 'assistant':
+                                return <Box key={m.id} sx={{ my: 2 }}><Markdown text={m.content} /></Box>;
                             case 'thread_started': {
                                 const ids = parse<{ thread_ids: string[] }>(m.payload)?.thread_ids ?? [];
                                 return (

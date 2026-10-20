@@ -10,7 +10,6 @@ export type Project = S['Project'];
 export type ProjectSummary = S['ProjectSummary'];
 export type ProjectDetail = S['ProjectDetailResponse'];
 export type ThreadCounts = S['ThreadCounts'];
-export type ProjectMessage = S['ProjectMessage'];
 export type Thread = S['Thread'];
 export type ThreadEvent = S['ThreadEvent'];
 export type ThreadDetail = S['ThreadDetailResponse'];
@@ -28,10 +27,14 @@ export type ConnectionDraft = S['ConnectionDraft'];
 export type Model = S['Model'];
 export type TestResponse = S['TestResponse'];
 
+/** A project's kind: `project` has a goal, memory and a coordinator; `folder` is a plain working folder. */
+export type ProjectType = NonNullable<S['CreateProjectRequest']['type']>;
+
+/** A working folder is a project of type folder (its `path` is the folder). */
+export const isFolder = (p: { type: string }): boolean => p.type === 'folder';
+
 export type ProjectRuntime = S['ProjectRuntimeResponse'];
 
-export type Workdir = S['Workdir'];
-export type SessionDetail = S['SessionDetailResponse'];
 export type BackgroundTask = S['BackgroundTask'];
 
 let hostFetch: typeof fetch = (input, init) => globalThis.fetch(input, init);

@@ -16,17 +16,18 @@ afterEach(() => {
 });
 
 const summary = (id: string, name: string, waiting: number, starred = false) => ({
-    id, name, starred, threads: { waiting, ready: 0, working: 0 },
+    id, name, starred, type: 'project', threads: { waiting, ready: 0, working: 0 },
 });
 
+// A folder is a project of type folder, in the same list.
+const folder = (id: string, path: string, waiting: number, working = 0) => ({
+    id, name: path.split('/').pop(), path, starred: false, type: 'folder', threads: { waiting, ready: 0, working },
+});
+
+const folders = [folder('f-app', '/home/me/app', 2), folder('f-notes', '/home/me/notes', 0, 1)];
+
 const host = (projects: unknown[]): ProjectsHost => {
-    list.mockImplementation((path: string) => Promise.resolve({
-        data: path === '/api/v1/projects/workdirs' ? { workdirs: [
-            { path: '/home/me/app', saved: true, waiting: 2, working: 0, sessions: 3 },
-            { path: '/home/me/notes', saved: false, waiting: 0, working: 1, sessions: 1 },
-        ] } : { projects },
-        response: new Response(),
-    }));
+    list.mockImplementation(() => Promise.resolve({ data: { projects }, response: new Response() }));
     return { paths: { list: '/p', project: (id) => `/p/${id}`, folder: (path) => (path ? `/f?path=${encodeURIComponent(path)}` : '/f') } };
 };
 
@@ -38,7 +39,7 @@ const show = (h: ProjectsHost, path: string, props: Parameters<typeof ProjectsSi
 
 describe('ProjectsSidebar', () => {
     it('lists projects starred first, marks the open one and counts what waits', async () => {
-        show(host([summary('a', 'Alpha', 0), summary('b', 'Beta', 2, true)]), '/p/a');
+        show(host([summary('a', 'Alpha', 0), summary('b', 'Beta', 2, true), ...folders]), '/p/a');
         const projects = await screen.findByRole('region', { name: 'nav.projects' });
         await waitFor(() => expect(within(projects).getAllByRole('link').map((l) => l.textContent)).toEqual(['nav.projects', 'Betasidebar.waiting', 'Alpha']));
         expect(within(projects).getByRole('link', { name: 'Alpha' })).toHaveAttribute('aria-current', 'page');
@@ -58,12 +59,29 @@ describe('ProjectsSidebar', () => {
         expect(list).not.toHaveBeenCalled();
     });
 
-    it('lists working folders with what waits there and marks the open one', async () => {
-        show(host([]), '/f?path=%2Fhome%2Fme%2Fnotes', { showProjects: false, showWorkdirs: true });
-        const folders = await screen.findByRole('region', { name: 'workdir.title' });
-        await waitFor(() => expect(within(folders).getAllByRole('link').map((l) => l.textContent)).toEqual(['workdir.title', 'appsidebar.sessionsWaiting', 'notes~']));
-        const notes = within(folders).getByTitle('/home/me/notes');
+    it('lists working folders (the other type of the same list) with what waits there and marks the open one', async () => {
+        show(host([summary('a', 'Alpha', 0), ...folders]), '/f?path=%2Fhome%2Fme%2Fnotes', { showProjects: false, showWorkdirs: true });
+        const region = await screen.findByRole('region', { name: 'workdir.title' });
+        await waitFor(() => expect(within(region).getAllByRole('link').map((l) => l.textContent)).toEqual(['workdir.title', 'appsidebar.sessionsWaiting', 'notes~']));
+        const notes = within(region).getByTitle('/home/me/notes');
         expect(notes.getAttribute('aria-current')).toBe('page');
-        expect(within(folders).getByTitle('/home/me/app').getAttribute('href')).toBe('/f?path=%2Fhome%2Fme%2Fapp');
+        expect(within(region).getByTitle('/home/me/app').getAttribute('href')).toBe('/f?path=%2Fhome%2Fme%2Fapp');
+    });
+    it('pins an IM row with the bot count when the host has IM, and leaves it out otherwise', async () => {
+        const h = host([summary('a', 'Alpha', 0)]);
+        const withIm: ProjectsHost = {
+            ...h,
+            paths: { ...h.paths, im: '/im' },
+            im: { listBots: async () => [{ uuid: 'b1', name: 'A', platform: 'telegram', online: true }, { uuid: 'b2', name: 'B', platform: 'feishu', online: false }], listChats: async () => [] },
+        };
+        show(withIm, '/im');
+        const row = await screen.findByRole('link', { name: /im\.title/ });
+        expect(row).toHaveAttribute('href', '/im');
+        expect(row).toHaveAttribute('aria-current', 'page');
+        await waitFor(() => expect(row.textContent).toContain('im.bots'));
+        cleanup();
+        show(h, '/p');
+        await screen.findByRole('region', { name: 'nav.projects' });
+        expect(screen.queryByRole('link', { name: /im\.title/ })).not.toBeInTheDocument();
     });
 });
