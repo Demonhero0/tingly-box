@@ -3,6 +3,7 @@ import {Alert, Box, Button, Chip, Paper, Stack, TextField, Typography} from '@mu
 import {alpha} from '@mui/material/styles';
 import {useState} from 'react';
 import {useTranslation} from 'react-i18next';
+import type {TFunction} from 'i18next';
 import {useDraft} from './context';
 import type {AskOption, AskQuestion} from './model';
 
@@ -69,12 +70,24 @@ const OptionButton = ({option, selected, multi, disabled, onClick}: {
     );
 };
 
+// autoNote says when the thread goes with the suggestion on its own: the
+// suggested option by name for one question, "the suggested answers" for more.
+const autoNote = (t: TFunction, questions: AskQuestion[], autoAt: string): string => {
+    const time = new Date(autoAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    const only = questions.length === 1 ? questions[0].options.find((o) => o.recommended) : undefined;
+    return only
+        ? t('projects.transcript.autoAt', {defaultValue: 'Goes with “{{answer}}” at {{time}} if you don’t answer', answer: only.text, time})
+        : t('projects.transcript.autoAtMany', {defaultValue: 'Goes with the suggested answers at {{time}} if you don’t answer', time});
+};
+
 // QuestionCard is a question the live turn waits on, as a choice: each
 // question's options as buttons (the suggested one marked), a box for
 // other words, and one send. A single question with a single choice goes
 // out on the click itself.
-const QuestionCard = ({requestId, title, questions, onRespond}: {
+const QuestionCard = ({requestId, title, questions, autoAt, onRespond}: {
     requestId: string;
+    // When the thread goes with the suggestion unless answered first.
+    autoAt?: string;
     // The question as the engine summarized it, used when there are no
     // structured questions to show.
     title: string;
@@ -193,6 +206,11 @@ const QuestionCard = ({requestId, title, questions, onRespond}: {
                     </Box>
                 ))}
                 {failed && <Alert severity="error">{t('projects.transcript.responseRetry', {defaultValue: 'Response was not accepted. Your answer is kept; try again.'})}</Alert>}
+                {autoAt && !submitted && (
+                    <Typography variant="caption" sx={{color: 'text.secondary'}} data-testid="auto-answer-note">
+                        {autoNote(t, shown, autoAt)}
+                    </Typography>
+                )}
                 {submitted && <Typography role="status" variant="caption">{t('projects.transcript.responseSubmitted', {defaultValue: 'Response sent — waiting for the agent…'})}</Typography>}
                 <Stack direction="row" spacing={1}>
                     <Button size="small" variant="contained" startIcon={<Check/>} disabled={locked || !complete} onClick={() => void send(true, latest())}>

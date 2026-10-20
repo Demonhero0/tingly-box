@@ -441,3 +441,96 @@ func TestSettleAsk(t *testing.T) {
 	a = settleAsk("Proceed?", nil, Answer{Allow: true, Answer: "yes"})
 	assert.Equal(t, map[string]string{"Proceed?": "yes"}, a.Answers)
 }
+
+func TestSuggestedAnswers(t *testing.T) {
+	q := func(question string, multi bool, labels ...string) map[string]any {
+		opts := []any{}
+		for _, l := range labels {
+			opts = append(opts, map[string]any{"label": l})
+		}
+		return map[string]any{"question": question, "multiSelect": multi, "options": opts}
+	}
+	got, ok := suggestedAnswers(map[string]any{"questions": []any{q("DB?", false, "SQLite", "Postgres (Recommended)"), q("Flag?", false, "Keep (推荐)", "Drop")}})
+	require.True(t, ok)
+	assert.Equal(t, map[string]string{"DB?": "Postgres (Recommended)", "Flag?": "Keep (推荐)"}, got)
+	// One question without a suggestion, or with several picks, leaves the whole call to the user.
+	_, ok = suggestedAnswers(map[string]any{"questions": []any{q("DB?", false, "Postgres (Recommended)"), q("Flag?", false, "Keep", "Drop")}})
+	assert.False(t, ok)
+	_, ok = suggestedAnswers(map[string]any{"questions": []any{q("Which?", true, "A (Recommended)", "B")}})
+	assert.False(t, ok)
+	_, ok = suggestedAnswers(map[string]any{})
+	assert.False(t, ok)
+}
+
+func TestAskAnswersItselfWithTheSuggestion(t *testing.T) {
+	got := make(chan agentboot.AskResponse, 1)
+	f := newFixture(t, func(turn *enginetest.Turn) error {
+		resp, err := turn.AskQuestions("q-1", map[string]any{"questions": []any{
+			map[string]any{"question": "Which database?", "options": []any{
+				map[string]any{"label": "Postgres (Recommended)"}, map[string]any{"label": "SQLite"},
+			}},
+		}})
+		if err != nil {
+			return err
+		}
+		got <- resp
+		turn.Say("ok", 1, 1)
+		return nil
+	})
+	th, err := f.threads.Start(context.Background(), f.project, StartSpec{Task: "pick"})
+	require.NoError(t, err)
+	waitStatus(t, f.store, th.ID, db.ThreadWaiting)
+
+	// A project thread waits ten minutes by default and says until when.
+	events, _ := f.store.ListThreadEvents(th.ID)
+	var ask *db.ThreadEvent
+	for i := range events {
+		if events[i].Kind == db.EvAsk {
+			ask = &events[i]
+		}
+	}
+	require.NotNil(t, ask)
+	assert.Contains(t, ask.Payload, `"auto_at":`)
+
+	// Switching to "right away" answers the waiting question.
+	_, err = f.threads.SetAutoAnswer(th.ID, AutoAnswerNow)
+	require.NoError(t, err)
+	select {
+	case resp := <-got:
+		require.True(t, resp.Approved)
+		assert.Equal(t, map[string]string{"Which database?": "Postgres (Recommended)"}, resp.UpdatedInput["answers"])
+	case <-time.After(5 * time.Second):
+		t.Fatal("not answered")
+	}
+	f.report(t)
+	events, _ = f.store.ListThreadEvents(th.ID)
+	for _, e := range events {
+		if e.Kind == db.EvAsk {
+			assert.Contains(t, e.Payload, `"auto":true`)
+			assert.Contains(t, e.Payload, `"state":"answered"`)
+			assert.NotContains(t, e.Payload, `"auto_at"`)
+		}
+	}
+
+	_, err = f.threads.SetAutoAnswer(th.ID, "sometimes")
+	assert.ErrorIs(t, err, ErrBadAutoAnswer)
+}
+
+func TestSessionQuestionsWaitByDefault(t *testing.T) {
+	f := newFixture(t, func(turn *enginetest.Turn) error {
+		_, err := turn.AskQuestions("q-1", map[string]any{"questions": []any{
+			map[string]any{"question": "Which?", "options": []any{map[string]any{"label": "A (Recommended)"}}},
+		}})
+		return err
+	})
+	s, err := f.threads.StartSession(SessionSpec{Folder: f.repo, Task: "pick"})
+	require.NoError(t, err)
+	assert.Equal(t, "main", s.HeadBranch, "a session names the branch its folder is on")
+	waitStatus(t, f.store, s.ID, db.ThreadWaiting)
+	events, _ := f.store.ListThreadEvents(s.ID)
+	for _, e := range events {
+		if e.Kind == db.EvAsk {
+			assert.NotContains(t, e.Payload, `"auto_at"`)
+		}
+	}
+}

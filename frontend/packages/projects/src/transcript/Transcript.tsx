@@ -371,6 +371,11 @@ const SettledRequest = ({block}: {block: RequestBlock}) => {
                 {isAsk && response && (
                     <Typography variant="body2" sx={{color: outcome === 'answered' ? 'text.primary' : 'text.secondary', whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
                         ↳ {response.content.trim() || t('projects.transcript.noAnswer', {defaultValue: '(no answer)'})}
+                        {response.auto && (
+                            <Box component="span" sx={{color: 'text.secondary', ml: 0.75}}>
+                                · {t('projects.transcript.answeredAuto', {defaultValue: 'answered automatically with the suggestion'})}
+                            </Box>
+                        )}
                     </Typography>
                 )}
             </Box>
@@ -529,6 +534,7 @@ const BlockList = ({blocks, pendingRequestId, working, expandAll, onRespond, anc
                                 requestId={b.message.request_id}
                                 title={b.message.content}
                                 questions={askQuestions(b.message.payload)}
+                                autoAt={b.message.autoAt}
                                 onRespond={(...args) => onRespond(b.message.request_id ?? '', ...args)}
                             />
                         )

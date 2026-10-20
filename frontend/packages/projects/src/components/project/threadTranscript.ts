@@ -15,6 +15,8 @@ interface RequestPayload {
     input?: Record<string, unknown>;
     state: 'pending' | 'allowed' | 'denied' | 'answered' | 'expired';
     answer?: string;
+    auto_at?: string;
+    auto?: boolean;
 }
 
 function parse<T>(s?: string): T | undefined {
@@ -82,7 +84,7 @@ export function threadTranscript(events: ThreadEvent[], running: boolean, author
                 if (!pl) break;
                 const ask = e.kind === 'ask';
                 entries.push(ask
-                    ? { kind: 'ask_request', content: e.content, request_id: pl.request_id, payload: pl.input, timestamp }
+                    ? { kind: 'ask_request', content: e.content, request_id: pl.request_id, payload: pl.input, autoAt: pl.auto_at, timestamp }
                     : { kind: 'approval_request', content: pl.tool || e.content, request_id: pl.request_id, payload: pl.input, timestamp });
                 if (pl.state === 'pending') {
                     if (running) pending = pl.request_id;
@@ -93,6 +95,7 @@ export function threadTranscript(events: ThreadEvent[], running: boolean, author
                         kind: ask ? 'ask_response' : 'approval_response',
                         content: ask ? pl.answer ?? '' : pl.state === 'denied' ? 'denied' : 'approved',
                         request_id: pl.request_id,
+                        auto: pl.auto,
                         timestamp,
                     });
                 }

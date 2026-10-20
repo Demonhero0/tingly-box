@@ -677,6 +677,10 @@ func (m *Threads) settle(threadID string, end engine.TurnEnd, tally *turnTally) 
 		stats = Stats(context.Background(), t.Worktree, t.BaseBranch)
 	}
 	session := t.ProjectID == ""
+	head := ""
+	if session {
+		head = HeadBranch(context.Background(), t.Worktree)
+	}
 	report := Report{Kind: ReportFinished, Text: strings.TrimSpace(tally.text)}
 	t, _ = m.update(threadID, func(t *db.Thread) {
 		t.Turns++
@@ -692,6 +696,9 @@ func (m *Threads) settle(threadID string, end engine.TurnEnd, tally *turnTally) 
 			t.Model = tally.launchModel
 		}
 		t.CommitsAhead, t.FilesChanged, t.Uncommitted = stats.CommitsAhead, stats.FilesChanged, stats.Uncommitted
+		if session {
+			t.HeadBranch = head
+		}
 		if t.Status == db.ThreadResolved {
 			// Resolved while the turn was ending: that decision stands.
 			return
@@ -931,10 +938,80 @@ type Answer struct {
 	Answers map[string]string
 }
 
+// Auto-answer settings: when a question with a suggested answer is answered
+// without the user.
+const (
+	AutoAnswerOff   = "off"
+	AutoAnswerDelay = "delay"
+	AutoAnswerNow   = "now"
+)
+
+// AutoAnswerAfter is how long a question waits under AutoAnswerDelay.
+var AutoAnswerAfter = 10 * time.Minute
+
+// ValidAutoAnswer reports whether mode is a setting; empty is the default.
+func ValidAutoAnswer(mode string) bool {
+	switch mode {
+	case "", AutoAnswerOff, AutoAnswerDelay, AutoAnswerNow:
+		return true
+	}
+	return false
+}
+
+// autoAnswerMode is the setting a thread's questions follow: its own, else
+// delay for a project thread (its owner is usually away) and off for a
+// folder session (its owner is usually watching).
+func autoAnswerMode(t *db.Thread) string {
+	if t.AutoAnswer != "" {
+		return t.AutoAnswer
+	}
+	if t.ProjectID == "" {
+		return AutoAnswerOff
+	}
+	return AutoAnswerDelay
+}
+
+var recommendedRe = regexp.MustCompile(`(?i)\s*\((recommended|推荐)\)\s*$`)
+
+// suggestedAnswers answers every question of an AskUserQuestion input with
+// the option Claude Code marked "(Recommended)". ok is false when a question
+// has no such option or takes several picks: those are left to the user.
+func suggestedAnswers(input map[string]any) (map[string]string, bool) {
+	qs, _ := input["questions"].([]any)
+	if len(qs) == 0 {
+		return nil, false
+	}
+	out := map[string]string{}
+	for _, q := range qs {
+		m, _ := q.(map[string]any)
+		question, _ := m["question"].(string)
+		if question == "" {
+			return nil, false
+		}
+		if multi, _ := m["multiSelect"].(bool); multi {
+			return nil, false
+		}
+		opts, _ := m["options"].([]any)
+		for _, o := range opts {
+			om, _ := o.(map[string]any)
+			if label, _ := om["label"].(string); recommendedRe.MatchString(label) {
+				out[question] = label
+				break
+			}
+		}
+		if _, found := out[question]; !found {
+			return nil, false
+		}
+	}
+	return out, true
+}
+
 type pending struct {
 	event *db.ThreadEvent
 	tool  string
-	ch    chan Answer
+	// retime wakes a waiting question when the auto-answer setting changed.
+	retime chan struct{}
+	ch     chan Answer
 }
 
 // threadPrompter routes a turn's approvals and questions to the thread view:
@@ -978,6 +1055,44 @@ type requestPayload struct {
 	Scope   string            `json:"scope,omitempty"`
 	Answer  string            `json:"answer,omitempty"`
 	Answers map[string]string `json:"answers,omitempty"`
+	// AutoAt is when a pending question is answered with its suggestion.
+	AutoAt *time.Time `json:"auto_at,omitempty"`
+	// Auto says the suggestion answered it, not the user.
+	Auto bool `json:"auto,omitempty"`
+}
+
+// retime makes every waiting question read the auto-answer setting again.
+func (p *threadPrompter) retime() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, pd := range p.pending {
+		select {
+		case pd.retime <- struct{}{}:
+		default:
+		}
+	}
+}
+
+// autoDeadline is when a question asked at asked is answered with its
+// suggestion under the thread's setting; nil when it waits for the user.
+func (p *threadPrompter) autoDeadline(asked time.Time, suggested bool) *time.Time {
+	if !suggested {
+		return nil
+	}
+	t, err := p.m.store.GetThread(p.threadID)
+	if err != nil {
+		return nil
+	}
+	var at time.Time
+	switch autoAnswerMode(t) {
+	case AutoAnswerNow:
+		at = time.Now()
+	case AutoAnswerDelay:
+		at = asked.Add(AutoAnswerAfter)
+	default:
+		return nil
+	}
+	return &at
 }
 
 func (p *threadPrompter) wait(ctx context.Context, kind, tool, question string, payload requestPayload) (Answer, error) {
@@ -985,9 +1100,16 @@ func (p *threadPrompter) wait(ctx context.Context, kind, tool, question string, 
 	if err != nil {
 		return Answer{}, err
 	}
+	// A question whose every part has a suggestion can answer itself.
+	var suggested map[string]string
+	if kind == db.EvAsk {
+		suggested, _ = suggestedAnswers(payload.Input)
+	}
+	asked := time.Now()
+	payload.AutoAt = p.autoDeadline(asked, suggested != nil)
 	ev := &db.ThreadEvent{Kind: kind, Content: question, Payload: jsonString(payload)}
 	p.m.addEvent(t, ev)
-	pd := &pending{event: ev, tool: tool, ch: make(chan Answer, 1)}
+	pd := &pending{event: ev, tool: tool, ch: make(chan Answer, 1), retime: make(chan struct{}, 1)}
 	p.mu.Lock()
 	p.pending[payload.RequestID] = pd
 	p.mu.Unlock()
@@ -998,18 +1120,59 @@ func (p *threadPrompter) wait(ctx context.Context, kind, tool, question string, 
 	_, _ = p.m.update(p.threadID, func(t *db.Thread) { t.Status, t.WaitReason = db.ThreadWaiting, reason })
 
 	var ans Answer
-	select {
-	case ans = <-pd.ch:
-	case <-ctx.Done():
-		p.mu.Lock()
-		delete(p.pending, payload.RequestID)
-		p.mu.Unlock()
-		payload.State = "expired"
-		ev.Payload = jsonString(payload)
-		_ = p.m.store.UpdateThreadEvent(ev)
-		p.m.hub.Publish(Event{Type: EventThreadEvent, ProjectID: t.ProjectID, Data: ev})
-		return Answer{}, ctx.Err()
+	timer := time.NewTimer(time.Hour)
+	defer timer.Stop()
+	arm := func() <-chan time.Time {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		if payload.AutoAt == nil {
+			return nil
+		}
+		timer.Reset(time.Until(*payload.AutoAt))
+		return timer.C
 	}
+	fire := arm()
+wait:
+	for {
+		select {
+		case ans = <-pd.ch:
+			break wait
+		case <-pd.retime:
+			payload.AutoAt = p.autoDeadline(asked, suggested != nil)
+			ev.Payload = jsonString(payload)
+			_ = p.m.store.UpdateThreadEvent(ev)
+			p.m.hub.Publish(Event{Type: EventThreadEvent, ProjectID: t.ProjectID, Data: ev})
+			fire = arm()
+		case <-fire:
+			p.mu.Lock()
+			_, still := p.pending[payload.RequestID]
+			delete(p.pending, payload.RequestID)
+			p.mu.Unlock()
+			if !still {
+				// Answered at the same moment (theirs wins), or the turn is
+				// being cancelled: wait for whichever lands.
+				fire = nil
+				continue
+			}
+			ans = Answer{Allow: true, Answers: suggested}
+			payload.Auto = true
+			break wait
+		case <-ctx.Done():
+			p.mu.Lock()
+			delete(p.pending, payload.RequestID)
+			p.mu.Unlock()
+			payload.State, payload.AutoAt = "expired", nil
+			ev.Payload = jsonString(payload)
+			_ = p.m.store.UpdateThreadEvent(ev)
+			p.m.hub.Publish(Event{Type: EventThreadEvent, ProjectID: t.ProjectID, Data: ev})
+			return Answer{}, ctx.Err()
+		}
+	}
+	payload.AutoAt = nil
 	if kind == db.EvAsk {
 		ans = settleAsk(question, payload.Input, ans)
 	}

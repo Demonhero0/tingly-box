@@ -83,15 +83,12 @@ const threadEvents = (th: (typeof threads)[number]) => {
                 { label: 'Fixed 200 ms', description: 'Simplest; predictable, but retries arrive together.' },
                 { label: 'Linear', description: 'Grows slowly; a middle ground for short outages.' },
             ] },
-            { question: 'Which errors should be retried?', header: 'Errors', multiSelect: true, options: [
-                { label: '5xx responses' }, { label: 'Timeouts' }, { label: '429 Too Many Requests', description: 'Honours Retry-After when present.' },
-            ] },
         ] }
         return [
             brief,
             ...call('Read', { file_path: 'client/retry.go' }, 'for attempt := 0; attempt < max; attempt++ {', 6),
-            ev('assistant', 'The client retries immediately today. Before I add a backoff I need two choices from you.', 3),
-            ev('ask', 'Which backoff should retries use?', 2, { payload: JSON.stringify({ request_id: 'req-backoff', tool: 'AskUserQuestion', input, state: 'pending' }) }),
+            ev('assistant', 'The client retries immediately today. Before I add a backoff I need you to pick one.', 3),
+            ev('ask', 'Which backoff should retries use?', 2, { payload: JSON.stringify({ request_id: 'req-backoff', tool: 'AskUserQuestion', input, state: 'pending', auto_at: new Date(Date.now() + 8 * 60_000).toISOString() }) }),
         ]
     }
     if (th.id === 't-sdk') {
@@ -164,9 +161,9 @@ const session = (o: Partial<Record<string, unknown>> & { id: string; title: stri
 })
 
 const sessions = [
-    session({ id: 's-dark', title: 'Add a dark mode toggle', status: 'waiting', worktree: '/Users/me/code/notes-app', task: 'Add a dark mode toggle to the settings page and remember it.', wait_reason: 'Approve: Run `npm test`', input_tokens: 48_000, output_tokens: 2_900, updated_at: ago(2) }),
-    session({ id: 's-links', title: 'Fix the broken links check', status: 'working', worktree: '/Users/me/code/website', task: 'The link checker fails on anchors. Fix it.', updated_at: ago(1) }),
-    session({ id: 's-readme', title: 'Rewrite the README intro', status: 'idle', worktree: '/Users/me/code/website', task: 'Rewrite the README intro in plain language.', permission_mode: 'plan', input_tokens: 21_000, output_tokens: 1_500, updated_at: ago(50) }),
+    session({ id: 's-dark', title: 'Add a dark mode toggle', status: 'waiting', worktree: '/Users/me/code/notes-app', head_branch: 'main', task: 'Add a dark mode toggle to the settings page and remember it.', wait_reason: 'Approve: Run `npm test`', input_tokens: 48_000, output_tokens: 2_900, updated_at: ago(2) }),
+    session({ id: 's-links', title: 'Fix the broken links check', status: 'working', worktree: '/Users/me/code/website', head_branch: 'fix/link-anchors', task: 'The link checker fails on anchors. Fix it.', updated_at: ago(1) }),
+    session({ id: 's-readme', title: 'Rewrite the README intro', status: 'idle', worktree: '/Users/me/code/website', head_branch: 'main', task: 'Rewrite the README intro in plain language.', permission_mode: 'plan', input_tokens: 21_000, output_tokens: 1_500, updated_at: ago(50) }),
     session({ id: 's-old', title: 'Rename the config keys', status: 'resolved', worktree: '/Users/me/scratch', task: 'Rename the config keys to snake_case.', resolved_at: ago(60 * 30), updated_at: ago(60 * 30) }),
 ]
 
@@ -277,6 +274,18 @@ export const projectsHandlers = [
     http.post('/api/v1/projects/sessions/:sid/tasks/:task_id/stop', ({ params }) => {
         stoppedTasks.add(params.task_id as string)
         return new HttpResponse(null, { status: 204 })
+    }),
+    http.put('/api/v1/projects/sessions/:sid/auto-answer', async ({ params, request }) => {
+        const s = sessions.find((x) => x.id === params.sid) as Record<string, unknown> | undefined
+        if (!s) return HttpResponse.json({ error: 'session not found' }, { status: 404 })
+        s.auto_answer = ((await request.json()) as { auto_answer: string }).auto_answer
+        return HttpResponse.json(s)
+    }),
+    http.put('/api/v1/projects/:id/threads/:tid/auto-answer', async ({ params, request }) => {
+        const th = threads.find((x) => x.id === params.tid) as Record<string, unknown> | undefined
+        if (!th) return HttpResponse.json({ error: 'thread not found' }, { status: 404 })
+        th.auto_answer = ((await request.json()) as { auto_answer: string }).auto_answer
+        return HttpResponse.json(th)
     }),
     http.put('/api/v1/projects/sessions/:sid/permission-mode', async ({ params, request }) => {
         const s = sessions.find((x) => x.id === params.sid)

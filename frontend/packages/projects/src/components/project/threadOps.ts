@@ -12,6 +12,8 @@ export interface ThreadOps {
     reopen: () => Promise<unknown>;
     /** Release a session to a terminal: the command that resumes it. Threads have none. */
     handoff: () => Promise<string>;
+    /** When a question with a suggested answer is answered without the user. */
+    setAutoAnswer: (mode: '' | 'off' | 'delay' | 'now') => Promise<unknown>;
 }
 
 export function projectThreadOps(projectId: string, tid: string): ThreadOps {
@@ -25,6 +27,7 @@ export function projectThreadOps(projectId: string, tid: string): ThreadOps {
         finish: () => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/resolve', path)),
         reopen: () => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/reopen', path)),
         handoff: () => Promise.reject(new Error('a project thread is continued in its worktree')),
+        setAutoAnswer: (auto_answer) => unwrap(api.PUT('/api/v1/projects/{id}/threads/{tid}/auto-answer', { ...path, body: { auto_answer } })),
     };
 }
 
@@ -39,5 +42,6 @@ export function sessionOps(sid: string): ThreadOps {
         finish: () => unwrap(api.POST('/api/v1/projects/sessions/{sid}/archive', path)),
         reopen: () => unwrap(api.POST('/api/v1/projects/sessions/{sid}/reopen', path)),
         handoff: async () => (await unwrap(api.POST('/api/v1/projects/sessions/{sid}/handoff', path))).command,
+        setAutoAnswer: (auto_answer) => unwrap(api.PUT('/api/v1/projects/sessions/{sid}/auto-answer', { ...path, body: { auto_answer } })),
     };
 }

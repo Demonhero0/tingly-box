@@ -21,6 +21,11 @@ export interface TranscriptEntry {
     author?: string;
     // Files attached to a user message.
     attachments?: TranscriptAttachment[];
+    // A question that answers itself with its suggestion at this time
+    // unless the user answers first (ask_request).
+    autoAt?: string;
+    // The suggestion answered it, not the user (ask_response).
+    auto?: boolean;
     timestamp: string;
 }
 

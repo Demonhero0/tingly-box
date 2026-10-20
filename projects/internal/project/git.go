@@ -52,6 +52,16 @@ func InspectRepo(ctx context.Context, path string) (RepoInfo, error) {
 	return RepoInfo{Root: root, Branch: branch, Dirty: status != ""}, nil
 }
 
+// HeadBranch is the branch a folder is on; empty when the folder is not in
+// a repository or its HEAD is detached.
+func HeadBranch(ctx context.Context, dir string) string {
+	b, err := git(ctx, dir, "branch", "--show-current")
+	if err != nil {
+		return ""
+	}
+	return b
+}
+
 // AddWorktree creates branch from base in a new worktree at dir.
 func AddWorktree(ctx context.Context, repo, dir, branch, base string) error {
 	_, err := git(ctx, repo, "worktree", "add", "-b", branch, dir, base)

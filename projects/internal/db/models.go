@@ -98,6 +98,13 @@ type Thread struct {
 	// Profile is a folder session's launch profile, named by the host
 	// (Tingly Box: a Claude Code profile); empty for the host's default.
 	Profile string `gorm:"size:100" json:"profile,omitempty"`
+	// AutoAnswer says when a question with a suggested answer is answered
+	// without the user: off, delay or now. Empty is the kind's default
+	// (delay for a project thread, off for a folder session).
+	AutoAnswer string `gorm:"size:10" json:"auto_answer,omitempty"`
+	// HeadBranch is the branch a folder session's folder is on, read when
+	// the session starts and after each turn; empty outside a repository.
+	HeadBranch string `gorm:"size:200" json:"head_branch,omitempty"`
 	// MergedAt is set when the branch was merged from the Overview.
 	MergedAt   *time.Time `json:"merged_at,omitempty"`
 	ResolvedAt *time.Time `json:"resolved_at,omitempty"`

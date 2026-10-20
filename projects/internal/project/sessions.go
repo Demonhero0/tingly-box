@@ -42,6 +42,7 @@ var (
 	ErrNotFolder       = errors.New("the path is not a folder")
 	ErrTaskNotRunning  = errors.New("the task is not running")
 	ErrBadPermission   = errors.New("unknown permission mode")
+	ErrBadAutoAnswer   = errors.New("unknown auto-answer setting")
 	errFolderRequired  = errors.New("folder is required")
 	errBadTaskID       = errors.New("bad task id")
 	ErrTaskOutputUnset = errors.New("no output recorded for that task")
@@ -118,6 +119,7 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 		Title: title, Task: task, Status: db.ThreadWorking, Origin: "user",
 		Worktree: folder, SessionID: uuid.NewString(),
 		Model: model, PermissionMode: spec.PermissionMode, Profile: profile,
+		HeadBranch: HeadBranch(context.Background(), folder),
 	}
 	if err := m.store.CreateThread(t); err != nil {
 		return nil, err
@@ -147,6 +149,23 @@ func (m *Threads) SetPermissionMode(id, mode string) (*db.Thread, error) {
 	out, err := m.update(id, func(t *db.Thread) { t.PermissionMode = mode })
 	if err == nil {
 		m.addEvent(out, &db.ThreadEvent{Kind: db.EvSystem, Content: "permission mode: " + orDefault(mode)})
+	}
+	return out, err
+}
+
+// SetAutoAnswer sets when the thread's questions with a suggested answer
+// are answered without the user. A question already waiting is timed
+// again under the new setting.
+func (m *Threads) SetAutoAnswer(id, mode string) (*db.Thread, error) {
+	if !ValidAutoAnswer(mode) {
+		return nil, ErrBadAutoAnswer
+	}
+	if _, err := m.store.GetThread(id); err != nil {
+		return nil, err
+	}
+	out, err := m.update(id, func(t *db.Thread) { t.AutoAnswer = mode })
+	if err == nil {
+		m.prompter(id).retime()
 	}
 	return out, err
 }

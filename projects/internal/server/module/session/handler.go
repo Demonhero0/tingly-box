@@ -84,6 +84,12 @@ type SessionRespondRequest struct {
 	Answers map[string]string `json:"answers,omitempty"`
 }
 
+// SessionAutoAnswerRequest sets when the session's questions with a
+// suggested answer are answered without the user; empty is the default (off).
+type SessionAutoAnswerRequest struct {
+	AutoAnswer string `json:"auto_answer" enum:",off,delay,now"`
+}
+
 // PermissionModeRequest sets the mode of the session's next turn.
 type PermissionModeRequest struct {
 	PermissionMode string `json:"permission_mode"`
@@ -185,6 +191,10 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api.PUT("/projects/sessions/:sid/permission-mode", h.setPermissionMode, tag,
 		swagger.WithDescription("Set the permission mode of the session's next turn"),
 		swagger.WithRequestModel(PermissionModeRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.PUT("/projects/sessions/:sid/auto-answer", h.setAutoAnswer, tag,
+		swagger.WithDescription("Set when the session answers a question with its suggested option by itself"),
+		swagger.WithRequestModel(SessionAutoAnswerRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
 	api.PUT("/projects/sessions/:sid/profile", h.setProfile, tag,
 		swagger.WithDescription("Set the launch profile of the session's next turn (hosts with profiles only)"),
@@ -455,6 +465,23 @@ func (h *Handler) setPermissionMode(c *gin.Context) {
 		return
 	}
 	out, err := h.svc.Threads.SetPermissionMode(t.ID, req.PermissionMode)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) setAutoAnswer(c *gin.Context) {
+	var req SessionAutoAnswerRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	t, ok := h.session(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetAutoAnswer(t.ID, req.AutoAnswer)
 	if err != nil {
 		fail(c, err)
 		return

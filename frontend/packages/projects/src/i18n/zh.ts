@@ -132,6 +132,16 @@ export const zh: Dict<typeof en> = {
         uncommittedWarn: '线程在 worktree 里留下了未提交的改动，它们不在本次合并中：',
     },
     attachments: { removed: '{{name}}（已移除）' },
+    strip: {
+        title: '本线程', sessionTitle: '本会话', autoAt: '{{time}} 自动按推荐回答', expand: '展开详情', collapse: '收起详情',
+        folder: '文件夹', copyCd: '复制 cd 命令', branch: '分支', copyBranch: '复制分支名',
+        autoAnswer: {
+            title: '自动回答', change: '更改', menuTitle: '问题带有推荐答案时',
+            off: '关闭', offHelp: '每个问题都等你回答。',
+            delay: '10 分钟后', delayHelp: '10 分钟内没回答，线程就按推荐答案继续工作。',
+            now: '立即', nowHelp: '线程立即按推荐答案继续。之后仍可以发消息纠正。',
+        },
+    },
     library: {
         intro: '你添加的文件每个线程都能读取。没有仓库的线程会把产出放在这里。',
         add: '添加文件', empty: '还没有文件。', download: '下载', copyPath: '复制文件夹路径',

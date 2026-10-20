@@ -10,10 +10,11 @@ import { Composer } from '../Composer';
 import { AttachmentChips, uploadAttachments, type AttachOwner } from '../attachments';
 import { CodeBlock, Markdown } from '../Markdown';
 import { ConfirmDialog, CopyIconButton } from '@tingly/ui';
-import { ArrowBack, Branch, CheckCircle, DiffIcon, FolderOpen, Merge, MoreVert, Stream, Terminal, Undo } from '../icons';
+import { ArrowBack, CheckCircle, DiffIcon, Merge, MoreVert, Stream, Terminal, Undo } from '../icons';
 import { useNotify } from '../../hooks/useNotify';
-import { folderName, formatTokens } from '../../utils/format';
+import { formatTokens } from '../../utils/format';
 import { DiffDialog } from './DiffDialog';
+import { ComposerStrip } from './ComposerStrip';
 import { ThreadStatusChip, toneColor } from './threadStatus';
 import { threadTranscript } from './threadTranscript';
 import { projectThreadOps, sessionOps } from './threadOps';
@@ -132,6 +133,12 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
         const { entries, pendingRequestId } = threadTranscript(events ?? [], running, (from) => from === 'coordinator' ? coordinator : undefined);
         return { blocks: buildTranscript(entries), pendingRequestId };
     }, [events, running, coordinator]);
+
+    // The waiting question's own deadline, for the strip's folded line.
+    const pendingAutoAt = useMemo(() => {
+        const b = blocks.find((x) => x.type === 'request' && !!pendingRequestId && x.message.request_id === pendingRequestId);
+        return b?.type === 'request' ? b.message.autoAt : undefined;
+    }, [blocks, pendingRequestId]);
 
     const tasks = useMemo(() => session
         ? backgroundTasks(threadTranscript(events ?? [], running, () => undefined).entries, liveTasks)
@@ -261,19 +268,8 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                 <Box sx={{ pl: hideTitle ? 0.5 : 4.5 }}>
                     <MetaLine items={[
                         <ThreadStatusChip thread={thread} />,
-                        thread.branch
-                            ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
-                                <Branch sx={{ fontSize: 14, flexShrink: 0 }} />
-                                <Box component="span" sx={{ ...mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={t('thread.fromBase', { base: thread.base_branch })}>{thread.branch}</Box>
-                                <CopyIconButton value={`cd ${thread.worktree}`} label={t('thread.copyCd')} copiedLabel={t('common.copied')} iconSize={13} />
-                            </Box>
-                            : session
-                                ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
-                                    <FolderOpen sx={{ fontSize: 14, flexShrink: 0 }} />
-                                    <Box component="span" sx={{ ...mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={thread.worktree}>{folderName(thread.worktree)}</Box>
-                                    <CopyIconButton value={`cd ${thread.worktree}`} label={t('thread.copyCd')} copiedLabel={t('common.copied')} iconSize={13} />
-                                </Box>
-                                : t('thread.noRepo'),
+                        // The folder and branch float above the message box.
+                        !thread.branch && !session && t('thread.noRepo'),
                         thread.merged_at
                             ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: toneColor('success') }}><Merge sx={{ fontSize: 13 }} />{t('thread.mergedInto', { base: thread.base_branch })}</Box>
                             : thread.commits_ahead > 0 && <>{t('thread.commits', { count: thread.commits_ahead })} · {t('thread.files', { count: thread.files_changed })}</>,
@@ -313,6 +309,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                         </Box>
                     </Alert>
                 )}
+                <ComposerStrip thread={thread} autoAt={pendingAutoAt} onAutoAnswer={(mode) => { void act(() => ops.setAutoAnswer(mode)).then((ok) => ok && onRefresh?.()); }} />
                 <Composer
                     context={composerContext}
                     minRows={1}

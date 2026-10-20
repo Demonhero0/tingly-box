@@ -42,6 +42,13 @@ type ThreadRespondRequest struct {
 	Answers map[string]string `json:"answers,omitempty"`
 }
 
+// AutoAnswerRequest sets when the thread's questions with a suggested
+// answer are answered without the user; empty is the default (delay for a
+// project thread, off for a folder session).
+type AutoAnswerRequest struct {
+	AutoAnswer string `json:"auto_answer" enum:",off,delay,now"`
+}
+
 // MergeBlockedResponse explains why a merge was not done.
 type MergeBlockedResponse struct {
 	Error string `json:"error"`
@@ -82,6 +89,10 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithResponseModel(db.Thread{}))
 	api.POST("/projects/:id/threads/:tid/reopen", h.reopen, tag,
 		swagger.WithDescription("Reopen a resolved thread"),
+		swagger.WithResponseModel(db.Thread{}))
+	api.PUT("/projects/:id/threads/:tid/auto-answer", h.setAutoAnswer, tag,
+		swagger.WithDescription("Set when the thread answers a question with its suggested option by itself"),
+		swagger.WithRequestModel(AutoAnswerRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
 	api.GET("/projects/:id/threads/:tid/diff", h.diff, tag,
 		swagger.WithDescription("The thread's changes against its base branch"),
@@ -253,4 +264,21 @@ func (h *Handler) merge(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, t)
+}
+
+func (h *Handler) setAutoAnswer(c *gin.Context) {
+	var req AutoAnswerRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	t, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetAutoAnswer(t.ID, req.AutoAnswer)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
