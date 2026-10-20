@@ -1,4 +1,5 @@
 import {
+    Alert,
     Box,
     Divider,
     MenuItem,
@@ -14,6 +15,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { type AppLanguage, resolveLanguage } from '@/i18n';
 import { fontMono, fontSizes } from '@/theme/fonts';
+import { CODEX_COMPACT, planCodexCompact } from '@/components/rule-card/codexCompact';
 
 // CodexPrefs mirrors the Go struct in internal/config (CodexPrefs).
 // Keys are the literal Codex config.toml keys so the object round-trips
@@ -138,7 +140,7 @@ const FIELDS_TEXT_ZH: FieldTextMap = {
     auto_compact_percent: {
         label: '自动压缩阈值 (%)',
         purpose: '上下文用到窗口的这个比例时触发自动压缩',
-        tooltip: '写入模型目录的 auto_compact_token_limit（窗口 × 比例），范围 50–100，且不会高于可用窗口比例。留空用 tb 默认（75）。',
+        tooltip: '写入模型目录的 auto_compact_token_limit（窗口 × 比例），范围 50–100，且不会高于可用窗口比例。留空用 tb 默认（75）。这是所有模型的默认值，单个模型可在规则行的“压缩”芯片里覆盖。',
     },
 };
 
@@ -171,7 +173,7 @@ const FIELDS_TEXT_EN: FieldTextMap = {
     auto_compact_percent: {
         label: 'Auto-compact at (%)',
         purpose: 'Compact the conversation once context reaches this share of the window',
-        tooltip: 'Written to the catalog as auto_compact_token_limit (window × percent), range 50–100, never above the usable window. Empty = tb default (75).',
+        tooltip: 'Written to the catalog as auto_compact_token_limit (window × percent), range 50–100, never above the usable window Empty = tb default (75). This is the default for every model; a single model can override it with the Compact chip on its rule row.',
     },
 };
 
@@ -204,7 +206,7 @@ const FIELDS_TEXT_RU: FieldTextMap = {
     auto_compact_percent: {
         label: 'Автосжатие при (%)',
         purpose: 'Сжимать диалог, когда контекст достигает этой доли окна',
-        tooltip: 'Записывается в каталог как auto_compact_token_limit (окно × доля), диапазон 50–100, не выше доступного окна. Пусто — значение tb по умолчанию (75).',
+        tooltip: 'Записывается в каталог как auto_compact_token_limit (окно × доля), диапазон 50–100, не выше доступного окна Пусто — значение tb по умолчанию (75). Это значение по умолчанию для всех моделей; для отдельной модели его можно переопределить чипом «Сжатие» в строке правила.',
     },
 };
 
@@ -236,6 +238,52 @@ function useLang(): AppLanguage {
     return resolveLanguage(i18n.language);
 }
 
+// ── Auto-compact warnings ──────────────────────────────────────────────
+// The shared default is judged against the default 200K window; a rule that
+// sets the 1M flag has far more room (the Compact chip on its header judges it
+// against its own window).
+
+const COMPACT_WARN_TEXT: Record<AppLanguage, { low: string; limited: string }> = {
+    zh: {
+        low: '按 200K 窗口估算，压缩时仅剩约 {remain} tokens（建议不低于 {min}）。长工具输出可能撞上窗口上限，导致压缩失败。',
+        limited: '高于「可用窗口 {effective}%」，实际按 {applied}% 生效。要更晚压缩，请先调高可用窗口。',
+    },
+    en: {
+        low: 'On a 200K window only about {remain} tokens would be free when compacting (at least {min} recommended). A long tool output could overflow the window and make compaction fail.',
+        limited: 'Higher than the usable window ({effective}%), so {applied}% is what takes effect. To compact later, raise the usable window first.',
+    },
+    ru: {
+        low: 'На окне 200K при сжатии останется около {remain} токенов (рекомендуется не менее {min}). Длинный вывод инструмента может переполнить окно, и сжатие не удастся.',
+        limited: 'Выше доступного окна ({effective}%), поэтому действует {applied}%. Чтобы сжимать позже, сначала увеличьте доступное окно.',
+    },
+};
+
+const parseCompactPercent = (raw: string | undefined, fallback: number): number => {
+    const n = Number.parseInt(raw ?? '', 10);
+    return Number.isFinite(n) && n >= CONTEXT_PERCENT_MIN && n <= CONTEXT_PERCENT_MAX ? n : fallback;
+};
+
+/** The warning for the shared auto-compact percent, or null when it is fine. */
+export function compactDefaultWarning(
+    prefs: CodexPrefs,
+    text: { low: string; limited: string },
+): { severity: 'warning' | 'info'; message: string } | null {
+    const effective = parseCompactPercent(prefs.effective_context_window_percent, CONTEXT_PERCENT_DEFAULTS.effective_context_window_percent);
+    const percent = parseCompactPercent(prefs.auto_compact_percent, CONTEXT_PERCENT_DEFAULTS.auto_compact_percent);
+    const plan = planCodexCompact({ window: CODEX_COMPACT.window, percent, effectivePercent: effective });
+    const fill = (tpl: string) => tpl
+        .replace('{value}', String(percent))
+        .replace('{applied}', String(plan.applied))
+        .replace('{effective}', String(effective))
+        .replace('{remain}', plan.remain.toLocaleString('en-US'))
+        .replace('{min}', CODEX_COMPACT.minRemaining.toLocaleString('en-US'));
+    switch (plan.status) {
+        case 'limited': return { severity: 'info', message: fill(text.limited) };
+        case 'low': return { severity: 'warning', message: fill(text.low) };
+        default: return null;
+    }
+}
+
 // ── Field row ──────────────────────────────────────────────────────────
 
 interface FieldRowProps {
@@ -257,7 +305,11 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, text, unsetLabel, prefs, set
         </Box>
     );
 
+    const lang = useLang();
+    const warning = field.key === 'auto_compact_percent' ? compactDefaultWarning(prefs, COMPACT_WARN_TEXT[lang]) : null;
+
     return (
+        <Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1, minHeight: 44 }}>
             {/* Col 1 — Label + info icon */}
             <Box sx={{ flex: '0 0 180px', display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
@@ -325,6 +377,12 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, text, unsetLabel, prefs, set
                     </Select>
                 )}
             </Box>
+        </Box>
+        {warning && (
+            <Alert severity={warning.severity} variant="outlined" sx={{ mb: 1, py: 0, fontSize: fontSizes.sm }}>
+                {warning.message}
+            </Alert>
+        )}
         </Box>
     );
 };

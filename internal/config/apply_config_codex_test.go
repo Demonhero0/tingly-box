@@ -905,6 +905,58 @@ func TestRenderCodexModelCatalog_HeadroomFromPrefs(t *testing.T) {
 	assert.Equal(t, win*60/100, compact)
 }
 
+// A rule's codex_compact_percent overrides the shared default for that model
+// only; results stay inside the usable window.
+func TestRenderCodexModelCatalog_PerModelCompactPercent(t *testing.T) {
+	raw, err := RenderCodexModelCatalogWithPrefs(
+		[]string{"plain", "tuned", "high", "tooLow"},
+		map[string]int{"tuned": codex1MContextWindow},
+		&CodexPrefs{
+			EffectiveContextWindowPercent: "95",
+			ModelAutoCompactPercent:       map[string]int{"tuned": 60, "high": 100, "tooLow": 10},
+		})
+	require.NoError(t, err)
+	var c struct {
+		Models []struct {
+			Slug          string `json:"slug"`
+			ContextWindow int    `json:"context_window"`
+			Compact       int    `json:"auto_compact_token_limit"`
+		} `json:"models"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &c))
+	got := map[string]int{}
+	for _, m := range c.Models {
+		got[m.Slug] = m.Compact * 100 / m.ContextWindow
+	}
+	assert.Equal(t, 75, got["plain"], "no override follows the shared default")
+	assert.Equal(t, 60, got["tuned"])
+	assert.Equal(t, 95, got["high"], "capped at the usable window")
+	assert.Equal(t, 75, got["tooLow"], "out-of-range override is ignored")
+}
+
+func TestBuildCompactPercentsFromRules(t *testing.T) {
+	cfg := &Config{Rules: []typ.Rule{
+		{UUID: "a", Scenario: typ.ScenarioCodex, RequestModel: "m1", Active: true, Flags: typ.RuleFlags{CodexCompactPercent: 70}},
+		{UUID: "b", Scenario: typ.ScenarioCodex, RequestModel: "m2", Active: true},
+		{UUID: "c", Scenario: typ.ScenarioCodex, RequestModel: "m3", Active: false, Flags: typ.RuleFlags{CodexCompactPercent: 70}},
+		{UUID: "d", Scenario: typ.ScenarioClaudeCode, RequestModel: "m4", Active: true, Flags: typ.RuleFlags{CodexCompactPercent: 70}},
+	}}
+	assert.Equal(t, map[string]int{"m1": 70}, BuildCompactPercentsFromRules(cfg))
+}
+
+// With per-model overrides in the catalog, the shared default read back is the
+// most common value, not whichever model happens to come first.
+func TestReadCodexConfig_RestoresSharedCompactDefaultDespiteOverrides(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+	_, err := ApplyCodexConfig("http://h/tingly/codex", []string{"first", "b", "c"},
+		&CodexPrefs{AutoCompactPercent: "70", ModelAutoCompactPercent: map[string]int{"first": 55}}, true)
+	require.NoError(t, err)
+	prefs, _, _, err := ReadCodexConfig()
+	require.NoError(t, err)
+	assert.Equal(t, "70", prefs.AutoCompactPercent)
+}
+
 // ReadCodexConfig restores non-default headroom percentages from the catalog.
 func TestReadCodexConfig_RestoresCatalogHeadroom(t *testing.T) {
 	tempDir := t.TempDir()

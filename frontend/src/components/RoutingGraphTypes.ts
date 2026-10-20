@@ -72,6 +72,7 @@ export interface RuleFlags {
     claudeCodeCompat?: boolean;
     cleanHeader?: boolean;
     context1m?: boolean;
+    codexCompactPercent?: number;
     claudeOrgId?: string;
     extraHeaders?: Record<string, string>;
     recording?: string;
@@ -93,6 +94,7 @@ export interface RuleFlagsApi {
     claude_code_compat?: boolean;
     clean_header?: boolean;
     context_1m?: boolean;
+    codex_compact_percent?: number;
     claude_org_id?: string;
     claude_code_version?: string;
     extra_headers?: Record<string, string>;

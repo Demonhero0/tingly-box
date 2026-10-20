@@ -286,7 +286,23 @@ export default {
     "endpointNotApplicable": "只对 OpenAI 兼容上游生效。此规则目前没有这类上游，所以选择暂时不起作用。",
     "managePlugins": "管理插件",
     "test": "测试",
-    "ruleActions": "规则操作"
+    "ruleActions": "规则操作",
+    "compact": {
+      "chip": "压缩：{{value}}",
+      "auto": "跟随默认",
+      "aria": "此模型的自动压缩：{{value}}",
+      "tooltip": "设置 Codex 在上下文用到多少时压缩这个模型的对话",
+      "title": "自动压缩触发点",
+      "description": "上下文用到窗口的这个比例时，Codex 会先压缩历史对话。只写入 Codex 配置，不影响请求转发。",
+      "following": "当前跟随 Auto Config（{{percent}}%）。拖动即只为这个模型单独设置。",
+      "window": "窗口",
+      "line": "压缩线",
+      "remain": "压缩时剩余",
+      "low": "压缩时仅剩约 {{remain}} tokens（建议不低于 {{min}}）。长工具输出可能撞上窗口上限，导致压缩失败。",
+      "limited": "受「可用窗口 {{effective}}%」限制，实际按 {{applied}}% 生效。要更晚压缩，请先在 Auto Config 调高可用窗口。",
+      "needsApply": "改动需点 Auto Config 应用后生效。",
+      "reset": "恢复为 Auto Config 的值（{{percent}}%）"
+    }
   },
   "templateActions": {
     "troubleshoot": "错误检查",

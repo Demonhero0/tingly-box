@@ -25,6 +25,7 @@ import { isWildcardModelName } from '@/components/rule-card/utils';
 import { notify } from '@/utils/notify';
 import { fontMono, fontSizes } from '@/theme/fonts';
 import type {OpenAIEndpointSelection} from '@/hooks/useResponsesToggle';
+import {CodexCompactChip} from '@/components/rule-card/CodexCompactChip';
 
 // Styled components - compact for graph use
 const HEADER_PADDING_X = 40;
@@ -136,6 +137,10 @@ export interface ModelRequestHeaderProps {
     endpointSelection?: OpenAIEndpointSelection;
     responsesProbing?: boolean;
     onEndpointSelect?: (selection: OpenAIEndpointSelection) => void;
+    // Codex only: the share of the context window at which Codex auto-compacts
+    // this rule's model (0 = follow Auto Config). Config-only, see CodexCompactChip.
+    onCompactChange?: (percent: number) => void;
+    compactPercent?: number;
     // False when none of the rule's services is OpenAI-compatible: the chip stays
     // (and works) but its tooltip says it has no effect there.
     endpointApplicable?: boolean;
@@ -162,6 +167,8 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
     endpointSelection = 'auto',
     responsesProbing = false,
     onEndpointSelect,
+    onCompactChange,
+    compactPercent = 0,
     endpointApplicable = true,
     pluginsCount = 0,
     onPluginsClick,
@@ -422,6 +429,17 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                             ))}
                         </Menu>
                     </Box>
+                )}
+
+                {onCompactChange && (
+                    <CodexCompactChip
+                        percent={compactPercent}
+                        context1M={context1M}
+                        disabled={!active}
+                        onChange={onCompactChange}
+                        buttonSx={strategyButtonSx}
+                        highlightedButtonSx={highlightedStrategyButtonSx}
+                    />
                 )}
 
                 {pluginsCount > 0 && onPluginsClick && (

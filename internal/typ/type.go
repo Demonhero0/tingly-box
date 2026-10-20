@@ -278,6 +278,14 @@ type RuleFlags struct {
 	// only the beta header changes behavior.
 	Context1M bool `json:"context_1m,omitempty" yaml:"context_1m,omitempty"`
 
+	// CodexCompactPercent overrides, for this rule's model only, the share of
+	// the context window at which Codex auto-compacts (50-100; 0 = follow the
+	// shared Auto Config default). Config-only: it is written into the
+	// generated Codex model catalog and never reaches the request pipeline,
+	// so it is deliberately not in RuleFlagRegistry (the rule header's
+	// Compact chip is its editor).
+	CodexCompactPercent int `json:"codex_compact_percent,omitempty" yaml:"codex_compact_percent,omitempty"`
+
 	// ExtraHeaders are appended to the outbound upstream request for requests
 	// matched by this rule. Applied on api_key providers only (vendor/OAuth
 	// chains keep their handshake headers untouched). Provider- and

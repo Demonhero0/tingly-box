@@ -17807,6 +17807,11 @@
             "type": "boolean",
             "description": "Field clean_header"
           },
+          "codex_compact_percent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Field codex_compact_percent"
+          },
           "context_1m": {
             "type": "boolean",
             "description": "Field context_1m"

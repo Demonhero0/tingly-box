@@ -286,7 +286,23 @@ export default {
     "endpointNotApplicable": "Only applies to OpenAI-compatible upstreams. This rule has none, so the choice has no effect for now.",
     "managePlugins": "Manage plugins",
     "test": "Test",
-    "ruleActions": "Rule actions"
+    "ruleActions": "Rule actions",
+    "compact": {
+      "chip": "Compact: {{value}}",
+      "auto": "Auto",
+      "aria": "Auto-compact for this model: {{value}}",
+      "tooltip": "Choose when Codex compacts this model's context",
+      "title": "Auto-compact trigger",
+      "description": "Codex compacts the conversation once the context reaches this share of the window. It only goes into the Codex config; requests are not affected.",
+      "following": "Following Auto Config ({{percent}}%). Drag to set a value for this model only.",
+      "window": "Window",
+      "line": "Compacts at",
+      "remain": "Free when compacting",
+      "low": "Only about {{remain}} tokens will be free when compacting (at least {{min}} recommended). A long tool output could overflow the window and make compaction fail.",
+      "limited": "Capped by the usable window ({{effective}}%), so {{applied}}% is what takes effect. To compact later, raise Usable window in Auto Config.",
+      "needsApply": "Takes effect after Auto Config is applied.",
+      "reset": "Use Auto Config value ({{percent}}%)"
+    }
   },
   "templateActions": {
     "troubleshoot": "Troubleshoot",

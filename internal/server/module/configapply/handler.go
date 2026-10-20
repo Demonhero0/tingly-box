@@ -608,6 +608,7 @@ func (h *Handler) ApplyCodexConfigFromState(c *gin.Context) {
 
 	// Build context windows map from rules for models with context_1m flag
 	contextWindows := config.BuildContextWindowsFromRules(cfg)
+	prefs.ModelAutoCompactPercent = config.BuildCompactPercentsFromRules(cfg)
 
 	port := h.resolvedPort()
 	codexBaseURL := middleware.BaseURLFromRequest(c, port) + "/tingly/codex"
@@ -725,6 +726,7 @@ func (h *Handler) GetCodexConfigPreview(c *gin.Context) {
 
 	// Build context windows map from rules for models with context_1m flag
 	contextWindows := config.BuildContextWindowsFromRules(cfg)
+	prefs.ModelAutoCompactPercent = config.BuildCompactPercentsFromRules(cfg)
 
 	port := h.resolvedPort()
 	codexBaseURL := middleware.BaseURLFromRequest(c, port) + "/tingly/codex"

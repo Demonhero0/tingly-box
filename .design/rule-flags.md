@@ -141,6 +141,14 @@ func RuleFlagRegistry() []FlagSpec { … }
 | `claude_code_version` | enum | request_anthropic | **yes** | override | Claude OAuth wire profile：空/Default 跟随最新支持版本，当前 2.1.280；2.1.86 是显式 Legacy。仅适用于 Claude OAuth，旁路 client 的默认行为见 `claude-code-oauth-compat.md` §B0.1。 | `ResolveRuleFlagsWithScenario` → `ClaudeCodeVersionTransform` + client header/beta/cch 层 |
 | `context_1m` | bool | request_anthropic | — | — | 对支持模型追加 `context-1m-2025-08-07` beta；不改出站模型名，客户端自身请求 1M 仍被尊重。 | Anthropic SDK Betas / per-call options |
 
+**不在 registry 的字段**：`codex_compact_percent`（`RuleFlags.CodexCompactPercent`）是
+config-only flag——只在生成 Codex 模型目录时读取，不进请求链路、没有注入点，编辑器是 Codex
+规则头上的 `Compact` 芯片（滑块弹层），所以不放进 `RuleFlagRegistry`（否则 Plugins 目录会
+给它一个通用的整数输入框）。设计见 [`codex-config.md`](./codex-config.md) 的
+“Per-model auto-compact”。
+
+---
+
 ## 5. 五种 flag 注入手法
 
 ```
