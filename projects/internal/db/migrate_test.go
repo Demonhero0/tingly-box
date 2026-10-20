@@ -555,3 +555,21 @@ func TestCanonicalPathAgreesOnSpellings(t *testing.T) {
 	assert.Equal(t, "", PathKey(" "))
 	assert.Equal(t, "(unknown folder)", FolderName(""))
 }
+
+// A database made by a release from before IM bindings has a project_messages
+// table without the source columns; the migration must still start.
+func TestMigrationCarriesAReleaseDatabaseWithoutSourceColumns(t *testing.T) {
+	f := buildOldDB(t)
+	g := rawOpen(t, f.path)
+	for _, c := range []string{"source", "source_platform", "source_chat_id"} {
+		require.NoError(t, g.Exec("ALTER TABLE project_messages DROP COLUMN "+c).Error)
+	}
+	closeRaw(t, g)
+
+	s, err := Open(f.path)
+	require.NoError(t, err)
+	defer s.Close()
+	events := rawCount(t, s.db, "SELECT COUNT(*) FROM thread_events WHERE thread_id IN (SELECT main_thread_id FROM projects WHERE type = 'project')")
+	assert.EqualValues(t, f.messages, events)
+	assert.EqualValues(t, 0, rawCount(t, s.db, "SELECT COUNT(*) FROM thread_events WHERE source = 'im'"))
+}

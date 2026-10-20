@@ -438,9 +438,16 @@ func migrateMessages(tx *gorm.DB) (int64, error) {
 	if !tx.Migrator().HasTable("project_messages") {
 		return 0, nil
 	}
+	// A database from before IM bindings has no source columns on the table.
+	col := func(name string) string {
+		if tx.Migrator().HasColumn("project_messages", name) {
+			return "COALESCE(m." + name + ",'')"
+		}
+		return "''"
+	}
 	var msgs []legacyMessage
 	err := tx.Raw(`SELECT m.id, m.project_id, m.role, m.kind, COALESCE(m.content,'') content, COALESCE(m.payload,'') payload,
-		COALESCE(m.source,'') source, COALESCE(m.source_platform,'') source_platform, COALESCE(m.source_chat_id,'') source_chat_id, m.created_at
+		` + col("source") + ` source, ` + col("source_platform") + ` source_platform, ` + col("source_chat_id") + ` source_chat_id, m.created_at
 		FROM project_messages m WHERE m.id NOT IN (SELECT id FROM thread_events) ORDER BY m.created_at, m.rowid`).Scan(&msgs).Error
 	if err != nil {
 		return 0, err
