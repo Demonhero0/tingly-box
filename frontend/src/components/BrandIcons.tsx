@@ -3,9 +3,9 @@ import {Box, useTheme} from '@mui/material';
 
 // Import SVG files as URLs
 import AnthropicSvg from '@lobehub/icons-static-svg/icons/anthropic.svg?url';
-import ClaudeSvg from '@lobehub/icons-static-svg/icons/claude.svg?url';
+import ClaudeSvg from '@lobehub/icons-static-svg/icons/claude-color.svg?url';
 import ClaudeCodeSvg from '@lobehub/icons-static-svg/icons/claudecode.svg?url';
-import CodexSvg from '@lobehub/icons-static-svg/icons/codex.svg?url';
+import CodexSvg from '@lobehub/icons-static-svg/icons/codex-color.svg?url';
 import GeminiSvg from '@lobehub/icons-static-svg/icons/gemini.svg?url';
 import GoogleSvg from '@lobehub/icons-static-svg/icons/google.svg?url';
 import KimiSvg from '@lobehub/icons-static-svg/icons/kimi.svg?url';
@@ -13,7 +13,7 @@ import OpenAISvg from '@lobehub/icons-static-svg/icons/openai.svg?url';
 import OpenCodeSvg from '@lobehub/icons-static-svg/icons/opencode.svg?url';
 import PiSvg from '@lobehub/icons-static-svg/icons/pi.svg?url';
 import QwenSvg from '@lobehub/icons-static-svg/icons/qwen.svg?url';
-import DeepSeekSvg from '@lobehub/icons-static-svg/icons/deepseek.svg?url';
+import DeepSeekSvg from '@lobehub/icons-static-svg/icons/deepseek-color.svg?url';
 import MinimaxSvg from '@lobehub/icons-static-svg/icons/minimax.svg?url';
 import ZhipuSvg from '@lobehub/icons-static-svg/icons/zhipu.svg?url';
 import ZaiSvg from '@lobehub/icons-static-svg/icons/zai.svg?url';
@@ -120,15 +120,15 @@ const createBrandIcon = (src: string, alt: string, defaultGrayscale = false, mon
 
 export const OpenAI = createBrandIcon(OpenAISvg, 'OpenAI', false, true);
 export const Anthropic = createBrandIcon(AnthropicSvg, 'Anthropic', false, true);
-export const Claude = createBrandIcon(ClaudeSvg, 'Claude', false, true);
+export const Claude = createBrandIcon(ClaudeSvg, 'Claude', true);
 export const ClaudeCode = createBrandIcon(ClaudeCodeSvg, 'Claude Code', false, true);
-export const Codex = createBrandIcon(CodexSvg, 'Codex', false, true);
+export const Codex = createBrandIcon(CodexSvg, 'Codex', true);
 export const Gemini = createBrandIcon(GeminiSvg, 'Gemini', false, true);
 export const Google = createBrandIcon(GoogleSvg, 'Google', false, true);
 export const Kimi = createBrandIcon(KimiSvg, 'Kimi', false, true);
 export const Qwen = createBrandIcon(QwenSvg, 'Qwen', false, true);
 export const OpenCode = createBrandIcon(OpenCodeSvg, 'OpenCode', false, true);
-export const DeepSeek = createBrandIcon(DeepSeekSvg, 'DeepSeek', false, true);
+export const DeepSeek = createBrandIcon(DeepSeekSvg, 'DeepSeek', true);
 export const Minimax = createBrandIcon(MinimaxSvg, 'Minimax', false, true);
 export const Zhipu = createBrandIcon(ZhipuSvg, 'Zhipu', false, true);
 export const Zai = createBrandIcon(ZaiSvg, 'Z.ai', false, true);

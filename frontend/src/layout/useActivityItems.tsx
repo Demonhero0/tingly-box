@@ -24,8 +24,8 @@ import {
     Key as IconKey,
     Shield as IconShield,
     Lock as IconLock,
-    Vector as IconVector,
-    Rule as IconRule,
+    Embedding as IconEmbedding,
+    Decisions as IconDecisions,
     Photo as IconPhoto,
     Palette as IconPalette,
     Cable as IconPlug,
@@ -34,7 +34,7 @@ import {
     Handyman as IconTools,
     Server as IconServer,
     AiAgents as IconAiAgents,
-    Extension as IconExtension,
+    CircleOutlined as IconCustom,
     Code as IconCode,
     TestPipe as IconTestPipe,
     Folder as IconFolder,
@@ -190,20 +190,20 @@ export function useActivityItems(): ActivityItem[] {
             { id: 'codex', nav: { path: '/agent/codex', label: t('layout.nav.useCodex', { defaultValue: 'Codex' }), icon: <Codex size={20} /> } },
             { id: 'opencode', nav: { path: '/agent/opencode', label: t('layout.nav.useOpenCode', { defaultValue: 'OpenCode' }), icon: <OpenCode size={20} /> } },
             { id: 'pi', nav: { path: '/agent/pi', label: t('layout.nav.usePi', { defaultValue: 'Pi' }), icon: <Pi size={20} /> } },
-            { id: 'workbuddy', nav: { path: '/agent/workbuddy', label: t('layout.nav.useWorkBuddy', { defaultValue: 'WorkBuddy' }), icon: <WorkBuddy size={20} /> } },
+            { id: 'workbuddy', nav: { path: '/agent/workbuddy', label: t('layout.nav.useWorkBuddy', { defaultValue: 'WorkBuddy' }), icon: <WorkBuddy size={20} grayscale /> } },
             { id: 'dsh', nav: { path: '/agent/dsh', label: t('layout.nav.useDsh', { defaultValue: 'DeepSeek' }), icon: <DeepSeek size={20} /> } },
             { id: 'xcode', nav: { path: '/agent/xcode', label: t('layout.nav.useXcode', { defaultValue: 'Xcode' }), icon: <Xcode size={20} /> } },
             { id: 'vscode', nav: { path: '/agent/vscode', label: t('layout.nav.useVSCode', { defaultValue: 'VS Code' }), icon: <VSCode size={20} /> } },
             { id: 'cursor', nav: { path: '/agent/cursor', label: t('layout.nav.useCursor', { defaultValue: 'Cursor' }), icon: <Cursor size={20} /> } },
             // "custom" (bring-your-own-request-model) closes out the coding
             // tools group, right after the named integrations it's a fallback for.
-            { id: 'custom', nav: { path: '/agent/custom', label: t('layout.nav.useCustom', { defaultValue: 'Custom' }), icon: <IconExtension sx={{ fontSize: 20 }} /> } },
+            { id: 'custom', nav: { path: '/agent/custom', label: t('layout.nav.useCustom', { defaultValue: 'Custom' }), icon: <IconCustom sx={{ fontSize: 20 }} /> } },
         ]);
         const sdkTools = flagged([
             { id: 'openai', nav: { path: '/agent/openai', label: t('layout.nav.useOpenAI', { defaultValue: 'OpenAI' }), icon: <OpenAI size={20} /> } },
             { id: 'anthropic', nav: { path: '/agent/anthropic', label: t('layout.nav.useAnthropic', { defaultValue: 'Anthropic' }), icon: <Anthropic size={20} /> } },
-            { id: 'embed', nav: { path: '/agent/embed', label: t('layout.nav.useEmbed', { defaultValue: 'Embedding' }), icon: <IconVector sx={{ fontSize: 20 }} /> } },
-            { id: 'decisions', nav: { path: '/agent/decisions', label: t('layout.nav.useDecisions', { defaultValue: 'Decisions' }), icon: <IconRule sx={{ fontSize: 20 }} /> } },
+            { id: 'embed', nav: { path: '/agent/embed', label: t('layout.nav.useEmbed', { defaultValue: 'Embedding' }), icon: <IconEmbedding sx={{ fontSize: 20 }} /> } },
+            { id: 'decisions', nav: { path: '/agent/decisions', label: t('layout.nav.useDecisions', { defaultValue: 'Decisions' }), icon: <IconDecisions sx={{ fontSize: 20 }} /> } },
         ]);
 
         const scenarioChildren: NavItem[] = [];

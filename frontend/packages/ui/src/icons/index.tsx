@@ -151,6 +151,9 @@ import {
     IconMessageReport,
     IconMessage,
     IconWaveSine,
+    IconCircle,
+    IconGitFork,
+    IconChartDots3,
     IconCircleFilled,
     IconWorldDownload,
     IconGridDots,
@@ -354,11 +357,14 @@ export const Undo = tablerMui(IconArrowBackUp);
 
 // --- Custom / AI -------------------------------------------------------------
 export const AiAgents = tablerMui(IconAiAgents);
+export const Decisions = tablerMui(IconGitFork);
+export const Embedding = tablerMui(IconChartDots3);
 
 // --- Media -------------------------------------------------------------------
 export const Photo = tablerMui(IconPhoto);
 export const Vector = tablerMui(IconVector);
 export const WaveSine = tablerMui(IconWaveSine);
+export const CircleOutlined = tablerMui(IconCircle);
 export const Circle = tablerMuiFilled(IconCircleFilled);
 
 // --- Infrastructure ----------------------------------------------------------
