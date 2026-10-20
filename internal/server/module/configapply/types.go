@@ -18,6 +18,11 @@ type ApplyClaudeConfigRequest struct {
 	// ShowThinkingSummaries controls the top-level showThinkingSummaries key in
 	// settings.json. nil falls back to agent.DefaultClaudeCodeShowThinkingSummaries.
 	ShowThinkingSummaries *bool `json:"showThinkingSummaries,omitempty"`
+	// CoAuthoredBy controls both includeCoAuthoredBy and attribution in
+	// settings.json. nil, or the value the file already has, leaves them as
+	// written; a file that says nothing gets agent.DefaultClaudeCodeCoAuthoredBy
+	// (off).
+	CoAuthoredBy *bool `json:"coAuthoredBy,omitempty"`
 }
 
 const DefaultClaudeCodeDefaultMode = agent.DefaultClaudeCodeDefaultMode
@@ -49,6 +54,7 @@ type ClaudeConfigResponse struct {
 	DefaultMode           string                `json:"defaultMode"`
 	InstallStatusLine     bool                  `json:"installStatusLine"`
 	ShowThinkingSummaries bool                  `json:"showThinkingSummaries"`
+	CoAuthoredBy          bool                  `json:"coAuthoredBy"`
 }
 
 // CodexConfigResponse returns the typed values currently persisted in the

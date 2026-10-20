@@ -658,6 +658,18 @@ export const CLAUDE_CODE_DEFAULT_MODE_OPTIONS: ClaudeCodeDefaultMode[] = ['accep
 // Mirrors agent.DefaultClaudeCodeShowThinkingSummaries in internal/agent/prefs.go.
 export const CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES = true;
 
+// Mirrors agent.DefaultClaudeCodeCoAuthoredBy: tb leaves Claude's
+// Co-Authored-By credit out of commits unless the user turns it on.
+export const CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY = false;
+
+// The settings.json keys one Co-Authored-By choice writes, mirroring
+// applyCoAuthoredBy in internal/config/apply_config_claude.go: the legacy
+// includeCoAuthoredBy for older Claude Code, and attribution (empty = hidden)
+// for newer ones. On leaves attribution out so Claude Code's credit returns.
+export const coAuthoredBySettings = (include: boolean): Record<string, unknown> => include
+    ? { includeCoAuthoredBy: true }
+    : { includeCoAuthoredBy: false, attribution: { commit: '', pr: '' } };
+
 const DEFAULT_MODE_TEXT_ZH: Record<ClaudeCodeDefaultMode, DefaultModeOptionText> = {
     acceptEdits: { label: '接受编辑（推荐）', description: '自动接受文件编辑，其他高风险操作仍按 Claude Code 规则处理。' },
     default: { label: '默认', description: '使用 Claude Code 官方默认权限行为。' },
@@ -737,6 +749,27 @@ const SHOW_THINKING_SUMMARIES_TEXT: Record<AppLanguage, ToggleSettingText> = {
         hint: 'Записывает showThinkingSummaries на верхнем уровне settings.json; это не переменная окружения.',
         label: 'Показывать сводки',
         tooltip: 'Когда включено, Claude Code показывает сводку рассуждений модели перед ответом. Выключение лишь скрывает сводку — на то, рассуждает ли модель, это не влияет.',
+    },
+};
+
+const CO_AUTHORED_BY_TEXT: Record<AppLanguage, ToggleSettingText> = {
+    zh: {
+        title: '提交署名',
+        hint: '同时写入 settings.json 的 includeCoAuthoredBy（旧版 Claude Code）和 attribution（新版）；tb 默认关闭。',
+        label: '在提交和 PR 中署名 Claude',
+        tooltip: '开启后 Claude Code 会在 git 提交里加 Co-Authored-By: Claude，并在 PR 描述里注明由 Claude Code 生成。关闭时 includeCoAuthoredBy 写 false，attribution 的 commit 和 pr 写为空。',
+    },
+    en: {
+        title: 'Commit attribution',
+        hint: 'Writes both includeCoAuthoredBy (older Claude Code) and attribution (newer) in settings.json; tb keeps it off by default.',
+        label: 'Credit Claude',
+        tooltip: 'When on, Claude Code adds a Co-Authored-By: Claude trailer to git commits and a "Generated with Claude Code" line to PR descriptions. When off, includeCoAuthoredBy is false and attribution.commit / attribution.pr are empty.',
+    },
+    ru: {
+        title: 'Авторство в коммитах',
+        hint: 'Записывает в settings.json и includeCoAuthoredBy (старые версии Claude Code), и attribution (новые); в tb по умолчанию выключено.',
+        label: 'Указывать Claude',
+        tooltip: 'Когда включено, Claude Code добавляет к git-коммитам строку Co-Authored-By: Claude, а к описанию PR — пометку «Generated with Claude Code». Когда выключено, includeCoAuthoredBy = false, а attribution.commit и attribution.pr пустые.',
     },
 };
 
@@ -1263,9 +1296,38 @@ const ShowThinkingSummariesSection: React.FC<{
     );
 };
 
+// One switch for two keys: the badge names both, and Apply writes both
+// (coAuthoredBySettings / applyCoAuthoredBy).
+const CoAuthoredBySection: React.FC<{
+    lang: AppLanguage;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+}> = ({ lang, checked, onChange }) => {
+    const text = CO_AUTHORED_BY_TEXT[lang];
+
+    return (
+        <SettingsRowSection
+            title={text.title}
+            hint={text.hint}
+            label={text.label}
+            tooltip={text.tooltip}
+            settingsKey="attribution + includeCoAuthoredBy"
+            control={
+                <Switch
+                    size="small"
+                    checked={checked}
+                    onChange={(_, c) => onChange(c)}
+                />
+            }
+        />
+    );
+};
+
 interface QuickConfigPanelWithBehaviorProps extends QuickConfigPanelProps {
     showThinkingSummaries: boolean;
     setShowThinkingSummaries: (show: boolean) => void;
+    coAuthoredBy: boolean;
+    setCoAuthoredBy: (include: boolean) => void;
 }
 
 const ClaudeCodeQuickConfig: React.FC<QuickConfigPanelWithBehaviorProps> = ({
@@ -1275,6 +1337,8 @@ const ClaudeCodeQuickConfig: React.FC<QuickConfigPanelWithBehaviorProps> = ({
     setDefaultMode,
     showThinkingSummaries,
     setShowThinkingSummaries,
+    coAuthoredBy,
+    setCoAuthoredBy,
 }) => {
     const lang = useLang();
 
@@ -1282,6 +1346,7 @@ const ClaudeCodeQuickConfig: React.FC<QuickConfigPanelWithBehaviorProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <DefaultModeSection lang={lang} defaultMode={defaultMode} setDefaultMode={setDefaultMode} />
             <ShowThinkingSummariesSection lang={lang} checked={showThinkingSummaries} onChange={setShowThinkingSummaries} />
+            <CoAuthoredBySection lang={lang} checked={coAuthoredBy} onChange={setCoAuthoredBy} />
             <Section group="model" lang={lang} prefs={prefs} setPrefs={setPrefs} />
             <Section group="limits" lang={lang} prefs={prefs} setPrefs={setPrefs} />
             <Section group="switches" lang={lang} prefs={prefs} setPrefs={setPrefs} />

@@ -10,7 +10,7 @@ import CodeBlock from '@/components/CodeBlock';
 import { shouldIgnoreDialogClose } from '@/components/dialogClose';
 import { ManualFileSection, type ManualFileTab } from './config/ManualFileSection';
 import { useScenarioPageModal } from '@/pages/scenario/context/ScenarioPageContext';
-import ClaudeCodeQuickConfig, { CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES, derivePrefsFromRules, prefsToEnvPreview } from './ClaudeCodeQuickConfig';
+import ClaudeCodeQuickConfig, { CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY, CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES, coAuthoredBySettings, derivePrefsFromRules, prefsToEnvPreview } from './ClaudeCodeQuickConfig';
 import type { ClaudeCodeDefaultMode, ClaudeCodePrefs } from './ClaudeCodeQuickConfig';
 import type { AgentApplyResult } from './AgentSetupCard';
 import Context1MChangeBanner from './Context1MChangeBanner';
@@ -37,7 +37,7 @@ interface ClaudeCodeConfigModalProps {
     // this callback is what writes them to ~/.claude/settings.json. The
     // returned AgentApplyResult is rendered in-modal so the user sees
     // which files were touched and where the backup landed.
-    onApplyWithPrefs?: (prefs: ClaudeCodePrefs, installStatusLine: boolean, defaultMode: ClaudeCodeDefaultMode, showThinkingSummaries: boolean) => Promise<AgentApplyResult>;
+    onApplyWithPrefs?: (prefs: ClaudeCodePrefs, installStatusLine: boolean, defaultMode: ClaudeCodeDefaultMode, showThinkingSummaries: boolean, coAuthoredBy: boolean) => Promise<AgentApplyResult>;
     // A successful apply is handed here (the page closes the modal and toasts
     // the files); without it, success is shown in-modal like a failure.
     onApplied?: (result: AgentApplyResult) => void;
@@ -142,6 +142,7 @@ const ClaudeCodeConfigModal: React.FC<ClaudeCodeConfigModalProps> = ({
     const [installStatusLine, setInstallStatusLine] = React.useState(true);
     const [defaultMode, setDefaultMode] = React.useState<ClaudeCodeDefaultMode>('acceptEdits');
     const [showThinkingSummaries, setShowThinkingSummaries] = React.useState(CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES);
+    const [coAuthoredBy, setCoAuthoredBy] = React.useState(CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY);
     const [isConfigLoading, setIsConfigLoading] = React.useState(false);
 
     // Prefs is the single source of truth for both tabs. On open, restore the
@@ -155,6 +156,7 @@ const ClaudeCodeConfigModal: React.FC<ClaudeCodeConfigModalProps> = ({
             setPrefs(derivePrefsFromRules({ rules, mode: configMode }));
             setDefaultMode('acceptEdits');
             setShowThinkingSummaries(CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES);
+            setCoAuthoredBy(CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY);
             setInstallStatusLine(true);
             setApplyResult(null);
             setIsConfigLoading(false);
@@ -193,11 +195,13 @@ const ClaudeCodeConfigModal: React.FC<ClaudeCodeConfigModalProps> = ({
                 }));
                 setDefaultMode((result.defaultMode || 'acceptEdits') as ClaudeCodeDefaultMode);
                 setShowThinkingSummaries(result.showThinkingSummaries ?? CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES);
+                setCoAuthoredBy(result.coAuthoredBy ?? CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY);
                 setInstallStatusLine(!!result.installStatusLine);
             } else {
                 setPrefs(generated);
                 setDefaultMode('acceptEdits');
                 setShowThinkingSummaries(CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES);
+                setCoAuthoredBy(CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY);
                 setInstallStatusLine(true);
                 if (result?.success === false) {
                     setApplyResult({ success: false, error: result.error || 'Failed to load the applied Claude Code configuration' });
@@ -229,6 +233,11 @@ const ClaudeCodeConfigModal: React.FC<ClaudeCodeConfigModalProps> = ({
         setApplyResult(null);
     }, []);
 
+    const setCoAuthoredByAndClearResult = React.useCallback((next: boolean) => {
+        setCoAuthoredBy(next);
+        setApplyResult(null);
+    }, []);
+
     const claudeJsonConfig = { hasCompletedOnboarding: true };
 
     // Env map for both the manual tab (display/copy) and the preview dialog.
@@ -239,8 +248,8 @@ const ClaudeCodeConfigModal: React.FC<ClaudeCodeConfigModalProps> = ({
     );
 
     const settingsConfig = React.useMemo(
-        () => ({ env: envConfig, defaultMode, showThinkingSummaries }),
-        [envConfig, defaultMode, showThinkingSummaries],
+        () => ({ env: envConfig, defaultMode, showThinkingSummaries, ...coAuthoredBySettings(coAuthoredBy) }),
+        [envConfig, defaultMode, showThinkingSummaries, coAuthoredBy],
     );
 
     const generateSettingsConfig = React.useCallback(() => {
@@ -352,7 +361,7 @@ node -e '${nodeCode.replace(/'/g, "'\\''")}'`;
 
     const handleApply = async (installStatusLine: boolean) => {
         if (!onApplyWithPrefs) return;
-        const result = await onApplyWithPrefs(prefs, installStatusLine, defaultMode, showThinkingSummaries);
+        const result = await onApplyWithPrefs(prefs, installStatusLine, defaultMode, showThinkingSummaries, coAuthoredBy);
         if (result.success && onApplied) {
             onApplied(result);
             return;
@@ -364,7 +373,8 @@ node -e '${nodeCode.replace(/'/g, "'\\''")}'`;
         setPrefsAndClearResult(derivePrefsFromRules({ rules, mode: configMode }));
         setDefaultModeAndClearResult('acceptEdits');
         setShowThinkingSummariesAndClearResult(CLAUDE_CODE_DEFAULT_SHOW_THINKING_SUMMARIES);
-    }, [configMode, rules, setDefaultModeAndClearResult, setPrefsAndClearResult, setShowThinkingSummariesAndClearResult]);
+        setCoAuthoredByAndClearResult(CLAUDE_CODE_DEFAULT_CO_AUTHORED_BY);
+    }, [configMode, rules, setCoAuthoredByAndClearResult, setDefaultModeAndClearResult, setPrefsAndClearResult, setShowThinkingSummariesAndClearResult]);
 
     const canApply = !!onApplyWithPrefs;
 
@@ -565,6 +575,8 @@ node -e '${nodeCode.replace(/'/g, "'\\''")}'`;
                             setDefaultMode={setDefaultModeAndClearResult}
                             showThinkingSummaries={showThinkingSummaries}
                             setShowThinkingSummaries={setShowThinkingSummariesAndClearResult}
+                            coAuthoredBy={coAuthoredBy}
+                            setCoAuthoredBy={setCoAuthoredByAndClearResult}
                         />
                     )}
 

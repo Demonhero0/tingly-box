@@ -12,6 +12,11 @@ const DefaultClaudeCodeDefaultMode = "acceptEdits"
 // default for the top-level showThinkingSummaries setting.
 const DefaultClaudeCodeShowThinkingSummaries = true
 
+// DefaultClaudeCodeCoAuthoredBy is Tingly's default for crediting Claude in
+// commits and PRs. Unlike Claude Code's own default (on), tb leaves the
+// Co-Authored-By trailer out unless the user turns it on.
+const DefaultClaudeCodeCoAuthoredBy = false
+
 var validClaudeCodeDefaultModes = map[string]struct{}{
 	"acceptEdits":       {},
 	"bypassPermissions": {},
@@ -39,6 +44,15 @@ func NormalizeClaudeCodeDefaultMode(mode string) (string, bool) {
 func NormalizeClaudeCodeShowThinkingSummaries(v *bool) bool {
 	if v == nil {
 		return DefaultClaudeCodeShowThinkingSummaries
+	}
+	return *v
+}
+
+// NormalizeClaudeCodeCoAuthoredBy applies the Tingly default (off) when the
+// settings file has never said, and passes an explicit value through.
+func NormalizeClaudeCodeCoAuthoredBy(v *bool) bool {
+	if v == nil {
+		return DefaultClaudeCodeCoAuthoredBy
 	}
 	return *v
 }

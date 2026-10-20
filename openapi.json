@@ -10829,6 +10829,10 @@
       "ApplyClaudeConfigRequest": {
         "type": "object",
         "properties": {
+          "coAuthoredBy": {
+            "type": "boolean",
+            "description": "Field coAuthoredBy"
+          },
           "defaultMode": {
             "type": "string",
             "description": "Field defaultMode"
@@ -11900,6 +11904,10 @@
       "ClaudeConfigResponse": {
         "type": "object",
         "properties": {
+          "coAuthoredBy": {
+            "type": "boolean",
+            "description": "Field coAuthoredBy"
+          },
           "defaultMode": {
             "type": "string",
             "description": "Field defaultMode"
@@ -11930,7 +11938,8 @@
           "preferences",
           "defaultMode",
           "installStatusLine",
-          "showThinkingSummaries"
+          "showThinkingSummaries",
+          "coAuthoredBy"
         ]
       },
       "ClientConfigDifference": {

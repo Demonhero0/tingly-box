@@ -63,6 +63,7 @@ func (h *Handler) GetClaudeConfig(c *gin.Context) {
 		DefaultMode:           defaultMode,
 		InstallStatusLine:     snapshot.StatusLine,
 		ShowThinkingSummaries: agent.NormalizeClaudeCodeShowThinkingSummaries(snapshot.ShowThinkingSummaries),
+		CoAuthoredBy:          agent.NormalizeClaudeCodeCoAuthoredBy(snapshot.CoAuthoredBy),
 	})
 }
 
@@ -242,6 +243,11 @@ func (h *Handler) ApplyClaudeConfig(c *gin.Context) {
 	var opts []config.ApplyOption
 	opts = append(opts, config.WithDefaultMode(defaultMode))
 	opts = append(opts, config.WithShowThinkingSummaries(agent.NormalizeClaudeCodeShowThinkingSummaries(req.ShowThinkingSummaries)))
+	if snapshot, readErr := agent.ReadMainClaudeCodeSettings(); readErr == nil {
+		if include, write := coAuthoredByToWrite(req.CoAuthoredBy, snapshot.CoAuthoredBy); write {
+			opts = append(opts, config.WithCoAuthoredBy(include))
+		}
+	}
 	if req.InstallStatusLine {
 		var scriptCreated bool
 		statusLinePath, scriptCreated, err = config.InstallStatusLineScript()
@@ -783,4 +789,20 @@ func (h *Handler) GetCodexConfigPreview(c *gin.Context) {
 // RestoreCodexConfig rolls back Codex config files to their most recent backup.
 func (h *Handler) RestoreCodexConfig(c *gin.Context) {
 	h.restoreAgent(c, agent.AgentTypeCodex)
+}
+
+// coAuthoredByToWrite decides whether an apply rewrites the Co-Authored-By
+// keys. What the user's settings.json already says wins: a request that
+// carries no choice (one-click apply, the 1M re-apply), or one that matches the
+// file, leaves includeCoAuthoredBy and attribution exactly as written, custom
+// attribution text included. Only a real flip, or a file that says nothing
+// (tb's default, off), writes them.
+func coAuthoredByToWrite(requested, current *bool) (include bool, write bool) {
+	if current == nil {
+		return agent.NormalizeClaudeCodeCoAuthoredBy(requested), true
+	}
+	if requested == nil || *requested == *current {
+		return false, false
+	}
+	return *requested, true
 }

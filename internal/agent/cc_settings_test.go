@@ -697,3 +697,37 @@ func TestGenerateCCEnv_ProfileWithoutFableRuleFollowsDefault(t *testing.T) {
 		t.Errorf("profile fable = %q, want the default tier", got)
 	}
 }
+
+// attribution.commit decides like Claude Code does; includeCoAuthoredBy is
+// only the fallback, and a file with neither stays unset (nil).
+func TestReadClaudeCodeSettings_CoAuthoredBy(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want *bool
+	}{
+		{"neither key", `{}`, nil},
+		{"legacy off", `{"includeCoAuthoredBy":false}`, boolPtr(false)},
+		{"legacy on", `{"includeCoAuthoredBy":true}`, boolPtr(true)},
+		{"attribution blank wins", `{"includeCoAuthoredBy":true,"attribution":{"commit":"","pr":""}}`, boolPtr(false)},
+		{"attribution text", `{"attribution":{"commit":"Made with Claude"}}`, boolPtr(true)},
+		{"attribution without commit keeps default credit", `{"attribution":{"pr":""}}`, boolPtr(true)},
+		{"malformed attribution falls back", `{"includeCoAuthoredBy":false,"attribution":"x"}`, boolPtr(false)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "settings.json")
+			writeTestFile(t, path, tc.body)
+			snapshot, err := readClaudeCodeSettings(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := snapshot.CoAuthoredBy
+			if (got == nil) != (tc.want == nil) || (got != nil && *got != *tc.want) {
+				t.Fatalf("CoAuthoredBy = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }

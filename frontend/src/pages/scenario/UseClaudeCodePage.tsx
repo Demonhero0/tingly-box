@@ -16,9 +16,10 @@ const applyClaudeConfig = async (
     installStatusLine: boolean,
     defaultMode: ClaudeCodeDefaultMode = 'acceptEdits',
     showThinkingSummaries: boolean = true,
+    coAuthoredBy?: boolean,
 ): Promise<AgentApplyResult> => {
     try {
-        const result = await api.applyClaudeConfig(prefs, installStatusLine, defaultMode, showThinkingSummaries);
+        const result = await api.applyClaudeConfig(prefs, installStatusLine, defaultMode, showThinkingSummaries, coAuthoredBy);
         if (result?.success) {
             const created = result.createdFiles || [];
             const updated = result.updatedFiles || [];
@@ -84,8 +85,8 @@ const ClaudeCodeSetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
             baseUrl={slot.baseUrl}
             rules={slot.rules}
             copyToClipboard={slot.copyToClipboard}
-            onApplyWithPrefs={(prefs, installStatusLine, defaultMode, showThinkingSummaries) =>
-                slot.runApply(() => applyClaudeConfig(t, prefs as Record<string, string>, installStatusLine, defaultMode, showThinkingSummaries))
+            onApplyWithPrefs={(prefs, installStatusLine, defaultMode, showThinkingSummaries, coAuthoredBy) =>
+                slot.runApply(() => applyClaudeConfig(t, prefs as Record<string, string>, installStatusLine, defaultMode, showThinkingSummaries, coAuthoredBy))
             }
             onApplied={slot.closeApplied}
             isApplyLoading={slot.isApplyLoading}

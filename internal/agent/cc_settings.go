@@ -154,6 +154,9 @@ type ClaudeCodeSettingsSnapshot struct {
 	DefaultMode           string
 	StatusLine            bool
 	ShowThinkingSummaries *bool
+	// CoAuthoredBy is whether Claude credits itself in commits; nil when the
+	// file sets neither attribution nor includeCoAuthoredBy.
+	CoAuthoredBy *bool
 }
 
 // ReadMainClaudeCodeSettings reads the user's source-of-truth settings file.
@@ -181,6 +184,8 @@ func readClaudeCodeSettings(path string) (ClaudeCodeSettingsSnapshot, error) {
 		Permissions           json.RawMessage `json:"permissions"`
 		StatusLine            json.RawMessage `json:"statusLine"`
 		ShowThinkingSummaries *bool           `json:"showThinkingSummaries"`
+		IncludeCoAuthoredBy   *bool           `json:"includeCoAuthoredBy"`
+		Attribution           json.RawMessage `json:"attribution"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return snapshot, fmt.Errorf("failed to parse Claude Code settings: %w", err)
@@ -208,7 +213,25 @@ func readClaudeCodeSettings(path string) (ClaudeCodeSettingsSnapshot, error) {
 	}
 	snapshot.StatusLine = len(raw.StatusLine) > 0 && string(raw.StatusLine) != "null"
 	snapshot.ShowThinkingSummaries = raw.ShowThinkingSummaries
+	snapshot.CoAuthoredBy = readCoAuthoredBy(raw.IncludeCoAuthoredBy, raw.Attribution)
 	return snapshot, nil
+}
+
+// readCoAuthoredBy resolves the Co-Authored-By choice the way Claude Code
+// does: attribution.commit wins when present (an empty string hides the
+// trailer, a missing key keeps Claude Code's default credit), otherwise the
+// legacy includeCoAuthoredBy. A malformed attribution falls back the same way.
+func readCoAuthoredBy(include *bool, attribution json.RawMessage) *bool {
+	if len(attribution) > 0 && string(attribution) != "null" {
+		var parsed struct {
+			Commit *string `json:"commit"`
+		}
+		if err := json.Unmarshal(attribution, &parsed); err == nil {
+			on := parsed.Commit == nil || *parsed.Commit != ""
+			return &on
+		}
+	}
+	return include
 }
 
 // CCProfileSettingsResolution contains both the inherited profile base and the
