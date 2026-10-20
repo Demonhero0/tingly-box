@@ -4,11 +4,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { setSyncedItem } from '@/services/uiPrefs';
 import {
-    Extension as IconExtension,
+    CircleOutlined as IconCustom,
     Photo as IconPhoto,
     Users as IconUsers,
-    Rule as IconRule,
-    Vector as IconVector,
+    Decisions as IconDecisions,
+    Embedding as IconEmbedding,
 } from '@/components/icons';
 import {
     Anthropic,
@@ -121,7 +121,7 @@ export const SCENARIOS: ScenarioDescriptor[] = [
         labelKey: 'layout.nav.useCustom',
         descKey: 'scenarioOverview.descriptions.custom',
         path: '/agent/custom',
-        icon: (size) => <IconExtension sx={{ fontSize: size }} />,
+        icon: (size) => <IconCustom sx={{ fontSize: size }} />,
         hideable: true,
     },
     {
@@ -145,7 +145,7 @@ export const SCENARIOS: ScenarioDescriptor[] = [
         labelKey: 'layout.nav.useEmbed',
         descKey: 'scenarioOverview.descriptions.embed',
         path: '/agent/embed',
-        icon: (size) => <IconVector sx={{ fontSize: size }} />,
+        icon: (size) => <IconEmbedding sx={{ fontSize: size }} />,
         hideable: true,
     },
     {
@@ -153,7 +153,7 @@ export const SCENARIOS: ScenarioDescriptor[] = [
         labelKey: 'layout.nav.useDecisions',
         descKey: 'scenarioOverview.descriptions.decisions',
         path: '/agent/decisions',
-        icon: (size) => <IconRule sx={{ fontSize: size }} />,
+        icon: (size) => <IconDecisions sx={{ fontSize: size }} />,
         hideable: true,
     },
     {
