@@ -4,6 +4,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Add, Check, Folder, FolderOpen, Forum, MoreHoriz, Settings, SidebarCollapse } from '../components/icons';
 import { useAppData } from '../contexts/AppDataContext';
+import { useProjectList } from '../hooks/useProjectList';
+import { folderName } from '../utils/format';
 import { useThemeMode } from '../contexts/ThemeModeContext';
 import { ChatActionsMenu } from '../components/ChatActionsMenu';
 import type { Conversation } from '../client';
@@ -67,7 +69,9 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
-    const { recents, starredChats, projects } = useAppData();
+    const { recents, starredChats } = useAppData();
+    // The shared project list (the same store the embedded sidebar reads), live over the all-projects stream.
+    const { projects, folders } = useProjectList();
     const { mode, setMode } = useThemeMode();
     const [themeAnchor, setThemeAnchor] = useState<HTMLElement | null>(null);
     const starredIds = new Set(starredChats.map((c) => c.id));
@@ -77,9 +81,10 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
         { to: '/folder', label: t('workdir.title'), icon: <FolderOpen fontSize="small" /> },
         { to: '/chats', label: t('nav.chats'), icon: <Forum fontSize="small" /> },
     ];
-    // Starred first, then the most recently active; waiting counts make the
-    // projects that need the user stand out.
-    const sideProjects = projects.slice(0, 12);
+    // Starred first; waiting counts make the projects and folders that need the user stand out.
+    const sideProjects = (projects ?? []).slice(0, 12);
+    const sideFolders = (folders ?? []).slice(0, 12);
+    const folderScope = location.pathname === '/folder' ? new URLSearchParams(location.search).get('path') ?? '' : undefined;
 
     return (
         <Box
@@ -136,6 +141,22 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
                                 {p.threads.waiting > 0 && <Typography variant="caption" color="warning.main" sx={{ fontWeight: 600 }}>{p.threads.waiting}</Typography>}
                             </ListItemButton>
                         ))}
+                    </Section>
+                )}
+                {sideFolders.length > 0 && (
+                    <Section title={t('workdir.title')}>
+                        {sideFolders.map((f) => {
+                            const path = f.path ?? '';
+                            return (
+                                <ListItemButton key={f.id} component={NavLink} to={`/folder?path=${encodeURIComponent(path)}`} title={path} selected={folderScope === path} sx={{ mx: 1, borderRadius: 1.5, py: 0.5 }}>
+                                    <ListItemIcon sx={{ minWidth: 28 }}>
+                                        <Badge color="warning" variant="dot" invisible={f.threads.waiting === 0}><FolderOpen sx={{ fontSize: 16 }} /></Badge>
+                                    </ListItemIcon>
+                                    <ListItemText primary={folderName(path)} slotProps={{ primary: { noWrap: true, sx: { fontSize: fontSizes.lg, color: 'text.primary' } } }} />
+                                    {f.threads.waiting > 0 && <Typography variant="caption" color="warning.main" sx={{ fontWeight: 600 }}>{f.threads.waiting}</Typography>}
+                                </ListItemButton>
+                            );
+                        })}
                     </Section>
                 )}
                 {(starredChats.length > 0 || recents.length > 0) && (

@@ -212,8 +212,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Server-sent events for every project (project, thread, thread_event, coordinator), for the sidebar; streamed coordinator text is left out
-         * @description Server-sent events for every project (project, thread, thread_event, coordinator), for the sidebar; streamed coordinator text is left out
+         * Server-sent events for every project, for the sidebar and lists: project, thread and coordinator frames only. Transcript entries (thread_event) and streamed coordinator text are not sent here; subscribe to /projects/{id}/events for those
+         * @description Server-sent events for every project, for the sidebar and lists: project, thread and coordinator frames only. Transcript entries (thread_event) and streamed coordinator text are not sent here; subscribe to /projects/{id}/events for those
          */
         get: operations["apiV1ProjectsEventsGet"];
         put?: never;

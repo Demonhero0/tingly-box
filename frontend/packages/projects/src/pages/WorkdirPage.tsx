@@ -15,7 +15,7 @@ import { WorkspaceLayout, useWorkspacePane } from '../components/workspace/Works
 import { Add, Close } from '../components/icons';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useNotify } from '../hooks/useNotify';
-import type { ProjectEvent } from '../hooks/useProjectEvents';
+import { useProjectEvents, type ProjectEvent } from '../hooks/useProjectEvents';
 import { useProjectList } from '../hooks/useProjectList';
 import { useProjectsHost, type SessionLaunch } from '../host/ProjectsHost';
 import { folderName, timeAgo } from '../utils/format';
@@ -62,9 +62,12 @@ export default function WorkdirPage() {
     const sessionId = params.get('session') ?? '';
     const pane = useWorkspacePane('folder.');
     // The folders are the folder-typed projects of the one project list (the
-    // sidebar's too); its stream also carries this page's thread events.
+    // sidebar's too); its all-projects stream carries thread / project frames
+    // only. Transcript entries (thread_event) come on the open thread's own
+    // project stream, subscribed below.
     const onEvent = useRef<(ev: ProjectEvent) => void>(() => undefined);
     const onOpen = useRef<() => void>(() => undefined);
+    const onThreadEvent = useRef<(ev: ProjectEvent) => void>(() => undefined);
     const { folders, reload: reloadList } = useProjectList(true, (ev) => onEvent.current(ev), () => onOpen.current());
     const folder = scope ? folders?.find((f) => f.path === scope) : undefined;
     // Which folders' threads this page lists, as a stable key: the open folder, or every folder with threads.
@@ -154,13 +157,15 @@ export default function WorkdirPage() {
                 const mine = scope ? th.project_id === folder?.id : !!folders?.some((f) => f.id === th.project_id);
                 // The list stream already refreshes the folder list for this event.
                 if (mine) setSessions((list) => upsert(list ?? [], th));
-            } else if (ev.type === 'thread_event') {
-                const e = ev.data as ThreadEvent;
-                if (e.thread_id !== sessionId) return;
-                setEvents((list) => (list ? upsert(list, e, true) : list));
-                // The live set changed: it comes with the session.
-                if (e.kind === 'task' && changesLiveTasks(e)) void loadSession(sessionId);
             }
+        };
+        onThreadEvent.current = (ev: ProjectEvent) => {
+            if (ev.type !== 'thread_event') return;
+            const e = ev.data as ThreadEvent;
+            if (e.thread_id !== sessionId) return;
+            setEvents((list) => (list ? upsert(list, e, true) : list));
+            // The live set changed: it comes with the session.
+            if (e.kind === 'task' && changesLiveTasks(e)) void loadSession(sessionId);
         };
         onOpen.current = () => {
             void loadSessions();
@@ -169,6 +174,11 @@ export default function WorkdirPage() {
     });
 
     const selected = sessions?.find((s) => s.id === sessionId);
+    // The open thread's project stream (the all-projects one never carries thread_event). It reconnects on its own;
+    // on a reconnect the thread is re-read for anything missed.
+    useProjectEvents(sessionId ? (selected?.project_id ?? folder?.id ?? '') : '', (ev) => onThreadEvent.current(ev), () => {
+        if (sessionId) void loadSession(sessionId);
+    });
     const running = selected?.status === 'working'
         || (selected?.status === 'waiting' && !!events?.some((e) => (e.kind === 'approval' || e.kind === 'ask') && e.payload?.includes('"state":"pending"')));
 

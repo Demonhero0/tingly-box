@@ -201,7 +201,7 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithResponseModel(OKResponse{}))
 
 	api.GET("/projects/events", h.allEvents, tag,
-		swagger.WithDescription("Server-sent events for every project (project, thread, thread_event, coordinator), for the sidebar; streamed coordinator text is left out"),
+		swagger.WithDescription("Server-sent events for every project, for the sidebar and lists: project, thread and coordinator frames only. Transcript entries (thread_event) and streamed coordinator text are not sent here; subscribe to /projects/{id}/events for those"),
 		swagger.WithResponseModel(rt.Event{}))
 	api.GET("/projects/:id/events", h.events, tag,
 		swagger.WithDescription("Server-sent events for one project: message_delta (streamed coordinator text), thread, thread_event (a main thread's are the project conversation), project, coordinator"),

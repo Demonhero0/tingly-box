@@ -1,15 +1,33 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsHostProvider, type ProjectsHost } from '../host/ProjectsHost';
 import WorkdirPage from './WorkdirPage';
 
-const m = vi.hoisted(() => ({ get: vi.fn(), del: vi.fn(), post: vi.fn(), folders: [] as unknown[], reload: vi.fn() }));
+type Frame = { type: string; data: unknown };
+const m = vi.hoisted(() => ({
+    get: vi.fn(), del: vi.fn(), post: vi.fn(), folders: [] as unknown[], reload: vi.fn(),
+    // The two streams, split the way the real hub splits them.
+    listCb: null as null | ((ev: Frame) => void),
+    projectUrls: [] as string[],
+    projectCb: null as null | ((ev: Frame) => void),
+}));
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (key: string, o?: Record<string, unknown>) => (o ? `${key} ${JSON.stringify(o)}` : key), i18n: { language: 'en' } }),
 }));
 vi.mock('../client', async (actual) => ({ ...(await actual<typeof import('../client')>()), api: { GET: m.get, DELETE: m.del, POST: m.post } }));
-vi.mock('../hooks/useProjectList', () => ({ useProjectList: () => ({ folders: m.folders, all: m.folders, projects: [], waiting: 0, reload: m.reload }) }));
+vi.mock('../hooks/useProjectList', () => ({
+    useProjectList: (_on: boolean, onEvent: (ev: Frame) => void) => {
+        m.listCb = onEvent;
+        return { folders: m.folders, all: m.folders, projects: [], waiting: 0, reload: m.reload };
+    },
+}));
+vi.mock('../hooks/useProjectEvents', () => ({
+    useProjectEvents: (id: string, onEvent: (ev: Frame) => void) => {
+        m.projectCb = id ? onEvent : null;
+        if (id && !m.projectUrls.includes(id)) m.projectUrls.push(id);
+    },
+}));
 
 const folder = (working: number, waiting: number) => ({
     id: 'f1', name: 'app', path: '/home/me/app', type: 'folder', starred: false,
@@ -56,5 +74,39 @@ describe('WorkdirPage removing a folder', () => {
         m.folders = [];
         show('/');
         expect(await screen.findByRole('button', { name: 'composer.attach' })).toBeDisabled();
+    });
+});
+
+describe('WorkdirPage live transcript', () => {
+    const thread = { id: 't1', project_id: 'f1', title: 'fix it', status: 'working', updated_at: '2026-10-01T00:00:00Z' };
+    const entry = (id: string, content: string) => ({ id, kind: 'user', content, thread_id: 't1', created_at: '2026-10-01T00:00:00Z' });
+
+    beforeEach(() => {
+        m.listCb = null;
+        m.projectCb = null;
+        m.projectUrls = [];
+        m.folders = [folder(1, 0)];
+        m.get.mockImplementation(async (url: string) => {
+            const data = url.endsWith('permission-modes') ? { modes: [] }
+                : url === '/api/v1/threads/{id}' ? { thread, background_tasks: [], running: true }
+                    : url === '/api/v1/threads/{id}/events' ? { events: [] }
+                        : { threads: [thread] };
+            return { data, response: new Response() };
+        });
+    });
+
+    // The real hub sends thread_event only on /projects/{id}/events; the
+    // all-projects stream (useProjectList) carries thread / project frames.
+    it('takes transcript entries from the open folder\'s own stream, not the all-projects one', async () => {
+        show('/?path=%2Fhome%2Fme%2Fapp&session=t1');
+        await waitFor(() => expect(m.projectCb).not.toBeNull());
+        expect(m.projectUrls).toEqual(['f1']);
+
+        // Not delivered by the all-projects stream (and if it were, it is not this page's source).
+        act(() => m.listCb?.({ type: 'thread_event', data: entry('e0', 'from the list stream') }));
+        expect(screen.queryByText('from the list stream')).not.toBeInTheDocument();
+
+        act(() => m.projectCb?.({ type: 'thread_event', data: entry('e1', 'live hello') }));
+        expect(await screen.findByText('live hello')).toBeInTheDocument();
     });
 });
