@@ -11,7 +11,7 @@ import (
 	"github.com/tingly-dev/tingly-box/projects/internal/project"
 )
 
-func TestFolderSessionEndToEnd(t *testing.T) {
+func TestFolderThreadEndToEnd(t *testing.T) {
 	a := &enginetest.Agent{Script: func(turn *enginetest.Turn) error {
 		turn.Say("Here is the answer.", 5, 2)
 		return nil
@@ -20,84 +20,102 @@ func TestFolderSessionEndToEnd(t *testing.T) {
 	folder := t.TempDir()
 
 	var e map[string]any
-	assert.Equal(t, 400, c.do("POST", "/projects/sessions", map[string]any{"folder": "/no/such/dir", "content": "hi"}, &e))
+	assert.Equal(t, 400, c.do("POST", "/projects", map[string]any{"type": "folder", "path": "/no/such/dir"}, &e))
 	assert.Contains(t, e["error"], "not a folder")
-	assert.Equal(t, 404, c.do("PUT", "/projects/sessions/x/permission-mode", map[string]any{"permission_mode": "plan"}, &e))
+	assert.Equal(t, 400, c.do("POST", "/projects", map[string]any{"type": "tree", "name": "x"}, &e))
+	assert.Equal(t, 404, c.do("PUT", "/threads/x/permission-mode", map[string]any{"permission_mode": "plan"}, &e))
+
+	// Opening a folder returns its project; opening it again returns the same one.
+	var f db.Project
+	require.Equal(t, 200, c.do("POST", "/projects", map[string]any{"type": "folder", "path": folder}, &f))
+	assert.Equal(t, db.ProjectFolder, f.Type)
+	assert.Equal(t, folder, f.Path)
+	assert.Empty(t, f.MainThreadID)
+	var again db.Project
+	require.Equal(t, 200, c.do("POST", "/projects", map[string]any{"type": "folder", "path": folder + "/"}, &again))
+	assert.Equal(t, f.ID, again.ID)
 
 	var s db.Thread
-	require.Equal(t, 200, c.do("POST", "/projects/sessions", map[string]any{"folder": folder, "content": "explain this folder", "permission_mode": "plan"}, &s))
-	assert.Equal(t, "", s.ProjectID)
+	require.Equal(t, 201, c.do("POST", "/projects/"+f.ID+"/threads", map[string]any{"content": "explain this folder", "permission_mode": "plan"}, &s))
+	assert.Equal(t, f.ID, s.ProjectID)
+	assert.Equal(t, folder, s.Cwd)
 
-	var detail SessionDetail
+	var detail struct {
+		Thread          db.Thread `json:"thread"`
+		Running         bool      `json:"running"`
+		BackgroundTasks []any     `json:"background_tasks"`
+	}
 	require.Eventually(t, func() bool {
-		c.do("GET", "/projects/sessions/"+s.ID, nil, &detail)
-		return detail.Session.Status == db.ThreadIdle
+		c.do("GET", "/threads/"+s.ID, nil, &detail)
+		return detail.Thread.Status == db.ThreadIdle
 	}, 5*time.Second, 20*time.Millisecond)
-	assert.Equal(t, "plan", detail.Session.PermissionMode)
-	assert.NotEmpty(t, detail.Events)
+	assert.Equal(t, "plan", detail.Thread.PermissionMode)
 	assert.NotNil(t, detail.BackgroundTasks)
-
-	var list struct {
-		Sessions []db.Thread `json:"sessions"`
+	var evs struct {
+		Events []db.ThreadEvent `json:"events"`
 	}
-	c.do("GET", "/projects/sessions?folder="+folder, nil, &list)
-	require.Len(t, list.Sessions, 1)
-	c.do("GET", "/projects/sessions?folder=/elsewhere", nil, &list)
-	assert.Empty(t, list.Sessions)
+	c.do("GET", "/threads/"+s.ID+"/events", nil, &evs)
+	assert.NotEmpty(t, evs.Events)
 
-	var wd struct {
-		Workdirs []struct {
-			Path  string `json:"path"`
-			Saved bool   `json:"saved"`
-		} `json:"workdirs"`
+	// The folder is listed with the projects, with its thread counts.
+	var all struct {
+		Projects []struct {
+			db.Project
+			Threads map[string]int `json:"threads"`
+		} `json:"projects"`
 	}
-	c.do("GET", "/projects/workdirs", nil, &wd)
-	require.Len(t, wd.Workdirs, 1)
-	assert.Equal(t, folder, wd.Workdirs[0].Path)
-	other := t.TempDir()
-	require.Equal(t, 200, c.do("POST", "/projects/workdirs", map[string]any{"path": other}, nil))
-	assert.Equal(t, 400, c.do("POST", "/projects/workdirs", map[string]any{"path": other + "/missing"}, &e))
-	c.do("GET", "/projects/workdirs", nil, &wd)
-	assert.Len(t, wd.Workdirs, 2)
-	assert.Equal(t, 204, c.do("DELETE", "/projects/workdirs?path="+other, nil, nil))
-	c.do("GET", "/projects/workdirs", nil, &wd)
-	assert.Len(t, wd.Workdirs, 1)
+	c.do("GET", "/projects", nil, &all)
+	require.Len(t, all.Projects, 1)
+	assert.Equal(t, db.ProjectFolder, all.Projects[0].Type)
+	assert.Equal(t, 1, all.Projects[0].Threads["idle"])
+	var threads struct {
+		Threads []db.Thread `json:"threads"`
+	}
+	c.do("GET", "/projects/"+f.ID+"/threads", nil, &threads)
+	require.Len(t, threads.Threads, 1)
 
 	var modes struct {
 		Modes []string `json:"modes"`
 	}
-	c.do("GET", "/projects/permission-modes", nil, &modes)
+	c.do("GET", "/threads/permission-modes", nil, &modes)
 	assert.Contains(t, modes.Modes, "acceptEdits")
 
 	var out db.Thread
-	require.Equal(t, 200, c.do("PUT", "/projects/sessions/"+s.ID+"/permission-mode", map[string]any{"permission_mode": "default"}, &out))
+	require.Equal(t, 200, c.do("PUT", "/threads/"+s.ID+"/permission-mode", map[string]any{"permission_mode": "default"}, &out))
 	assert.Equal(t, "default", out.PermissionMode)
-	assert.Equal(t, 400, c.do("PUT", "/projects/sessions/"+s.ID+"/permission-mode", map[string]any{"permission_mode": "yolo"}, &e))
+	assert.Equal(t, 400, c.do("PUT", "/threads/"+s.ID+"/permission-mode", map[string]any{"permission_mode": "yolo"}, &e))
 	// The standalone server has no launch profiles; a model is free text.
-	assert.Equal(t, 400, c.do("PUT", "/projects/sessions/"+s.ID+"/profile", map[string]any{"profile": "work"}, &e))
-	require.Equal(t, 200, c.do("PUT", "/projects/sessions/"+s.ID+"/model", map[string]any{"model": "haiku"}, &out))
+	assert.Equal(t, 400, c.do("PUT", "/threads/"+s.ID+"/profile", map[string]any{"profile": "work"}, &e))
+	require.Equal(t, 200, c.do("PUT", "/threads/"+s.ID+"/model", map[string]any{"model": "haiku"}, &out))
 	assert.Equal(t, "haiku", out.Model)
 	var handoff struct {
 		Command string `json:"command"`
 	}
-	require.Equal(t, 200, c.do("POST", "/projects/sessions/"+s.ID+"/handoff", nil, &handoff))
+	require.Equal(t, 200, c.do("POST", "/threads/"+s.ID+"/handoff", nil, &handoff))
 	assert.Contains(t, handoff.Command, "claude --resume "+s.SessionID)
-	assert.Equal(t, 409, c.do("POST", "/projects/sessions/"+s.ID+"/tasks/task1/stop", nil, &e))
-	assert.Equal(t, 400, c.do("GET", "/projects/sessions/"+s.ID+"/tasks/bad.id/output", nil, &e))
-	assert.Equal(t, 200, c.do("POST", "/projects/sessions/"+s.ID+"/archive", nil, &out))
+	assert.Equal(t, 409, c.do("POST", "/threads/"+s.ID+"/tasks/task1/stop", nil, &e))
+	assert.Equal(t, 400, c.do("GET", "/threads/"+s.ID+"/tasks/bad.id/output", nil, &e))
+	assert.Equal(t, 200, c.do("POST", "/threads/"+s.ID+"/archive", nil, &out))
 	assert.Equal(t, db.ThreadResolved, out.Status)
-	assert.Equal(t, 409, c.do("POST", "/projects/sessions/"+s.ID+"/messages", map[string]any{"content": "late"}, &e))
-	assert.Equal(t, 200, c.do("POST", "/projects/sessions/"+s.ID+"/reopen", nil, &out))
-	assert.Equal(t, 404, c.do("GET", "/projects/sessions/missing", nil, &e))
+	assert.Equal(t, 409, c.do("POST", "/threads/"+s.ID+"/messages", map[string]any{"content": "late"}, &e))
+	assert.Equal(t, 200, c.do("POST", "/threads/"+s.ID+"/reopen", nil, &out))
+	assert.Equal(t, 404, c.do("GET", "/threads/missing", nil, &e))
 
-	// A session is not reachable through a project's thread routes.
+	// Only folders take threads from the web; a project's are the coordinator's.
 	var p db.Project
 	require.Equal(t, 201, c.do("POST", "/projects", map[string]any{"name": "P"}, &p))
-	assert.Equal(t, 404, c.do("GET", "/projects/"+p.ID+"/threads/"+s.ID, nil, &e))
-}
+	assert.Equal(t, 400, c.do("POST", "/projects/"+p.ID+"/threads", map[string]any{"content": "x"}, &e))
+	// A main thread is not an agent session: nothing to stop, but it can be read.
+	assert.Equal(t, 200, c.do("GET", "/threads/"+p.MainThreadID, nil, &detail))
+	assert.Equal(t, db.AgentLLM, detail.Thread.Agent)
 
-type SessionDetail struct {
-	Session         db.Thread        `json:"session"`
-	Events          []db.ThreadEvent `json:"events"`
-	BackgroundTasks []any            `json:"background_tasks"`
+	// Archiving a folder is how it goes away; DELETE does the same.
+	assert.Equal(t, 200, c.do("DELETE", "/projects/"+f.ID, nil, nil))
+	var archived struct {
+		Projects []db.Project `json:"projects"`
+	}
+	c.do("GET", "/projects?archived=true", nil, &archived)
+	require.Len(t, archived.Projects, 1)
+	assert.Equal(t, f.ID, archived.Projects[0].ID)
+	assert.Equal(t, 409, c.do("POST", "/threads/"+s.ID+"/messages", map[string]any{"content": "after archive"}, &e))
 }

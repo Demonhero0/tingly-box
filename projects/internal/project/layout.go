@@ -16,7 +16,7 @@ import (
 //
 //	<root>/<project>/memory/MEMORY.md, memory/*.md
 //	<root>/<project>/library/...           uploads; threads write outputs/<thread>/
-//	<root>/<project>/worktrees/<thread>/   each thread's working directory
+//	<root>/<project>/threads/<thread>/     each new thread's working directory (older ones keep theirs)
 //	<root>/<project>/threads/<thread>.settings.json
 type Layout struct {
 	Root string
@@ -38,9 +38,10 @@ func (l Layout) OutputDir(projectID, slug string) string {
 	return filepath.Join(l.LibraryDir(projectID), "outputs", slug)
 }
 
-// WorktreeDir is a thread's working directory.
-func (l Layout) WorktreeDir(projectID, threadID string) string {
-	return filepath.Join(l.Dir(projectID), "worktrees", threadID)
+// ThreadDir is a project thread's working directory: its worktree, or a
+// scratch directory when the project has no repository.
+func (l Layout) ThreadDir(projectID, threadID string) string {
+	return filepath.Join(l.Dir(projectID), "threads", threadID)
 }
 
 // SettingsFile is the Claude Code settings file a thread runs with.
@@ -55,7 +56,7 @@ func (l Layout) SessionSettingsFile(threadID string) string {
 
 // Ensure creates a project's directories.
 func (l Layout) Ensure(projectID string) error {
-	for _, d := range []string{l.MemoryDir(projectID), l.LibraryDir(projectID), filepath.Join(l.Dir(projectID), "worktrees"), filepath.Join(l.Dir(projectID), "threads")} {
+	for _, d := range []string{l.MemoryDir(projectID), l.LibraryDir(projectID), filepath.Join(l.Dir(projectID), "threads")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return err
 		}

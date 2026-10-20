@@ -10,7 +10,7 @@ import (
 	projectsapp "github.com/tingly-dev/tingly-box/projects"
 )
 
-// Handler mounts Projects' routes (all under /api/v1/projects) behind user
+// Handler mounts Projects' routes (all under /api/v1/projects and /api/v1/threads) behind user
 // auth and the feature flag.
 type Handler struct {
 	app *projectsapp.App

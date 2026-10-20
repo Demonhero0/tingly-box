@@ -23,10 +23,27 @@ type Store struct {
 	db *gorm.DB
 }
 
+type openOptions struct{ projectsDir string }
+
+// Option configures Open.
+type Option func(*openOptions)
+
+// WithProjectsDir tells the migration where project directories live, so a
+// migrated project's main thread gets the project directory as its cwd.
+func WithProjectsDir(dir string) Option { return func(o *openOptions) { o.projectsDir = dir } }
+
 // Open opens (creating if needed) the SQLite database at path and migrates
-// the schema. Pass ":memory:" for an in-memory database in tests.
-func Open(path string) (*Store, error) {
-	if path != ":memory:" {
+// the schema and data to the current model. Pass ":memory:" for an in-memory
+// database in tests. A migration that cannot be verified is rolled back and
+// Open fails with the old database untouched.
+func Open(path string, opts ...Option) (*Store, error) {
+	var o openOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	inMemory := path == ":memory:" || path == "" || strings.HasPrefix(path, "file::memory:")
+	dbPath := path
+	if !inMemory {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, fmt.Errorf("create data dir: %w", err)
 		}
@@ -36,7 +53,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	if path == ":memory:" {
+	if inMemory {
 		// Each new connection to :memory: is a fresh database; pin to one.
 		sqlDB, err := g.DB()
 		if err != nil {
@@ -44,8 +61,19 @@ func Open(path string) (*Store, error) {
 		}
 		sqlDB.SetMaxOpenConns(1)
 	}
-	if err := g.AutoMigrate(&Project{}, &ProjectMessage{}, &Thread{}, &ThreadEvent{}, &Conversation{}, &Message{}, &Setting{}, &Workdir{}, &ChannelBinding{}); err != nil {
-		return nil, fmt.Errorf("migrate: %w", err)
+	if !inMemory {
+		if err := backupBeforeMigration(g, dbPath); err != nil {
+			if sqlDB, e := g.DB(); e == nil {
+				sqlDB.Close()
+			}
+			return nil, err
+		}
+	}
+	if err := migrate(g, o); err != nil {
+		if sqlDB, e := g.DB(); e == nil {
+			sqlDB.Close()
+		}
+		return nil, err
 	}
 	return &Store{db: g}, nil
 }

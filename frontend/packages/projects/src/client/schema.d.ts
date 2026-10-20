@@ -144,16 +144,80 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List projects with thread counts per Overview group
-         * @description List projects with thread counts per Overview group
+         * List projects and folders (each has a type) with thread counts per Overview group
+         * @description List projects and folders (each has a type) with thread counts per Overview group
          */
         get: operations["apiV1ProjectsGet"];
         put?: never;
         /**
-         * Create a project
-         * @description Create a project
+         * Create a project, or open a folder (type folder with its path; the folder's existing project is returned when there is one)
+         * @description Create a project, or open a folder (type folder with its path; the folder's existing project is returned when there is one)
          */
         post: operations["apiV1ProjectsPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/channel-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the IM chats bound to threads, all of them or one project's or thread's
+         * @description List the IM chats bound to threads, all of them or one project's or thread's
+         */
+        get: operations["apiV1ProjectsChannel-bindingsGet"];
+        /**
+         * Bind an IM chat to a thread (or to a project, meaning its main thread); binding a bound chat again moves it
+         * @description Bind an IM chat to a thread (or to a project, meaning its main thread); binding a bound chat again moves it
+         */
+        put: operations["apiV1ProjectsChannel-bindingsPut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/channel-bindings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unbind an IM chat
+         * @description Unbind an IM chat
+         */
+        delete: operations["apiV1ProjectsChannel-bindingsIdDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server-sent events for every project (project, thread, thread_event, coordinator), for the sidebar; streamed coordinator text is left out
+         * @description Server-sent events for every project (project, thread, thread_event, coordinator), for the sidebar; streamed coordinator text is left out
+         */
+        get: operations["apiV1ProjectsEventsGet"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -172,26 +236,6 @@ export interface paths {
          * @description Models the coordinator and threads can use
          */
         get: operations["apiV1ProjectsModelsGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/permission-modes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The Claude Code permission modes a session can run in
-         * @description The Claude Code permission modes a session can run in
-         */
-        get: operations["apiV1ProjectsPermission-modesGet"];
         put?: never;
         post?: never;
         delete?: never;
@@ -240,398 +284,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Folder sessions, most recently updated first
-         * @description Folder sessions, most recently updated first
-         */
-        get: operations["apiV1ProjectsSessionsGet"];
-        put?: never;
-        /**
-         * Start a session in a folder
-         * @description Start a session in a folder
-         */
-        post: operations["apiV1ProjectsSessionsPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Server-sent events for folder sessions (session and transcript changes)
-         * @description Server-sent events for folder sessions (session and transcript changes)
-         */
-        get: operations["apiV1ProjectsSessionsEventsGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * A session with its transcript
-         * @description A session with its transcript
-         */
-        get: operations["apiV1ProjectsSessionsSidGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Archive the session (it stays readable and can be reopened)
-         * @description Archive the session (it stays readable and can be reopened)
-         */
-        post: operations["apiV1ProjectsSessionsSidArchivePost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/attachments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload files for a session message (multipart field "files"); kept per session, outside the working folder
-         * @description Upload files for a session message (multipart field "files"); kept per session, outside the working folder
-         */
-        post: operations["apiV1ProjectsSessionsSidAttachmentsPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/attachments/file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download a session attachment
-         * @description Download a session attachment
-         */
-        get: operations["apiV1ProjectsSessionsSidAttachmentsFileGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/auto-answer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set when the session answers a question with its suggested option by itself
-         * @description Set when the session answers a question with its suggested option by itself
-         */
-        put: operations["apiV1ProjectsSessionsSidAuto-answerPut"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/handoff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Release the session to a terminal: closes its process and returns the command that resumes it
-         * @description Release the session to a terminal: closes its process and returns the command that resumes it
-         */
-        post: operations["apiV1ProjectsSessionsSidHandoffPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send a message (runs after the current turn)
-         * @description Send a message (runs after the current turn)
-         */
-        post: operations["apiV1ProjectsSessionsSidMessagesPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/model": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set the model of the session's next turn
-         * @description Set the model of the session's next turn
-         */
-        put: operations["apiV1ProjectsSessionsSidModelPut"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/permission-mode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set the permission mode of the session's next turn
-         * @description Set the permission mode of the session's next turn
-         */
-        put: operations["apiV1ProjectsSessionsSidPermission-modePut"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set the launch profile of the session's next turn (hosts with profiles only)
-         * @description Set the launch profile of the session's next turn (hosts with profiles only)
-         */
-        put: operations["apiV1ProjectsSessionsSidProfilePut"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reopen an archived session
-         * @description Reopen an archived session
-         */
-        post: operations["apiV1ProjectsSessionsSidReopenPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/respond": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Answer a permission request or question the session is waiting on
-         * @description Answer a permission request or question the session is waiting on
-         */
-        post: operations["apiV1ProjectsSessionsSidRespondPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Interrupt the running turn; the process and its background tasks survive
-         * @description Interrupt the running turn; the process and its background tasks survive
-         */
-        post: operations["apiV1ProjectsSessionsSidStopPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/tasks/{task_id}/output": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The end of a background task's output
-         * @description The end of a background task's output
-         */
-        get: operations["apiV1ProjectsSessionsSidTasksTask_idOutputGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/sessions/{sid}/tasks/{task_id}/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stop one background task
-         * @description Stop one background task
-         */
-        post: operations["apiV1ProjectsSessionsSidTasksTask_idStopPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/workdirs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Working folders: the saved ones and every folder that has a session, with what waits there
-         * @description Working folders: the saved ones and every folder that has a session, with what waits there
-         */
-        get: operations["apiV1ProjectsWorkdirsGet"];
-        put?: never;
-        /**
-         * Keep an existing folder in the sidebar
-         * @description Keep an existing folder in the sidebar
-         */
-        post: operations["apiV1ProjectsWorkdirsPost"];
-        /**
-         * Drop a folder from the sidebar; its sessions stay
-         * @description Drop a folder from the sidebar; its sessions stay
-         */
-        delete: operations["apiV1ProjectsWorkdirsDelete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/workdirs/attachments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload files for the first message of a new session (multipart field "files"); they move into the session when it starts
-         * @description Upload files for the first message of a new session (multipart field "files"); they move into the session when it starts
-         */
-        post: operations["apiV1ProjectsWorkdirsAttachmentsPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/projects/{id}": {
         parameters: {
             query?: never;
@@ -647,15 +299,15 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Delete a project with its threads, memory and library. Branches are kept.
-         * @description Delete a project with its threads, memory and library. Branches are kept.
+         * Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted
+         * @description Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted
          */
         delete: operations["apiV1ProjectsIdDelete"];
         options?: never;
         head?: never;
         /**
-         * Update project settings; pause, resume, archive, unarchive, star
-         * @description Update project settings; pause, resume, archive, unarchive, star
+         * Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400.
+         * @description Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400.
          */
         patch: operations["apiV1ProjectsIdPatch"];
         trace?: never;
@@ -688,8 +340,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Server-sent events for the project page: message, message_delta, thread, thread_event, project
-         * @description Server-sent events for the project page: message, message_delta, thread, thread_event, project
+         * Server-sent events for one project: message_delta (streamed coordinator text), thread, thread_event (a main thread's are the project conversation), project, coordinator
+         * @description Server-sent events for one project: message_delta (streamed coordinator text), thread, thread_event (a main thread's are the project conversation), project, coordinator
          */
         get: operations["apiV1ProjectsIdEventsGet"];
         put?: never;
@@ -796,7 +448,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{id}/messages": {
+    "/api/v1/projects/{id}/threads": {
         parameters: {
             query?: never;
             header?: never;
@@ -804,216 +456,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The project conversation
-         * @description The project conversation
+         * A project's threads, most recently updated first (not its main thread)
+         * @description A project's threads, most recently updated first (not its main thread)
          */
-        get: operations["apiV1ProjectsIdMessagesGet"];
+        get: operations["apiV1ProjectsIdThreadsGet"];
         put?: never;
         /**
-         * Send work or a question to the coordinator; its reply arrives on the event stream
-         * @description Send work or a question to the coordinator; its reply arrives on the event stream
+         * Start a thread in a folder project
+         * @description Start a thread in a folder project
          */
-        post: operations["apiV1ProjectsIdMessagesPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/messages/{mid}/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start threads the coordinator proposed
-         * @description Start threads the coordinator proposed
-         */
-        post: operations["apiV1ProjectsIdMessagesMidStartPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * A thread with its transcript
-         * @description A thread with its transcript
-         */
-        get: operations["apiV1ProjectsIdThreadsTidGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/auto-answer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set when the thread answers a question with its suggested option by itself
-         * @description Set when the thread answers a question with its suggested option by itself
-         */
-        put: operations["apiV1ProjectsIdThreadsTidAuto-answerPut"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/diff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The thread's changes against its base branch
-         * @description The thread's changes against its base branch
-         */
-        get: operations["apiV1ProjectsIdThreadsTidDiffGet"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
-         * @description Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
-         */
-        post: operations["apiV1ProjectsIdThreadsTidMergePost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send a message straight to the thread (runs after its current turn)
-         * @description Send a message straight to the thread (runs after its current turn)
-         */
-        post: operations["apiV1ProjectsIdThreadsTidMessagesPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reopen a resolved thread
-         * @description Reopen a resolved thread
-         */
-        post: operations["apiV1ProjectsIdThreadsTidReopenPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark the thread resolved
-         * @description Mark the thread resolved
-         */
-        post: operations["apiV1ProjectsIdThreadsTidResolvePost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/respond": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Answer a permission request or question the thread is waiting on
-         * @description Answer a permission request or question the thread is waiting on
-         */
-        post: operations["apiV1ProjectsIdThreadsTidRespondPost"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{id}/threads/{tid}/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Interrupt the thread's running turn
-         * @description Interrupt the thread's running turn
-         */
-        post: operations["apiV1ProjectsIdThreadsTidStopPost"];
+        post: operations["apiV1ProjectsIdThreadsPost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1104,14 +556,410 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/threads/permission-modes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Claude Code permission modes a thread can run in
+         * @description The Claude Code permission modes a thread can run in
+         */
+        get: operations["apiV1ThreadsPermission-modesGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A thread: its state, whether a turn is running and its background tasks
+         * @description A thread: its state, whether a turn is running and its background tasks
+         */
+        get: operations["apiV1ThreadsIdGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive (resolve) the thread; it stays readable and can be reopened
+         * @description Archive (resolve) the thread; it stays readable and can be reopened
+         */
+        post: operations["apiV1ThreadsIdArchivePost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload files for a message to the thread (multipart field "files")
+         * @description Upload files for a message to the thread (multipart field "files")
+         */
+        post: operations["apiV1ThreadsIdAttachmentsPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/attachments/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an attachment of the thread
+         * @description Download an attachment of the thread
+         */
+        get: operations["apiV1ThreadsIdAttachmentsFileGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/auto-answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set when the thread answers a question with its suggested option by itself
+         * @description Set when the thread answers a question with its suggested option by itself
+         */
+        put: operations["apiV1ThreadsIdAuto-answerPut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The thread's changes against its base branch
+         * @description The thread's changes against its base branch
+         */
+        get: operations["apiV1ThreadsIdDiffGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A thread's events, oldest first; for a main thread, the project conversation
+         * @description A thread's events, oldest first; for a main thread, the project conversation
+         */
+        get: operations["apiV1ThreadsIdEventsGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/events/{eid}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start threads the coordinator proposed in a suggestions event of a main thread
+         * @description Start threads the coordinator proposed in a suggestions event of a main thread
+         */
+        post: operations["apiV1ThreadsIdEventsEidStartPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release the thread to a terminal: closes its process and returns the command that resumes it
+         * @description Release the thread to a terminal: closes its process and returns the command that resumes it
+         */
+        post: operations["apiV1ThreadsIdHandoffPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
+         * @description Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready.
+         */
+        post: operations["apiV1ThreadsIdMergePost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a message to the thread (runs after its current turn); to a main thread it goes to the coordinator, whose reply arrives on the event stream
+         * @description Send a message to the thread (runs after its current turn); to a main thread it goes to the coordinator, whose reply arrives on the event stream
+         */
+        post: operations["apiV1ThreadsIdMessagesPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the model of a folder thread's next turn
+         * @description Set the model of a folder thread's next turn
+         */
+        put: operations["apiV1ThreadsIdModelPut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/permission-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the permission mode of the thread's next turn
+         * @description Set the permission mode of the thread's next turn
+         */
+        put: operations["apiV1ThreadsIdPermission-modePut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the launch profile of a folder thread's next turn (hosts with profiles only)
+         * @description Set the launch profile of a folder thread's next turn (hosts with profiles only)
+         */
+        put: operations["apiV1ThreadsIdProfilePut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen an archived thread
+         * @description Reopen an archived thread
+         */
+        post: operations["apiV1ThreadsIdReopenPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a permission request or question the thread is waiting on
+         * @description Answer a permission request or question the thread is waiting on
+         */
+        post: operations["apiV1ThreadsIdRespondPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interrupt the running turn; the process and its background tasks survive
+         * @description Interrupt the running turn; the process and its background tasks survive
+         */
+        post: operations["apiV1ThreadsIdStopPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/tasks/{task_id}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The end of a background task's output
+         * @description The end of a background task's output
+         */
+        get: operations["apiV1ThreadsIdTasksTask_idOutputGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threads/{id}/tasks/{task_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop one background task
+         * @description Stop one background task
+         */
+        post: operations["apiV1ThreadsIdTasksTask_idStopPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AddWorkdirRequest: {
-            /** @description Field path */
-            path: string;
-        };
         Attachment: {
             /** @description Field name */
             name: string;
@@ -1143,6 +991,46 @@ export interface components {
             task_id: string;
             /** @description Field task_type */
             task_type: string;
+        };
+        BindChannelRequest: {
+            /** @description Field chat_id */
+            chat_id: string;
+            /** @description Field chat_title */
+            chat_title?: string;
+            /** @description Field platform */
+            platform: string;
+            /** @description Field project_id */
+            project_id?: string;
+            /** @description Field thread_id */
+            thread_id?: string;
+        };
+        BindingsResponse: {
+            /** @description Field bindings */
+            bindings: components["schemas"]["ChannelBinding"][];
+        };
+        ChannelBinding: {
+            /** @description Field chat_id */
+            chat_id: string;
+            /** @description Field chat_title */
+            chat_title: string;
+            /**
+             * Format: date-time
+             * @description Field created_at
+             */
+            created_at: string;
+            /** @description Field id */
+            id: string;
+            /** @description Field platform */
+            platform: string;
+            /** @description Field project_id */
+            project_id: string;
+            /** @description Field thread_id */
+            thread_id: string;
+            /**
+             * Format: date-time
+             * @description Field updated_at
+             */
+            updated_at: string;
         };
         ConnectionDraft: {
             /** @description Field api_key */
@@ -1194,9 +1082,30 @@ export interface components {
             /** @description Field goal */
             goal?: string;
             /** @description Field name */
-            name: string;
+            name?: string;
+            /** @description Field path */
+            path?: string;
             /** @description Field repos */
             repos?: string[];
+            /**
+             * @description Field type
+             * @enum {string}
+             */
+            type?: "project" | "folder";
+        };
+        CreateThreadRequest: {
+            /** @description Field attachments */
+            attachments?: string[];
+            /** @description Field content */
+            content: string;
+            /** @description Field model */
+            model?: string;
+            /** @description Field permission_mode */
+            permission_mode?: string;
+            /** @description Field profile */
+            profile?: string;
+            /** @description Field title */
+            title?: string;
         };
         Diff: {
             /** @description Field base */
@@ -1219,6 +1128,14 @@ export interface components {
             project_id: string;
             /** @description Field type */
             type: string;
+        };
+        EventsResponse: {
+            /** @description Field events */
+            events: components["schemas"]["ThreadEvent"][];
+        };
+        HandoffResponse: {
+            /** @description Field command */
+            command: string;
         };
         HealthResponse: {
             /**
@@ -1330,10 +1247,6 @@ export interface components {
             /** @description Field stop_reason */
             stop_reason?: string;
         };
-        MessagesResponse: {
-            /** @description Field messages */
-            messages: components["schemas"]["ProjectMessage"][];
-        };
         Model: {
             /** @description Field display_name */
             display_name: string;
@@ -1377,11 +1290,9 @@ export interface components {
             /** @description Field permission_mode */
             permission_mode: string;
         };
-        PostMessageRequest: {
-            /** @description Field attachments */
-            attachments?: string[];
-            /** @description Field content */
-            content: string;
+        PermissionModesResponse: {
+            /** @description Field modes */
+            modes: string[];
         };
         ProfileRequest: {
             /** @description Field profile */
@@ -1406,8 +1317,12 @@ export interface components {
             id: string;
             /** @description Field instructions */
             instructions: string;
+            /** @description Field main_thread_id */
+            main_thread_id?: string;
             /** @description Field name */
             name: string;
+            /** @description Field path */
+            path?: string;
             /** @description Field paused */
             paused: boolean;
             /** @description Field repos */
@@ -1418,6 +1333,8 @@ export interface components {
             thread_model: string;
             /** @description Field thread_permission_mode */
             thread_permission_mode: string;
+            /** @description Field type */
+            type: string;
             /**
              * Format: date-time
              * @description Field updated_at
@@ -1435,25 +1352,6 @@ export interface components {
         ProjectListResponse: {
             /** @description Field projects */
             projects: components["schemas"]["ProjectSummary"][];
-        };
-        ProjectMessage: {
-            /** @description Field content */
-            content: string;
-            /**
-             * Format: date-time
-             * @description Field created_at
-             */
-            created_at: string;
-            /** @description Field id */
-            id: string;
-            /** @description Field kind */
-            kind: string;
-            /** @description Field payload */
-            payload?: string;
-            /** @description Field project_id */
-            project_id: string;
-            /** @description Field role */
-            role: string;
         };
         ProjectModelsResponse: {
             /** @description Field error */
@@ -1486,8 +1384,12 @@ export interface components {
             id: string;
             /** @description Field instructions */
             instructions: string;
+            /** @description Field main_thread_id */
+            main_thread_id?: string;
             /** @description Field name */
             name: string;
+            /** @description Field path */
+            path?: string;
             /** @description Field paused */
             paused: boolean;
             /** @description Field repos */
@@ -1499,6 +1401,8 @@ export interface components {
             /** @description Field thread_permission_mode */
             thread_permission_mode: string;
             threads: components["schemas"]["ThreadCounts"];
+            /** @description Field type */
+            type: string;
             /**
              * Format: date-time
              * @description Field updated_at
@@ -1526,78 +1430,6 @@ export interface components {
             attachments?: string[];
             /** @description Field content */
             content: string;
-        };
-        SessionAutoAnswerRequest: {
-            /**
-             * @description Field auto_answer
-             * @enum {string}
-             */
-            auto_answer: "" | "off" | "delay" | "now";
-        };
-        SessionCreateRequest: {
-            /** @description Field attachments */
-            attachments?: string[];
-            /** @description Field content */
-            content: string;
-            /** @description Field folder */
-            folder: string;
-            /** @description Field model */
-            model?: string;
-            /** @description Field permission_mode */
-            permission_mode?: string;
-            /** @description Field profile */
-            profile?: string;
-            /** @description Field title */
-            title?: string;
-        };
-        SessionDetailResponse: {
-            /** @description Field background_tasks */
-            background_tasks: components["schemas"]["BackgroundTask"][];
-            /** @description Field events */
-            events: components["schemas"]["ThreadEvent"][];
-            /** @description Field running */
-            running: boolean;
-            session: components["schemas"]["Thread"];
-        };
-        SessionHandoffResponse: {
-            /** @description Field command */
-            command: string;
-        };
-        SessionPermissionModesResponse: {
-            /** @description Field modes */
-            modes: string[];
-        };
-        SessionRespondRequest: {
-            /** @description Field allow */
-            allow: boolean;
-            /** @description Field answer */
-            answer?: string;
-            /** @description Field answers */
-            answers?: {
-                [key: string]: string;
-            };
-            /** @description Field request_id */
-            request_id: string;
-            /**
-             * @description Field scope
-             * @enum {string}
-             */
-            scope?: "once" | "thread";
-        };
-        SessionTaskOutputResponse: {
-            /** @description Field content */
-            content: string;
-            /**
-             * Format: int64
-             * @description Field size
-             */
-            size: number;
-            /** @description Field truncated */
-            truncated: boolean;
-        };
-        SessionsResponse: {
-            /** @description Field sessions */
-            sessions: components["schemas"]["Thread"][];
         };
         SettingsResponse: {
             /**
@@ -1646,6 +1478,17 @@ export interface components {
              */
             type: "user_message" | "delta" | "assistant_message" | "title" | "error" | "done";
         };
+        TaskOutputResponse: {
+            /** @description Field content */
+            content: string;
+            /**
+             * Format: int64
+             * @description Field size
+             */
+            size: number;
+            /** @description Field truncated */
+            truncated: boolean;
+        };
         TestRequest: {
             /** @description Field api_key */
             api_key?: string;
@@ -1679,6 +1522,8 @@ export interface components {
             reply?: string;
         };
         Thread: {
+            /** @description Field agent */
+            agent: string;
             /** @description Field auto_answer */
             auto_answer?: string;
             /** @description Field base_branch */
@@ -1695,6 +1540,8 @@ export interface components {
              * @description Field created_at
              */
             created_at: string;
+            /** @description Field cwd */
+            cwd: string;
             /**
              * Format: int64
              * @description Field files_changed
@@ -1725,6 +1572,8 @@ export interface components {
              * @description Field output_tokens
              */
             output_tokens: number;
+            /** @description Field parent_id */
+            parent_id?: string;
             /** @description Field permission_mode */
             permission_mode?: string;
             /** @description Field profile */
@@ -1738,6 +1587,11 @@ export interface components {
              * @description Field resolved_at
              */
             resolved_at?: string;
+            /**
+             * Format: int64
+             * @description Field seq
+             */
+            seq: number;
             /** @description Field session_id */
             session_id?: string;
             /** @description Field status */
@@ -1760,8 +1614,6 @@ export interface components {
             updated_at: string;
             /** @description Field wait_reason */
             wait_reason?: string;
-            /** @description Field worktree */
-            worktree: string;
         };
         ThreadCounts: {
             /**
@@ -1791,8 +1643,8 @@ export interface components {
             working: number;
         };
         ThreadDetailResponse: {
-            /** @description Field events */
-            events: components["schemas"]["ThreadEvent"][];
+            /** @description Field background_tasks */
+            background_tasks: components["schemas"]["BackgroundTask"][];
             /** @description Field running */
             running: boolean;
             thread: components["schemas"]["Thread"];
@@ -1805,8 +1657,6 @@ export interface components {
              * @description Field created_at
              */
             created_at: string;
-            /** @description Field from */
-            from?: string;
             /** @description Field id */
             id: string;
             /** @description Field kind */
@@ -1817,6 +1667,14 @@ export interface components {
             payload?: string;
             /** @description Field request_id */
             request_id?: string;
+            /** @description Field source */
+            source?: string;
+            /** @description Field source_chat_id */
+            source_chat_id?: string;
+            /** @description Field source_platform */
+            source_platform?: string;
+            /** @description Field source_ref */
+            source_ref?: string;
             /** @description Field thread_id */
             thread_id: string;
         };
@@ -1866,6 +1724,10 @@ export interface components {
              */
             turns: number;
         };
+        ThreadsResponse: {
+            /** @description Field threads */
+            threads: components["schemas"]["Thread"][];
+        };
         UpdateConversationRequest: {
             /** @description Field model */
             model?: string;
@@ -1904,31 +1766,6 @@ export interface components {
             by_model: components["schemas"]["ModelUsage"][];
             /** @description Field by_thread */
             by_thread: components["schemas"]["ThreadUsage"][];
-        };
-        Workdir: {
-            /** @description Field path */
-            path: string;
-            /** @description Field saved */
-            saved: boolean;
-            /**
-             * Format: int64
-             * @description Field sessions
-             */
-            sessions: number;
-            /**
-             * Format: int64
-             * @description Field waiting
-             */
-            waiting: number;
-            /**
-             * Format: int64
-             * @description Field working
-             */
-            working: number;
-        };
-        WorkdirsResponse: {
-            /** @description Field workdirs */
-            workdirs: components["schemas"]["Workdir"][];
         };
         WriteMemoryRequest: {
             /** @description Field content */
@@ -2168,7 +2005,7 @@ export interface operations {
     apiV1ProjectsGet: {
         parameters: {
             query?: {
-                /** @description Search name and goal */
+                /** @description Search name, goal and folder path */
                 q?: string;
                 /** @description List archived projects */
                 archived?: boolean;
@@ -2215,6 +2052,99 @@ export interface operations {
             };
         };
     };
+    "apiV1ProjectsChannel-bindingsGet": {
+        parameters: {
+            query?: {
+                /** @description Only chats bound to a thread of this project */
+                project_id?: string;
+                /** @description Only chats bound to this thread */
+                thread_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindingsResponse"];
+                };
+            };
+        };
+    };
+    "apiV1ProjectsChannel-bindingsPut": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BindChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelBinding"];
+                };
+            };
+        };
+    };
+    "apiV1ProjectsChannel-bindingsIdDelete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OKResponse"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsEventsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+        };
+    };
     apiV1ProjectsModelsGet: {
         parameters: {
             query?: never;
@@ -2231,26 +2161,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectModelsResponse"];
-                };
-            };
-        };
-    };
-    "apiV1ProjectsPermission-modesGet": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionPermissionModesResponse"];
                 };
             };
         };
@@ -2296,547 +2206,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectRuntimeResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsGet: {
-        parameters: {
-            query?: {
-                /** @description Only this folder's sessions */
-                folder?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionsResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SessionCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsEventsGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionDetailResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidArchivePost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidAttachmentsPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AttachmentsResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidAttachmentsFileGet: {
-        parameters: {
-            query?: {
-                /** @description Path returned by the upload */
-                path?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    "apiV1ProjectsSessionsSidAuto-answerPut": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SessionAutoAnswerRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidHandoffPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionHandoffResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidMessagesPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidModelPut: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    "apiV1ProjectsSessionsSidPermission-modePut": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PermissionModeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidProfilePut: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProfileRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidReopenPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidRespondPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SessionRespondRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidStopPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidTasksTask_idOutputGet: {
-        parameters: {
-            query?: {
-                /** @description Bytes from the end (default 8192) */
-                tail?: number;
-            };
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-                /** @description Resource ID */
-                task_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionTaskOutputResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsSessionsSidTasksTask_idStopPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                sid: string;
-                /** @description Resource ID */
-                task_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    apiV1ProjectsWorkdirsGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkdirsResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsWorkdirsPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddWorkdirRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Workdir"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsWorkdirsDelete: {
-        parameters: {
-            query?: {
-                /** @description The folder */
-                path?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    apiV1ProjectsWorkdirsAttachmentsPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AttachmentsResponse"];
                 };
             };
         };
@@ -3162,12 +2531,9 @@ export interface operations {
             };
         };
     };
-    apiV1ProjectsIdMessagesGet: {
+    apiV1ProjectsIdThreadsGet: {
         parameters: {
-            query?: {
-                /** @description Latest N messages */
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 /** @description Resource ID */
@@ -3183,12 +2549,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MessagesResponse"];
+                    "application/json": components["schemas"]["ThreadsResponse"];
                 };
             };
         };
     };
-    apiV1ProjectsIdMessagesPost: {
+    apiV1ProjectsIdThreadsPost: {
         parameters: {
             query?: never;
             header?: never;
@@ -3201,288 +2567,9 @@ export interface operations {
         /** @description Request body */
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PostMessageRequest"];
+                "application/json": components["schemas"]["CreateThreadRequest"];
             };
         };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectMessage"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdMessagesMidStartPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                mid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartSuggestionsRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectMessage"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ThreadDetailResponse"];
-                };
-            };
-        };
-    };
-    "apiV1ProjectsIdThreadsTidAuto-answerPut": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutoAnswerRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidDiffGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Diff"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidMergePost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-            /** @description merge blocked */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MergeBlockedResponse"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidMessagesPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidReopenPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidResolvePost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidRespondPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        /** @description Request body */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ThreadRespondRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Thread"];
-                };
-            };
-        };
-    };
-    apiV1ProjectsIdThreadsTidStopPost: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Resource ID */
-                id: string;
-                /** @description Resource ID */
-                tid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
             /** @description Successful response */
             200: {
@@ -3609,6 +2696,522 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestResponse"];
+                };
+            };
+        };
+    };
+    "apiV1ThreadsPermission-modesGet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionModesResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetailResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdArchivePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdAttachmentsPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentsResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdAttachmentsFileGet: {
+        parameters: {
+            query?: {
+                /** @description Path returned by the upload */
+                path?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    "apiV1ThreadsIdAuto-answerPut": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdDiffGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Diff"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdEventsGet: {
+        parameters: {
+            query?: {
+                /** @description Latest N events */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventsResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdEventsEidStartPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                eid: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartSuggestionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadEvent"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdHandoffPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdMergePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+            /** @description merge blocked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeBlockedResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdMessagesPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdModelPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    "apiV1ThreadsIdPermission-modePut": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionModeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdProfilePut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdReopenPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdRespondPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadRespondRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdStopPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdTasksTask_idOutputGet: {
+        parameters: {
+            query?: {
+                /** @description Bytes from the end (default 8192) */
+                tail?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOutputResponse"];
+                };
+            };
+        };
+    };
+    apiV1ThreadsIdTasksTask_idStopPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };

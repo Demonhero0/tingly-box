@@ -3,6 +3,9 @@
 > 状态：提案（TEP #2143）。承接 [projects-desk-absorption.md](./projects-desk-absorption.md)：Desk 已并入，
 > 这里把 Remote 的 IM 聊天（`@cc`）也并进来，并**重新打开**那篇 Decisions §1“`@cc` 不共享、不导入”。
 > 本文里的 schema、API 和里程碑都是提案，不是现状。图见 [projects-im.pencil.md](./projects-im.pencil.md)。
+>
+> **数据模型以 [projects-sessions.md](./projects-sessions.md) 为准**：一切会话都是 Thread，IM 绑定指向线程（`thread_id`），
+> 不再是 `project_id`/`workdir_id`/`focus_thread_id`。下面“数据模型”和“统一到 Project ID”两节保留为演变记录，其中与之冲突处以新文档为准。
 
 ## 决定
 
@@ -28,15 +31,27 @@
 | 输出渲染（流式、折叠、文件发送） | `remote/control/render`、`imbot-output.md` | 不动；输入换成线程事件 |
 | Remote 页面 | `frontend/src/pages/remote-agent` | 删除，内容分到 Projects（见前端） |
 
-## 数据模型（Projects 一侧）
+## 数据模型（Projects 一侧）——已被 projects-sessions.md 取代
+
+概念上，所有落点是同一种东西：**会话入口**（entry）。每个入口有一个 ID 和一个类别（kind），类别决定“谁来接话”：
+`project` 由 coordinator 接话并开线程，`workdir` 直接是一个文件夹里的会话。以后加新的类别（例如只聊天的入口）
+只是多一个 kind，不需要新的表和新的绑定方式。代码和接口里这个实体暂时仍叫 `Project`（改名要动整个 API 和数据库，
+收益小），界面上的名字按类别分别叫“项目”“工作目录”。
 
 ```
-ChannelBinding            -- 一个 IM chat 当前绑在哪
+Project                      -- 一切落点都是 Project，用 kind 区分
+  kind                           project | workdir       （新增，默认 project）
+  path                           workdir 的文件夹路径；project 为空
+  (goal / instructions / coordinator / 合并 只对 kind=project 有意义)
+
+Thread
+  project_id                     必填（原来文件夹会话为空）
+
+ChannelBinding               -- 一个 IM chat 当前绑在哪
   id, platform, chat_id          唯一键 (platform, chat_id)
-  target_kind                    project | workdir
-  project_id / workdir_id        二选一
-  thread_id                      workdir 绑定时的“当前会话”；project 绑定为空
-  focus_thread_id                project 绑定时可选的“聚焦线程”；空 = 跟 coordinator 说话
+  project_id                     必填；落点的 kind 决定路由
+  thread_id                      kind=workdir 时的“当前会话”；kind=project 为空
+  focus_thread_id                kind=project 时可选的“聚焦线程”；空 = 跟 coordinator 说话
   created_at, updated_at
 
 Thread / project_messages        新增来源字段（可空，空 = Web）
@@ -44,6 +59,11 @@ Thread / project_messages        新增来源字段（可空，空 = Web）
   source_platform, source_chat_id
 ```
 
+- **为什么把工作目录也做成 Project**：绑定、线程、编号（`Thread.Seq`）、等待信号、来源字段都只认 `project_id`，不会再有
+  “线程没有项目”和 `workdir_id` 两条旁路，以后加的字段也不会再分裂成两份。代价是项目相关代码要容忍“没有 coordinator”，
+  但这集中在一个 `kind` 判断上。取代 [projects-desk-absorption.md](./projects-desk-absorption.md) 里“线程没有项目”（选项 1）的数据模型决定。
+- **迁移**：升级时把 `Workdir` 表和 `project_id` 为空的文件夹会话迁成 `kind=workdir` 的项目（按文件夹路径合并，名字取文件夹名），
+  线程的 `project_id` 回填后改为必填。没有可回退的数据丢失：原来的会话、事件、`session_id` 都不动。侧栏仍分“项目”“工作目录”两组。
 - 为什么绑定存在 Projects 里：Web 端要显示“这个项目绑了哪些 chat”并改绑，IM 端要按它路由，
   放在 Remote 里两边都要跨模块查；Projects 是唯一数据源，所以放这边。
 - 独立版 Projects 也有这张表，但没有任何东西往里写，行为不变（`Host` 可选能力，类型断言，同 Desk）。
@@ -58,24 +78,30 @@ IM 入站 ──▶ 访问控制（Remote：配对/白名单/Disabled，不变�
         ──▶ 查 ChannelBinding(platform, chat_id)
               ├ 无：转 coordinator（无项目上下文的轻量对话），回复里附最近落点供选择
               ├ project：追加项目对话消息(source=im)
-              └ workdir：Send 到 thread_id（没有则 Start 新线程）
+              └ kind=workdir：Send 到 thread_id（没有则 Start 新线程）
 Projects 事件 ──▶ 订阅了该落点的 binding ──▶ 渲染到 chat
 ```
 
 - 回复前缀：已绑定时每条回复带落点短名（例：`[tingly-box] …`），避免用户忘了自己在哪。
 - 一个 chat 同一时刻只绑一个落点；一个落点可以被多个 chat 绑定（手机和群各一个），出站按 binding 广播。
 
+## 统一到 Project ID（已被取代）
+
+曾提议给 `Project` 加 `kind`（`project`/`workdir`），所有落点认 `project_id`。讨论中确认：coordinator 对话、线程、文件夹会话、
+IM 聊天本质上都是“与 agent 的一次交互”（Claude Code 自己也是这样存的：子 agent 是独立转录，渠道是消息的 `origin` 属性），
+所以单位应当是 **Thread**，不是项目。完整设计、调研、命名和迁移见 [projects-sessions.md](./projects-sessions.md)。
+
 ## 在 IM 里点名线程
 
 project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说话，需要能“点名”。点名是一次 `@`：
 
-- **线程编号**：每个线程在项目内有稳定的短编号 `#1`、`#2`（新增 `Thread.Seq`，项目内自增，不复用）。线程的通知、
+- **线程编号**：每个线程在项目内有稳定的短编号 `#1`、`#2`（新增 `Session.seq`，项目内自增，不复用）。线程的通知、
   汇报、审批、提问消息都带 `[#2 标题]` 前缀。
 - **主路径 `@2 补上边界用例`**：行首 `@` 加编号，整条消息去给线程 2，不改变 chat 的状态，每次显式，不会发错。
 - **顺手路径：引用回复**线程的某条消息，消息去给那个线程。不需要记编号，但容易忘记，所以它只是快捷方式，不是唯一入口。
   平台不支持引用回复时，这条路径不存在，`@` 仍可用。
 - **兜底 `/focus #2`**：之后的普通消息都进线程 2，回复前缀 `[#2 …]`；`/back` 或该线程结束后退回 coordinator。
-  聚焦只存在绑定上，不改线程本身，用于长时间只盯一个线程的场景。
+  聚焦就是把绑定改到那个会话，`/back` 改回它的父线程（projects-sessions.md），不改线程本身，用于长时间只盯一个线程的场景。
 - **`/threads`**：列出项目的线程（“等你处理”排前），每行带按钮：聚焦、停止、查看最近一条回复。
 - 审批和提问始终直接发到对应线程，按钮带编号，不受聚焦影响。
 - 优先级：引用回复 > 行首 `@N` > 聚焦 > coordinator。
@@ -107,7 +133,8 @@ project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说�
 | | 范围 | 不做 | 状态 |
 |---|---|---|---|
 | **M1 只到 coordinator**（先做） | `ChannelBinding`（只支持 project）、消息来源字段、绑定的增删查接口；绑了项目的 chat 的消息进项目对话，coordinator 的回复和折叠后的线程汇报发回 chat；前端：侧栏 IM 入口、项目页头标签、绑定弹窗、对话里的来源图标 | working folder 绑定、IM 里的审批/提问（只发一行“有线程等你，请到 Web 处理”）、点名线程、下线旧路径 | 后端已实现（见下“M1 后端的落地”）；前端另行 |
-| **M2 working folder 绑定** | 绑定到文件夹，消息进当前会话（取代 `@cc`）；`/new`、`/stop`；目录浏览器改为新建 working folder | 同 M1 | |
+| **统一模型** | 见 [projects-sessions.md](./projects-sessions.md) 的交付：一次变更，后端和前端两个叠放的 PR | IM 路由、前端新功能 | |
+| **M2b 文件夹绑定** | 绑定已是 `thread_id`；绑文件夹、`/new`、`/stop`；弹窗列项目和文件夹 | 同 M1 | |
 | **M3 审批与提问进 IM** | 线程审批/提问发到所有绑定的 chat，按钮，先答为准，另一边改写为“已处理” | | |
 | **M4 点名线程** | `Thread.Seq`、`@N`、引用回复、`/threads`、`/focus` | | |
 | **M5 收尾** | 未绑定走 coordinator；删 SmartGuide、Remote 页面、`remote/session`；旧绑定转换 | | |
@@ -120,11 +147,11 @@ M3 之前，需要审批的线程在 IM 里只有提示，靠 Web 处理，这�
 
 对应上面的提案，落地时的具体形状（与提案不同或提案没写到的地方）：
 
-- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4，不需要迁移）。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
+- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（统一模型折成 `thread_id`，`target_kind`、`workdir_id`、`focus_thread_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
 - **接口**（`/api/v1/projects` 下）：`GET /channel-bindings?project_id=`、`PUT /channel-bindings`（`platform`、`chat_id`、`project_id`，可选 `chat_title`；已绑定的 chat 再绑即**改绑**，同一行）、`DELETE /channel-bindings/:id`。归档的项目不能被绑定。
 - **入站**：`remoteagent.ProjectRouter`（小接口，`BotHandler` 可选持有）在 `HandleMessage` 里、`@cc`/`@tb` 握手词检测**之前**取走**已绑定 chat 的非斜杠文本**；斜杠命令（`/help`、`/bind`、`/cd`…）、正在输入 `/cd` 路径的 chat、以及访问控制/配对/黑名单都照旧在它前面或旁边。没有绑定的 chat 不受任何影响。绑定了项目的 chat 发附件，回一句“暂不支持”，而不是悄悄送去 `@cc`。投递失败（如项目已暂停）会把原因回给 chat。
-- **走 Web 同一条路径**：入站只是 `Coordinator.PostFrom`（`Post` 加来源），所以排队、暂停/归档检查、事件推送都和 Web 一致。
-- **出站**：Projects 的可选 Host 能力 `ChannelSink.SendChannelText(platform, chatID, text)`（类型断言，独立版没有，不发送）。`Relay` 在 `Coordinator.OnFinal`（助手回复、线程汇报、出错）和 `Threads.OnWait`（线程要审批/提问）上挂钩，**按完成顺序逐条**发给项目绑定的**所有** chat，前缀 `[项目名] `；线程汇报折成一行（首行，最多 240 字）；审批/提问只发一行“某线程需要你，请到 Web 处理”，同一线程 5 分钟内只提醒一次。用户自己发的消息不回显。
+- **走 Web 同一条路径**：入站只是 `Service.PostFromChannel`（解析绑定的线程，再调 `Service.Send(thread, text, source)`，来源记为 `im`），所以排队、暂停/归档检查、事件推送都和 Web 一致。
+- **出站**：Projects 的可选 Host 能力 `ChannelSink.SendChannelText(platform, chatID, text)`（类型断言，独立版没有，不发送）。`Relay` 在 `Coordinator.OnFinal`（主线程的助手回复、线程汇报、出错）、`Threads.OnReply`（非主线程每轮结束的文本或错误，只发给绑在该线程自己上的 chat）和 `Threads.OnWait`（线程要审批/提问）上挂钩，**按完成顺序逐条**发给项目绑定的**所有** chat，前缀 `[项目名] `；线程汇报折成一行（首行，最多 240 字）；审批/提问只发一行“某线程需要你，请到 Web 处理”，同一线程 5 分钟内只提醒一次。用户自己发的消息不回显。
 - **Tingly Box 一侧**：`internal/server/module/projects.ChatBridge` 同时实现 `ProjectRouter` 和 `ChannelSink`，经 bot 的 `remote/channel.Channel.Send` 发送（与通知同一条路径，微信的 `context_token` 等照常）。哪个 bot 发：优先该 chat 最近一次入站所用的 bot；重启后还没收到过消息时，依次试该平台的 bot。被屏蔽（disabled）的 chat 不发。Projects 开关关闭时桥不接任何消息。
 - **没做**：working folder 绑定、IM 里审批（M3）、`@N`、聚焦、媒体入站、`chat_title` 的自动获取（现在只有显式传入）。
 

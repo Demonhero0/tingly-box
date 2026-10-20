@@ -1,10 +1,15 @@
-// Package thread serves one thread: its transcript, messages to it,
-// approvals, and review actions (diff, merge, resolve).
+// Package thread serves threads, by thread id whatever their project's type:
+// a thread's state and events, messages to it (the one Send), approvals,
+// settings, background tasks, attachments and review actions. Listing and
+// creating threads is project-scoped (/projects/:id/threads).
 package thread
 
 import (
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,19 +20,53 @@ import (
 	"github.com/tingly-dev/tingly-box/swagger"
 )
 
-// ThreadDetailResponse is a thread with its transcript.
+// ThreadsResponse lists a project's threads, most recently updated first. The
+// main thread is the project's conversation and is not in it.
+type ThreadsResponse struct {
+	Threads []db.Thread `json:"threads"`
+}
+
+// CreateThreadRequest starts a thread in a folder project. A project's own
+// threads are started by its main thread.
+type CreateThreadRequest struct {
+	// Content is the first message; it may be empty when attachments are sent.
+	Content string `json:"content"`
+	// Attachments are paths returned by the project's attachments upload.
+	Attachments []string `json:"attachments,omitempty"`
+	Title       string   `json:"title,omitempty"`
+	// Model is empty for the host's default.
+	Model string `json:"model,omitempty"`
+	// PermissionMode is empty to inherit the default (acceptEdits).
+	PermissionMode string `json:"permission_mode,omitempty"`
+	// Profile is the host's launch profile; empty for its default. Only
+	// hosts with profiles (Tingly Box) accept one.
+	Profile string `json:"profile,omitempty"`
+}
+
+// ThreadDetailResponse is a thread as it is now.
 type ThreadDetailResponse struct {
-	Thread  db.Thread        `json:"thread"`
-	Events  []db.ThreadEvent `json:"events"`
-	Running bool             `json:"running"`
+	Thread          db.Thread           `json:"thread"`
+	Running         bool                `json:"running"`
+	BackgroundTasks []rt.BackgroundTask `json:"background_tasks"`
+}
+
+// EventsResponse is a thread's events, oldest first. For a main thread they
+// are the project conversation.
+type EventsResponse struct {
+	Events []db.ThreadEvent `json:"events"`
 }
 
 // SendRequest is a message to the thread.
 type SendRequest struct {
 	// Content may be empty when attachments are sent.
 	Content string `json:"content"`
-	// Attachments are paths returned by the project's attachments upload.
+	// Attachments are paths returned by the thread's attachments upload.
 	Attachments []string `json:"attachments,omitempty"`
+}
+
+// StartSuggestionsRequest starts proposed threads; empty indexes start all.
+type StartSuggestionsRequest struct {
+	Indexes []int `json:"indexes,omitempty"`
 }
 
 // ThreadRespondRequest answers a pending approval or question.
@@ -44,9 +83,41 @@ type ThreadRespondRequest struct {
 
 // AutoAnswerRequest sets when the thread's questions with a suggested
 // answer are answered without the user; empty is the default (delay for a
-// project thread, off for a folder session).
+// project thread, off for a folder thread).
 type AutoAnswerRequest struct {
 	AutoAnswer string `json:"auto_answer" enum:",off,delay,now"`
+}
+
+// PermissionModeRequest sets the mode of the thread's next turn.
+type PermissionModeRequest struct {
+	PermissionMode string `json:"permission_mode"`
+}
+
+// ProfileRequest sets the launch profile of a folder thread's next turn.
+type ProfileRequest struct {
+	Profile string `json:"profile"`
+}
+
+// ModelRequest sets the model of a folder thread's next turn ("" for the default).
+type ModelRequest struct {
+	Model string `json:"model"`
+}
+
+// HandoffResponse is the command that continues the thread in a terminal.
+type HandoffResponse struct {
+	Command string `json:"command"`
+}
+
+// PermissionModesResponse lists the selectable modes.
+type PermissionModesResponse struct {
+	Modes []string `json:"modes"`
+}
+
+// TaskOutputResponse is the end of a background task's output.
+type TaskOutputResponse struct {
+	Content   string `json:"content"`
+	Truncated bool   `json:"truncated"`
+	Size      int64  `json:"size"`
 }
 
 // MergeBlockedResponse explains why a merge was not done.
@@ -55,6 +126,9 @@ type MergeBlockedResponse struct {
 	// Command does the merge by hand.
 	Command string `json:"command"`
 }
+
+// maxUpload caps one uploaded file.
+const maxUpload = 200 << 20
 
 // Handler is the thread HTTP module.
 type Handler struct {
@@ -70,34 +144,80 @@ var _ module.Module = (*Handler)(nil)
 func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api := r.API
 	tag := swagger.WithTags("threads")
-	api.GET("/projects/:id/threads/:tid", h.get, tag,
-		swagger.WithDescription("A thread with its transcript"),
+	api.GET("/projects/:id/threads", h.list, tag,
+		swagger.WithDescription("A project's threads, most recently updated first (not its main thread)"),
+		swagger.WithResponseModel(ThreadsResponse{}))
+	api.POST("/projects/:id/threads", h.create, tag,
+		swagger.WithDescription("Start a thread in a folder project"),
+		swagger.WithRequestModel(CreateThreadRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.GET("/threads/permission-modes", h.permissionModes, tag,
+		swagger.WithDescription("The Claude Code permission modes a thread can run in"),
+		swagger.WithResponseModel(PermissionModesResponse{}))
+
+	api.GET("/threads/:id", h.get, tag,
+		swagger.WithDescription("A thread: its state, whether a turn is running and its background tasks"),
 		swagger.WithResponseModel(ThreadDetailResponse{}))
-	api.POST("/projects/:id/threads/:tid/messages", h.send, tag,
-		swagger.WithDescription("Send a message straight to the thread (runs after its current turn)"),
+	api.GET("/threads/:id/events", h.events, tag,
+		swagger.WithDescription("A thread's events, oldest first; for a main thread, the project conversation"),
+		swagger.WithQuery("limit", "integer", "Latest N events"),
+		swagger.WithResponseModel(EventsResponse{}))
+	api.POST("/threads/:id/messages", h.send, tag,
+		swagger.WithDescription("Send a message to the thread (runs after its current turn); to a main thread it goes to the coordinator, whose reply arrives on the event stream"),
 		swagger.WithRequestModel(SendRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/projects/:id/threads/:tid/respond", h.respond, tag,
+	api.POST("/threads/:id/events/:eid/start", h.startSuggestions, tag,
+		swagger.WithDescription("Start threads the coordinator proposed in a suggestions event of a main thread"),
+		swagger.WithRequestModel(StartSuggestionsRequest{}),
+		swagger.WithResponseModel(db.ThreadEvent{}))
+	api.POST("/threads/:id/respond", h.respond, tag,
 		swagger.WithDescription("Answer a permission request or question the thread is waiting on"),
 		swagger.WithRequestModel(ThreadRespondRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/projects/:id/threads/:tid/stop", h.stop, tag,
-		swagger.WithDescription("Interrupt the thread's running turn"),
+	api.POST("/threads/:id/stop", h.stop, tag,
+		swagger.WithDescription("Interrupt the running turn; the process and its background tasks survive"),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/projects/:id/threads/:tid/resolve", h.resolve, tag,
-		swagger.WithDescription("Mark the thread resolved"),
+	api.POST("/threads/:id/archive", h.archive, tag,
+		swagger.WithDescription("Archive (resolve) the thread; it stays readable and can be reopened"),
 		swagger.WithResponseModel(db.Thread{}))
-	api.POST("/projects/:id/threads/:tid/reopen", h.reopen, tag,
-		swagger.WithDescription("Reopen a resolved thread"),
+	api.POST("/threads/:id/reopen", h.reopen, tag,
+		swagger.WithDescription("Reopen an archived thread"),
 		swagger.WithResponseModel(db.Thread{}))
-	api.PUT("/projects/:id/threads/:tid/auto-answer", h.setAutoAnswer, tag,
+	api.PUT("/threads/:id/auto-answer", h.setAutoAnswer, tag,
 		swagger.WithDescription("Set when the thread answers a question with its suggested option by itself"),
 		swagger.WithRequestModel(AutoAnswerRequest{}),
 		swagger.WithResponseModel(db.Thread{}))
-	api.GET("/projects/:id/threads/:tid/diff", h.diff, tag,
+	api.PUT("/threads/:id/permission-mode", h.setPermissionMode, tag,
+		swagger.WithDescription("Set the permission mode of the thread's next turn"),
+		swagger.WithRequestModel(PermissionModeRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.PUT("/threads/:id/profile", h.setProfile, tag,
+		swagger.WithDescription("Set the launch profile of a folder thread's next turn (hosts with profiles only)"),
+		swagger.WithRequestModel(ProfileRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.PUT("/threads/:id/model", h.setModel, tag,
+		swagger.WithDescription("Set the model of a folder thread's next turn"),
+		swagger.WithRequestModel(ModelRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.POST("/threads/:id/handoff", h.handoff, tag,
+		swagger.WithDescription("Release the thread to a terminal: closes its process and returns the command that resumes it"),
+		swagger.WithResponseModel(HandoffResponse{}))
+	api.POST("/threads/:id/tasks/:task_id/stop", h.stopTask, tag,
+		swagger.WithDescription("Stop one background task"))
+	api.GET("/threads/:id/tasks/:task_id/output", h.taskOutput, tag,
+		swagger.WithDescription("The end of a background task's output"),
+		swagger.WithQuery("tail", "int", "Bytes from the end (default 8192)"),
+		swagger.WithResponseModel(TaskOutputResponse{}))
+	api.POST("/threads/:id/attachments", h.uploadAttachments, tag,
+		swagger.WithDescription("Upload files for a message to the thread (multipart field \"files\")"),
+		swagger.WithResponseModel(rt.AttachmentsResponse{}))
+	api.GET("/threads/:id/attachments/file", h.downloadAttachment, tag,
+		swagger.WithDescription("Download an attachment of the thread"),
+		swagger.WithQuery("path", "string", "Path returned by the upload"))
+	api.GET("/threads/:id/diff", h.diff, tag,
 		swagger.WithDescription("The thread's changes against its base branch"),
 		swagger.WithResponseModel(rt.Diff{}))
-	api.POST("/projects/:id/threads/:tid/merge", h.merge, tag,
+	api.POST("/threads/:id/merge", h.merge, tag,
 		swagger.WithDescription("Merge the thread's branch into its base branch in the main checkout. 409 with a command to run by hand when the checkout is not ready."),
 		swagger.WithResponseModel(db.Thread{}),
 		swagger.WithErrorResponses(swagger.ErrorResponseConfig{Code: http.StatusConflict, Message: "merge blocked", Model: MergeBlockedResponse{}}))
@@ -107,21 +227,20 @@ func fail(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, db.ErrNotFound):
 		apierr.Store(c, err, "thread")
-	case errors.Is(err, rt.ErrPaused), errors.Is(err, rt.ErrArchived), errors.Is(err, rt.ErrResolved), errors.Is(err, rt.ErrNoPrompt):
+	case errors.Is(err, rt.ErrPaused), errors.Is(err, rt.ErrArchived), errors.Is(err, rt.ErrResolved), errors.Is(err, rt.ErrNoPrompt),
+		errors.Is(err, rt.ErrTaskNotRunning), errors.Is(err, rt.ErrBusy):
 		apierr.Message(c, http.StatusConflict, err.Error())
+	case errors.Is(err, rt.ErrTaskOutputUnset), errors.Is(err, os.ErrNotExist):
+		// The output file may be gone; never echo its path.
+		apierr.Message(c, http.StatusNotFound, rt.ErrTaskOutputUnset.Error())
 	default:
 		apierr.BadRequest(c, err.Error())
 	}
 }
 
-// thread loads the thread named in the path. A thread asked for under
-// another project is reported as not found, so a URL can never reach a
-// thread through a project it does not belong to.
+// thread loads the thread named in the path.
 func (h *Handler) thread(c *gin.Context) (*db.Thread, bool) {
-	t, err := h.svc.Store.GetThread(c.Param("tid"))
-	if err == nil && t.ProjectID != c.Param("id") {
-		err = db.ErrNotFound
-	}
+	t, err := h.svc.Store.GetThread(c.Param("id"))
 	if err != nil {
 		fail(c, err)
 		return nil, false
@@ -129,12 +248,88 @@ func (h *Handler) thread(c *gin.Context) (*db.Thread, bool) {
 	return t, true
 }
 
+// worker loads the thread named in the path for an action that only makes
+// sense on a thread that runs an agent session. A project's main thread is its
+// conversation with the coordinator: it cannot be archived, stopped, merged,
+// answered or configured like a worker, so those requests are refused (400)
+// instead of acting on the conversation.
+func (h *Handler) worker(c *gin.Context) (*db.Thread, bool) {
+	t, ok := h.thread(c)
+	if !ok {
+		return nil, false
+	}
+	if t.Agent == db.AgentLLM {
+		apierr.BadRequest(c, "not available on a project's main thread; use the project's own settings and messages")
+		return nil, false
+	}
+	return t, true
+}
+
+// owner is whose uploads the thread's messages read.
+func (h *Handler) owner(t *db.Thread) (string, error) {
+	p, err := h.svc.Store.GetProject(t.ProjectID)
+	if err != nil {
+		return "", err
+	}
+	return rt.UploadOwner(p, t), nil
+}
+
+func (h *Handler) list(c *gin.Context) {
+	if _, err := h.svc.Store.GetProject(c.Param("id")); err != nil {
+		apierr.Store(c, err, "project")
+		return
+	}
+	threads, err := h.svc.Store.ListThreads(c.Param("id"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	if threads == nil {
+		threads = []db.Thread{}
+	}
+	c.JSON(http.StatusOK, ThreadsResponse{Threads: threads})
+}
+
+func (h *Handler) create(c *gin.Context) {
+	var req CreateThreadRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	atts, err := h.svc.Layout.ResolveAttachments(rt.DraftOwner, req.Attachments)
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	t, err := h.svc.Threads.StartFolderThread(rt.FolderThreadSpec{
+		ProjectID: c.Param("id"), Task: req.Content, Attachments: atts, Title: req.Title, Model: req.Model,
+		PermissionMode: req.PermissionMode, Profile: req.Profile,
+	})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, t)
+}
+
+func (h *Handler) permissionModes(c *gin.Context) {
+	c.JSON(http.StatusOK, PermissionModesResponse{Modes: rt.PermissionModes})
+}
+
 func (h *Handler) get(c *gin.Context) {
 	t, ok := h.thread(c)
 	if !ok {
 		return
 	}
-	events, err := h.svc.Store.ListThreadEvents(t.ID)
+	c.JSON(http.StatusOK, ThreadDetailResponse{Thread: *t, Running: h.svc.Threads.Running(t.ID), BackgroundTasks: h.svc.Threads.BackgroundTasks(t.ID)})
+}
+
+func (h *Handler) events(c *gin.Context) {
+	t, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	events, err := h.svc.Store.ListRecentThreadEvents(t.ID, limit)
 	if err != nil {
 		fail(c, err)
 		return
@@ -142,7 +337,7 @@ func (h *Handler) get(c *gin.Context) {
 	if events == nil {
 		events = []db.ThreadEvent{}
 	}
-	c.JSON(http.StatusOK, ThreadDetailResponse{Thread: *t, Events: events, Running: h.svc.Threads.Running(t.ID)})
+	c.JSON(http.StatusOK, EventsResponse{Events: events})
 }
 
 func (h *Handler) send(c *gin.Context) {
@@ -160,13 +355,16 @@ func (h *Handler) send(c *gin.Context) {
 	}
 	var atts []rt.Attachment
 	if len(req.Attachments) > 0 {
-		var err error
-		if atts, err = h.svc.Layout.ResolveAttachments(cur.ProjectID, req.Attachments); err != nil {
+		owner, err := h.owner(cur)
+		if err == nil {
+			atts, err = h.svc.Layout.ResolveAttachments(owner, req.Attachments)
+		}
+		if err != nil {
 			apierr.BadRequest(c, err.Error())
 			return
 		}
 	}
-	t, err := h.svc.Threads.Send(c.Request.Context(), cur.ID, req.Content, "user", atts)
+	t, err := h.svc.Send(c.Request.Context(), cur.ID, req.Content, atts, rt.Source{})
 	if err != nil {
 		fail(c, err)
 		return
@@ -174,12 +372,25 @@ func (h *Handler) send(c *gin.Context) {
 	c.JSON(http.StatusOK, t)
 }
 
+func (h *Handler) startSuggestions(c *gin.Context) {
+	var req StartSuggestionsRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	m, err := h.svc.Coordinator.StartSuggestions(c.Request.Context(), c.Param("id"), c.Param("eid"), req.Indexes)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, m)
+}
+
 func (h *Handler) respond(c *gin.Context) {
 	var req ThreadRespondRequest
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -191,7 +402,7 @@ func (h *Handler) respond(c *gin.Context) {
 }
 
 func (h *Handler) stop(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -209,8 +420,8 @@ func (h *Handler) reply(c *gin.Context, id string) {
 	c.JSON(http.StatusOK, t)
 }
 
-func (h *Handler) resolve(c *gin.Context) {
-	cur, ok := h.thread(c)
+func (h *Handler) archive(c *gin.Context) {
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -223,7 +434,7 @@ func (h *Handler) resolve(c *gin.Context) {
 }
 
 func (h *Handler) reopen(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -249,7 +460,7 @@ func (h *Handler) diff(c *gin.Context) {
 }
 
 func (h *Handler) merge(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -271,7 +482,7 @@ func (h *Handler) setAutoAnswer(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	t, ok := h.thread(c)
+	t, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -281,4 +492,152 @@ func (h *Handler) setAutoAnswer(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) setPermissionMode(c *gin.Context) {
+	var req PermissionModeRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetPermissionMode(t.ID, req.PermissionMode)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) setProfile(c *gin.Context) {
+	var req ProfileRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetProfile(c.Request.Context(), t.ID, req.Profile)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) setModel(c *gin.Context) {
+	var req ModelRequest
+	if !apierr.Bind(c, &req) {
+		return
+	}
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetModel(c.Request.Context(), t.ID, req.Model)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) handoff(c *gin.Context) {
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	cmd, err := h.svc.Threads.Handoff(t.ID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, HandoffResponse{Command: cmd})
+}
+
+func (h *Handler) stopTask(c *gin.Context) {
+	t, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.Threads.StopTask(c.Request.Context(), t.ID, c.Param("task_id")); err != nil {
+		fail(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) taskOutput(c *gin.Context) {
+	t, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	tail := 0
+	if v := c.Query("tail"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			apierr.BadRequest(c, "tail must be a non-negative integer")
+			return
+		}
+		tail = n
+	}
+	out, err := h.svc.Threads.TaskOutput(t.ID, c.Param("task_id"), tail)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, TaskOutputResponse{Content: out.Content, Truncated: out.Truncated, Size: out.Size})
+}
+
+func (h *Handler) uploadAttachments(c *gin.Context) {
+	t, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	owner, err := h.owner(t)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	form, err := c.MultipartForm()
+	if err != nil {
+		apierr.BadRequest(c, `expected multipart form with field "files"`)
+		return
+	}
+	atts, err := h.svc.Layout.SaveUploads(owner, form.File["files"], maxUpload)
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusCreated, rt.AttachmentsResponse{Attachments: atts})
+}
+
+func (h *Handler) downloadAttachment(c *gin.Context) {
+	t, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	owner, err := h.owner(t)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	rel := filepath.ToSlash(filepath.Clean(c.Query("path")))
+	if !strings.HasPrefix(rel, rt.UploadsDir+"/") {
+		apierr.BadRequest(c, "invalid attachment path")
+		return
+	}
+	path, err := h.svc.Layout.LibraryPath(owner, rel)
+	if err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	if st, err := os.Stat(path); err != nil || st.IsDir() {
+		apierr.Message(c, http.StatusNotFound, "file not found")
+		return
+	}
+	c.FileAttachment(path, filepath.Base(path))
 }

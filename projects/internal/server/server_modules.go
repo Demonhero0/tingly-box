@@ -7,7 +7,6 @@ import (
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/channel"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/conversation"
 	projectmod "github.com/tingly-dev/tingly-box/projects/internal/server/module/project"
-	"github.com/tingly-dev/tingly-box/projects/internal/server/module/session"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/settings"
 	"github.com/tingly-dev/tingly-box/projects/internal/server/module/thread"
 )
@@ -32,7 +31,6 @@ func ProjectModules(d Deps, host project.Host) ([]module.Module, *project.Servic
 	return []module.Module{
 		projectmod.NewHandler(svc),
 		thread.NewHandler(svc),
-		session.NewHandler(svc),
 		channel.NewHandler(svc),
 	}, svc
 }

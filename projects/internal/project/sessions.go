@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -39,19 +38,20 @@ func ValidPermissionMode(m string) bool {
 
 // Errors for folder sessions.
 var (
-	ErrNotFolder       = errors.New("the path is not a folder")
-	ErrTaskNotRunning  = errors.New("the task is not running")
-	ErrBadPermission   = errors.New("unknown permission mode")
-	ErrBadAutoAnswer   = errors.New("unknown auto-answer setting")
-	errFolderRequired  = errors.New("folder is required")
-	errBadTaskID       = errors.New("bad task id")
-	ErrTaskOutputUnset = errors.New("no output recorded for that task")
+	ErrNotFolder        = errors.New("the path is not a folder")
+	ErrTaskNotRunning   = errors.New("the task is not running")
+	ErrBadPermission    = errors.New("unknown permission mode")
+	ErrBadAutoAnswer    = errors.New("unknown auto-answer setting")
+	errFolderRequired   = errors.New("folder is required")
+	ErrNotFolderProject = errors.New("the project is not a folder")
+	errBadTaskID        = errors.New("bad task id")
+	ErrTaskOutputUnset  = errors.New("no output recorded for that task")
 )
 
-// SessionSpec describes a new folder session.
-type SessionSpec struct {
-	Folder string
-	Task   string
+// FolderThreadSpec describes a new thread in a folder project.
+type FolderThreadSpec struct {
+	ProjectID string
+	Task      string
 	// Attachments are uploads of the session pool sent with the first message.
 	Attachments    []Attachment
 	Title          string
@@ -86,10 +86,23 @@ func CleanFolder(raw string) (string, error) {
 	return path, nil
 }
 
-// StartSession creates a session in a folder and runs its first turn. The
-// folder is kept in the sidebar.
-func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
-	folder, err := CleanFolder(spec.Folder)
+// StartFolderThread creates a thread in a folder project and runs its first
+// turn.
+func (m *Threads) StartFolderThread(spec FolderThreadSpec) (*db.Thread, error) {
+	p, err := m.store.GetProject(spec.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if p.Type != db.ProjectFolder {
+		return nil, ErrNotFolderProject
+	}
+	if p.ArchivedAt != nil {
+		return nil, ErrArchived
+	}
+	if p.Paused {
+		return nil, ErrPaused
+	}
+	folder, err := CleanFolder(p.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +129,9 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 		title = spec.Attachments[0].Name
 	}
 	t := &db.Thread{
+		ProjectID: p.ID, Agent: db.AgentClaudeCode,
 		Title: title, Task: task, Status: db.ThreadWorking, Origin: "user",
-		Worktree: folder, SessionID: uuid.NewString(),
+		Cwd: folder, SessionID: uuid.NewString(),
 		Model: model, PermissionMode: spec.PermissionMode, Profile: profile,
 		HeadBranch: HeadBranch(context.Background(), folder),
 	}
@@ -125,16 +139,13 @@ func (m *Threads) StartSession(spec SessionSpec) (*db.Thread, error) {
 		return nil, err
 	}
 	if err := m.layout.AdoptUploads(DraftOwner, SessionOwner(t.ID), spec.Attachments); err != nil {
-		logrus.WithError(err).Warn("move session uploads")
+		logrus.WithError(err).Warn("move folder thread uploads")
 	}
-	_ = m.store.SaveWorkdir(folder)
-	m.hub.Publish(Event{Type: EventThread, Data: t})
-	m.enqueue(t.ID, queued{text: task, from: "user", atts: spec.Attachments})
+	_ = m.store.TouchProject(p.ID)
+	m.hub.Publish(Event{Type: EventThread, ProjectID: p.ID, Data: t})
+	m.enqueue(t.ID, queued{text: task, atts: spec.Attachments})
 	return t, nil
 }
-
-// Session loads a folder session.
-func (m *Threads) Session(id string) (*db.Thread, error) { return m.store.GetSession(id) }
 
 // SetPermissionMode sets the mode the session's next turn runs in. A
 // resident process keeps the mode it was launched with, and the engine
@@ -143,7 +154,7 @@ func (m *Threads) SetPermissionMode(id, mode string) (*db.Thread, error) {
 	if !ValidPermissionMode(mode) {
 		return nil, ErrBadPermission
 	}
-	if _, err := m.store.GetSession(id); err != nil {
+	if _, err := m.store.GetThread(id); err != nil {
 		return nil, err
 	}
 	out, err := m.update(id, func(t *db.Thread) { t.PermissionMode = mode })
@@ -217,56 +228,4 @@ func (m *Threads) TaskOutput(threadID, taskID string, tail int) (engine.TaskOutp
 		return engine.TaskOutput{}, ErrTaskOutputUnset
 	}
 	return engine.ReadTaskOutput(path, taskID, tail)
-}
-
-// Workdir is a folder in the sidebar with what waits there.
-type Workdir struct {
-	Path    string `json:"path"`
-	Saved   bool   `json:"saved"`
-	Waiting int    `json:"waiting"`
-	Working int    `json:"working"`
-	// Sessions counts every session in the folder, archived ones too.
-	Sessions int `json:"sessions"`
-}
-
-// Workdirs lists the saved folders and every folder that has a session.
-func (s *Service) Workdirs() ([]Workdir, error) {
-	saved, err := s.Store.ListWorkdirs()
-	if err != nil {
-		return nil, err
-	}
-	counts, err := s.Store.SessionCounts()
-	if err != nil {
-		return nil, err
-	}
-	out := []Workdir{}
-	seen := map[string]bool{}
-	add := func(path string, isSaved bool) {
-		seen[path] = true
-		w := Workdir{Path: path, Saved: isSaved}
-		for status, n := range counts[path] {
-			w.Sessions += n
-			switch status {
-			case db.ThreadWaiting:
-				w.Waiting += n
-			case db.ThreadWorking:
-				w.Working += n
-			}
-		}
-		out = append(out, w)
-	}
-	for _, w := range saved {
-		add(w.Path, true)
-	}
-	var unsaved []string
-	for path := range counts {
-		if !seen[path] {
-			unsaved = append(unsaved, path)
-		}
-	}
-	sort.Strings(unsaved)
-	for _, path := range unsaved {
-		add(path, false)
-	}
-	return out, nil
 }

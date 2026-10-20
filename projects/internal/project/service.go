@@ -5,8 +5,6 @@ package project
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +47,7 @@ func NewService(store *db.Store, layout Layout, agents Agents, host Host) *Servi
 	relay := NewRelay(store, sink)
 	coord.OnFinal = relay.Message
 	threads.OnWait = relay.NeedsUser
+	threads.OnReply = relay.ThreadReply
 	return &Service{
 		Store: store, Layout: layout, Hub: hub, Threads: threads,
 		Coordinator: coord, Relay: relay,
@@ -77,11 +76,15 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
-// NewProjectSpec is the New project dialog.
+// NewProjectSpec is the New project dialog (a project), or a folder to open.
 type NewProjectSpec struct {
+	// Type is project (the default) or folder.
+	Type  string
 	Name  string
 	Goal  string
 	Repos []string
+	// Path is the folder of a folder project.
+	Path string
 }
 
 // ResolveRepos validates repository paths and records their current branch
@@ -110,68 +113,4 @@ func ResolveRepos(ctx context.Context, paths []string) ([]db.Repo, error) {
 		repos = append(repos, db.Repo{Path: info.Root, BaseBranch: info.Branch})
 	}
 	return repos, nil
-}
-
-// Create makes a project and its directories.
-func (s *Service) Create(ctx context.Context, spec NewProjectSpec) (*db.Project, error) {
-	name := strings.TrimSpace(spec.Name)
-	if name == "" {
-		return nil, errors.New("name is required")
-	}
-	repos, err := ResolveRepos(ctx, spec.Repos)
-	if err != nil {
-		return nil, err
-	}
-	p := &db.Project{Name: name, Goal: strings.TrimSpace(spec.Goal), Repos: repos, ThreadPermissionMode: DefaultPermissionMode}
-	if err := s.Store.CreateProject(p); err != nil {
-		return nil, err
-	}
-	if err := s.Layout.Ensure(p.ID); err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-// Save persists a project change and tells open pages.
-func (s *Service) Save(p *db.Project) error {
-	if len([]rune(p.Instructions)) > MaxInstructions {
-		return fmt.Errorf("instructions exceed %d characters", MaxInstructions)
-	}
-	if err := s.Store.SaveProject(p); err != nil {
-		return err
-	}
-	s.Hub.Publish(Event{Type: EventProject, ProjectID: p.ID, Data: p})
-	return nil
-}
-
-// SetPaused pauses (stopping every running thread) or resumes a project.
-func (s *Service) SetPaused(p *db.Project, paused bool) error {
-	p.Paused = paused
-	if paused {
-		s.Threads.StopProject(p.ID)
-	}
-	return s.Save(p)
-}
-
-// SetArchived archives (stopping its threads) or unarchives a project.
-func (s *Service) SetArchived(p *db.Project, archived bool) error {
-	if archived {
-		now := time.Now()
-		p.ArchivedAt = &now
-		s.Threads.StopProject(p.ID)
-	} else {
-		p.ArchivedAt = nil
-	}
-	return s.Save(p)
-}
-
-// Delete removes a project, its threads' worktrees, memory and library.
-// Branches the threads created are kept.
-func (s *Service) Delete(ctx context.Context, p *db.Project) error {
-	s.Threads.StopProject(p.ID)
-	s.Threads.RemoveWorktrees(ctx, p.ID)
-	if err := s.Store.DeleteProject(p.ID); err != nil {
-		return err
-	}
-	return os.RemoveAll(s.Layout.Dir(p.ID))
 }

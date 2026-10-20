@@ -26,6 +26,10 @@ var (
 	ErrArchived = errors.New("the project is archived; unarchive it first")
 	ErrResolved = errors.New("the thread is resolved; reopen it first")
 	ErrNoPrompt = errors.New("no pending request with that id")
+	// ErrNotProject is for starting a worker in a project that is a folder.
+	ErrNotProject = errors.New("only a project's main thread starts threads in it")
+	// ErrMainThread is for running a main thread as an agent session.
+	ErrMainThread = errors.New("a main thread is the project conversation; send to it through the coordinator")
 )
 
 // MaxRunningPerProject caps concurrently running turns in one project. Turns
@@ -33,9 +37,8 @@ var (
 // are the coordinator's to follow; this is only the safety net.
 const MaxRunningPerProject = 4
 
-// MaxRunningSessions caps concurrently running folder sessions, which share
-// one limit because they belong to no project. It matches the resident
-// process pool.
+// MaxRunningSessions caps concurrently running folder threads, which share
+// one limit across all folders. It matches the resident process pool.
 const MaxRunningSessions = 10
 
 // Default permission mode threads run in: edits are accepted, anything else
@@ -76,11 +79,17 @@ type Threads struct {
 	env    ThreadEnv
 	// OnReport is called after each turn that was not stopped by the user.
 	OnReport func(Report)
-	// OnWait is called when a project thread stops to ask the user for an
-	// approval or an answer. It must not block.
+	// OnReply is called after each turn that was not stopped by the user, for
+	// every kind of thread (a folder thread included), with the turn's final
+	// text or error. The chats bound to that thread hear it. It must not block.
+	OnReply func(Report)
+	// OnWait is called when a thread stops to ask the user for an approval
+	// or an answer. It must not block.
 	OnWait func(db.Thread)
 
-	mu      sync.Mutex
+	mu sync.Mutex
+	// folders caches which projects are folders (a project's type never changes).
+	folders map[string]bool
 	active  map[string]*activeThread
 	turns   map[string]*turnTally
 	prompts map[string]*threadPrompter
@@ -105,8 +114,45 @@ type activeThread struct {
 
 type queued struct {
 	text string
-	from string
+	src  Source
 	atts []Attachment
+}
+
+// Source says where a message to a thread came from. The zero value is the
+// web. It is stored on the user event the message becomes.
+type Source struct {
+	// Kind is db.SourceIM, db.SourceThread or db.SourceSystem; empty for the web.
+	Kind string
+	// Ref is the sending thread's id for db.SourceThread.
+	Ref string
+	// Platform and ChatID name the IM chat for db.SourceIM.
+	Platform string
+	ChatID   string
+}
+
+// fromThread is the source of a message another thread sent.
+func fromThread(id string) Source { return Source{Kind: db.SourceThread, Ref: id} }
+
+func (s Source) stamp(e *db.ThreadEvent) {
+	e.Source, e.SourceRef, e.SourcePlatform, e.SourceChatID = s.Kind, s.Ref, s.Platform, s.ChatID
+}
+
+// isFolder reports whether a project is a folder.
+func (m *Threads) isFolder(projectID string) bool {
+	m.mu.Lock()
+	f, ok := m.folders[projectID]
+	m.mu.Unlock()
+	if ok {
+		return f
+	}
+	p, err := m.store.GetProject(projectID)
+	if err != nil {
+		return false
+	}
+	m.mu.Lock()
+	m.folders[projectID] = p.Type == db.ProjectFolder
+	m.mu.Unlock()
+	return p.Type == db.ProjectFolder
 }
 
 // turnTally is what a turn's transcript entries add up to, for its report.
@@ -125,7 +171,7 @@ func NewThreads(store *db.Store, layout Layout, hub *Hub, agents Agents, env Thr
 		active: map[string]*activeThread{}, turns: map[string]*turnTally{}, prompts: map[string]*threadPrompter{},
 		sessionOfThread: map[string]string{}, threadOfSession: map[string]string{},
 		slots: map[string]chan struct{}{}, threads: map[string]*sync.Mutex{},
-		allowed: map[string]map[string]bool{},
+		allowed: map[string]map[string]bool{}, folders: map[string]bool{},
 	}
 	m.engine = engine.New(engine.Config{
 		Agent:     agents.Service,
@@ -196,15 +242,12 @@ func threadPermissionMode(p *db.Project, t *db.Thread) string {
 	if t.PermissionMode != "" {
 		return t.PermissionMode
 	}
-	if p == nil {
-		return DefaultPermissionMode
-	}
 	return permissionMode(p)
 }
 
 func queuedNote(p *db.Project) string {
-	if p == nil {
-		return fmt.Sprintf("Queued: %d sessions are already running.", MaxRunningSessions)
+	if p.Type == db.ProjectFolder {
+		return fmt.Sprintf("Queued: %d folder threads are already running.", MaxRunningSessions)
 	}
 	return fmt.Sprintf("Queued: %d threads are already running in this project.", MaxRunningPerProject)
 }
@@ -216,19 +259,19 @@ func permissionMode(p *db.Project) string {
 	return DefaultPermissionMode
 }
 
-// slot is the running-turn limit of a project, or of all folder sessions
-// together (projectID "").
-func (m *Threads) slot(projectID string) chan struct{} {
+// slot is the running-turn limit of a project, or of all folder threads
+// together (key "").
+func (m *Threads) slot(key string) chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	s, ok := m.slots[projectID]
+	s, ok := m.slots[key]
 	if !ok {
 		n := MaxRunningPerProject
-		if projectID == "" {
+		if key == "" {
 			n = MaxRunningSessions
 		}
 		s = make(chan struct{}, n)
-		m.slots[projectID] = s
+		m.slots[key] = s
 	}
 	return s
 }
@@ -306,6 +349,9 @@ func slugify(s string) string {
 
 // Start creates a thread, prepares its workspace and runs its first turn.
 func (m *Threads) Start(ctx context.Context, p *db.Project, spec StartSpec) (*db.Thread, error) {
+	if p.Type != db.ProjectProject || p.MainThreadID == "" {
+		return nil, ErrNotProject
+	}
 	if p.ArchivedAt != nil {
 		return nil, ErrArchived
 	}
@@ -318,6 +364,8 @@ func (m *Threads) Start(ctx context.Context, p *db.Project, spec StartSpec) (*db
 	}
 	t := &db.Thread{
 		ProjectID: p.ID,
+		ParentID:  p.MainThreadID,
+		Agent:     db.AgentClaudeCode,
 		Title:     title,
 		Task:      strings.TrimSpace(spec.Task),
 		Status:    db.ThreadWorking,
@@ -331,17 +379,17 @@ func (m *Threads) Start(ctx context.Context, p *db.Project, spec StartSpec) (*db
 	if err := m.store.CreateThread(t); err != nil {
 		return nil, err
 	}
-	t.Worktree = m.layout.WorktreeDir(p.ID, t.ID)
+	t.Cwd = m.layout.ThreadDir(p.ID, t.ID)
 	if repo != nil {
 		t.RepoPath, t.BaseBranch = repo.Path, repo.BaseBranch
 		t.Branch = fmt.Sprintf("tp/%s-%s", slugify(title), t.ID[:6])
-		if err := AddWorktree(ctx, repo.Path, t.Worktree, t.Branch, repo.BaseBranch); err != nil {
+		if err := AddWorktree(ctx, repo.Path, t.Cwd, t.Branch, repo.BaseBranch); err != nil {
 			t.Status, t.WaitReason = db.ThreadWaiting, "Could not create the worktree: "+err.Error()
 			_ = m.store.SaveThread(t)
 			m.hub.Publish(Event{Type: EventThread, ProjectID: p.ID, Data: t})
 			return t, nil
 		}
-	} else if err := os.MkdirAll(t.Worktree, 0o755); err != nil {
+	} else if err := os.MkdirAll(t.Cwd, 0o755); err != nil {
 		return nil, err
 	}
 	if err := m.writeSettings(p, t); err != nil {
@@ -351,11 +399,11 @@ func (m *Threads) Start(ctx context.Context, p *db.Project, spec StartSpec) (*db
 		return nil, err
 	}
 	m.hub.Publish(Event{Type: EventThread, ProjectID: p.ID, Data: t})
-	from := "coordinator"
+	src := fromThread(p.MainThreadID)
 	if spec.Origin == "user" {
-		from = "user"
+		src = Source{}
 	}
-	m.enqueue(t.ID, queued{text: t.Task, from: from})
+	m.enqueue(t.ID, queued{text: t.Task, src: src})
 	return t, nil
 }
 
@@ -393,29 +441,31 @@ func (m *Threads) writeSettings(p *db.Project, t *db.Thread) error {
 	return os.WriteFile(path, []byte(jsonString(settings)), 0o644)
 }
 
-// Send gives a thread a message from the user or the coordinator. A busy
-// thread runs it after its current turn.
-func (m *Threads) Send(ctx context.Context, threadID, text, from string, atts []Attachment) (*db.Thread, error) {
+// Send gives a Claude Code thread a message; src says who sent it. A busy
+// thread runs it after its current turn. A main thread is not run here: its
+// messages go through Service.Send to the coordinator.
+func (m *Threads) Send(ctx context.Context, threadID, text string, src Source, atts []Attachment) (*db.Thread, error) {
 	t, err := m.store.GetThread(threadID)
 	if err != nil {
 		return nil, err
 	}
-	if t.ProjectID != "" {
-		p, err := m.store.GetProject(t.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		if p.ArchivedAt != nil {
-			return nil, ErrArchived
-		}
-		if p.Paused {
-			return nil, ErrPaused
-		}
+	if t.Agent == db.AgentLLM {
+		return nil, ErrMainThread
+	}
+	p, err := m.store.GetProject(t.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if p.ArchivedAt != nil {
+		return nil, ErrArchived
+	}
+	if p.Paused {
+		return nil, ErrPaused
 	}
 	if t.Status == db.ThreadResolved {
 		return nil, ErrResolved
 	}
-	m.enqueue(threadID, queued{text: text, from: from, atts: atts})
+	m.enqueue(threadID, queued{text: text, src: src, atts: atts})
 	return m.store.GetThread(threadID)
 }
 
@@ -426,7 +476,9 @@ func (m *Threads) enqueue(threadID string, q queued) {
 	if err != nil {
 		return
 	}
-	m.addEvent(t, &db.ThreadEvent{Kind: db.EvUser, Content: q.text, From: q.from, Payload: AttachmentsPayload(q.atts)})
+	ev := &db.ThreadEvent{Kind: db.EvUser, Content: q.text, Payload: AttachmentsPayload(q.atts)}
+	q.src.stamp(ev)
+	m.addEvent(t, ev)
 	followingUp := m.engine.Busy(m.sessionOf(threadID))
 	m.mu.Lock()
 	if a, busy := m.active[threadID]; busy || followingUp {
@@ -464,22 +516,24 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		m.drop(threadID)
 		return
 	}
-	// A folder session has no project: no instructions, library or limit
-	// but the shared one.
-	var p *db.Project
-	if t.ProjectID != "" {
-		if p, err = m.store.GetProject(t.ProjectID); err != nil {
-			m.drop(threadID)
-			return
-		}
+	// A folder has no instructions, library or limit but the shared one.
+	p, err := m.store.GetProject(t.ProjectID)
+	if err != nil {
+		m.drop(threadID)
+		return
 	}
+	folder := p.Type == db.ProjectFolder
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	m.mu.Lock()
 	a.cancel = cancel
 	m.mu.Unlock()
-	slot := m.slot(t.ProjectID)
+	slotKey := p.ID
+	if folder {
+		slotKey = ""
+	}
+	slot := m.slot(slotKey)
 	select {
 	case slot <- struct{}{}:
 	default:
@@ -500,7 +554,7 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		return
 	}
 	a.slot = slot
-	prompt := withAttachments(a.current.text, m.layout.LibraryDir(UploadOwner(t)), a.current.atts)
+	prompt := withAttachments(a.current.text, m.layout.LibraryDir(UploadOwner(p, t)), a.current.atts)
 	m.mu.Unlock()
 	// Waiting for the slot can take a while: launch with what the owner
 	// picked since (profile, model, permission mode).
@@ -508,12 +562,12 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 		t = fresh
 	}
 
-	env, defModel, settings := m.launchEnv(ctx, t)
-	// A project thread runs the project's model. A session runs the one its
-	// owner picked; a project thread's Model is only what the API reported,
+	env, defModel, settings := m.launchEnv(ctx, t, folder)
+	// A project thread runs the project's model. A folder thread runs the one
+	// its owner picked; a project thread's Model is only what the API reported,
 	// and launching with it would restart the resident process each turn.
 	model := t.Model
-	if p != nil {
+	if !folder {
 		model = p.ThreadModel
 	}
 	if model == "" {
@@ -523,13 +577,13 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 	m.turns[threadID] = &turnTally{launchModel: model}
 	m.mu.Unlock()
 	opts := agentboot.ExecutionOptions{Model: model, PermissionMode: threadPermissionMode(p, t), Env: env, SettingsPath: settings}
-	if p != nil {
+	if !folder {
 		opts.AppendSystemPrompt = threadSystemPrompt(m.layout, p, t)
 		opts.SettingsPath = m.layout.SettingsFile(p.ID, t.ID)
-	} else if path, err := m.sessionSettings(t, settings); err == nil {
+	} else if path, err := m.sessionSettings(p, t, settings); err == nil {
 		opts.SettingsPath = path
 	}
-	started := m.engine.Start(m.sessionOf(threadID), t.Worktree, prompt, t.Turns > 0, func(context.Context) agentboot.ExecutionOptions { return opts })
+	started := m.engine.Start(m.sessionOf(threadID), t.Cwd, prompt, t.Turns > 0, func(context.Context) agentboot.ExecutionOptions { return opts })
 	if !started {
 		// Claude started a turn of its own in the meantime: this message
 		// waits for it (turnEnded picks it up).
@@ -542,10 +596,10 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 	}
 }
 
-// sessionSettings lets a folder session read its own folder's uploads, which
-// live outside the folder: the host's settings (a profile's), if any, plus
-// that one extra directory. On error the session keeps the host's settings.
-func (m *Threads) sessionSettings(t *db.Thread, host string) (string, error) {
+// sessionSettings lets a folder thread read its own uploads, which live
+// outside the folder: the host's settings (a profile's), if any, plus that one
+// extra directory. On error the thread keeps the host's settings.
+func (m *Threads) sessionSettings(p *db.Project, t *db.Thread, host string) (string, error) {
 	doc := map[string]any{}
 	if host != "" {
 		b, err := os.ReadFile(host)
@@ -561,7 +615,7 @@ func (m *Threads) sessionSettings(t *db.Thread, host string) (string, error) {
 		perms = map[string]any{}
 	}
 	dirs, _ := perms["additionalDirectories"].([]any)
-	perms["additionalDirectories"] = append(dirs, m.layout.LibraryDir(UploadOwner(t)))
+	perms["additionalDirectories"] = append(dirs, m.layout.LibraryDir(UploadOwner(p, t)))
 	doc["permissions"] = perms
 	path := m.layout.SessionSettingsFile(t.ID)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -574,11 +628,11 @@ func (m *Threads) sessionSettings(t *db.Thread, host string) (string, error) {
 	return path, os.WriteFile(path, out, 0o644)
 }
 
-// launchEnv is how t's turn reaches a model. A folder session on a host
+// launchEnv is how t's turn reaches a model. A folder thread on a host
 // with launch profiles runs under its profile, and an unset model is left to
 // that profile; everything else runs in the host's thread environment.
-func (m *Threads) launchEnv(ctx context.Context, t *db.Thread) (env []string, defModel, settings string) {
-	if l, ok := m.env.(Launcher); ok && t.ProjectID == "" {
+func (m *Threads) launchEnv(ctx context.Context, t *db.Thread, folder bool) (env []string, defModel, settings string) {
+	if l, ok := m.env.(Launcher); ok && folder {
 		env, settings, err := l.LaunchEnv(ctx, t.Profile)
 		if err == nil {
 			return env, "", settings
@@ -677,12 +731,12 @@ func (m *Threads) settle(threadID string, end engine.TurnEnd, tally *turnTally) 
 	}
 	stats := BranchStats{}
 	if t.RepoPath != "" {
-		stats = Stats(context.Background(), t.Worktree, t.BaseBranch)
+		stats = Stats(context.Background(), t.Cwd, t.BaseBranch)
 	}
-	session := t.ProjectID == ""
+	session := m.isFolder(t.ProjectID)
 	head := ""
 	if session {
-		head = HeadBranch(context.Background(), t.Worktree)
+		head = HeadBranch(context.Background(), t.Cwd)
 	}
 	report := Report{Kind: ReportFinished, Text: strings.TrimSpace(tally.text)}
 	t, _ = m.update(threadID, func(t *db.Thread) {
@@ -742,6 +796,10 @@ func (m *Threads) settle(threadID string, end engine.TurnEnd, tally *turnTally) 
 		m.addEvent(t, &db.ThreadEvent{Kind: db.EvReport, Content: report.Text, Payload: jsonString(map[string]any{
 			"status": t.Status, "commits_ahead": stats.CommitsAhead, "files_changed": stats.FilesChanged, "uncommitted": stats.Uncommitted,
 		})})
+	}
+	if report.Kind != "" && m.OnReply != nil {
+		report.Thread = *t
+		m.OnReply(report)
 	}
 	if session {
 		// Nobody to report to; the session page shows the turn itself.
@@ -862,17 +920,7 @@ func (m *Threads) Diff(ctx context.Context, threadID string) (Diff, error) {
 	if t.RepoPath == "" {
 		return Diff{}, errors.New("this thread works without a repository")
 	}
-	return BranchDiff(ctx, t.Worktree, t.BaseBranch, t.Branch)
-}
-
-// RemoveWorktrees deletes a project's worktrees (branches are kept).
-func (m *Threads) RemoveWorktrees(ctx context.Context, projectID string) {
-	threads, _ := m.store.ListThreads(projectID)
-	for _, t := range threads {
-		if t.RepoPath != "" {
-			_ = RemoveWorktree(ctx, t.RepoPath, t.Worktree)
-		}
-	}
+	return BranchDiff(ctx, t.Cwd, t.BaseBranch, t.Branch)
 }
 
 // Recover runs at startup: turns that were running when the process stopped
@@ -909,8 +957,8 @@ func (m *Threads) AutoResolve(maxIdle time.Duration) {
 		return
 	}
 	for _, t := range threads {
-		// Folder sessions are archived by hand.
-		if t.ProjectID != "" && time.Since(t.UpdatedAt) > maxIdle {
+		// Folder threads are archived by hand.
+		if !m.isFolder(t.ProjectID) && time.Since(t.UpdatedAt) > maxIdle {
 			_, _ = m.Resolve(t.ID)
 		}
 	}
@@ -964,11 +1012,11 @@ func ValidAutoAnswer(mode string) bool {
 // autoAnswerMode is the setting a thread's questions follow: its own, else
 // delay for a project thread (its owner is usually away) and off for a
 // folder session (its owner is usually watching).
-func autoAnswerMode(t *db.Thread) string {
+func autoAnswerMode(t *db.Thread, folder bool) string {
 	if t.AutoAnswer != "" {
 		return t.AutoAnswer
 	}
-	if t.ProjectID == "" {
+	if folder {
 		return AutoAnswerOff
 	}
 	return AutoAnswerDelay
@@ -1087,7 +1135,7 @@ func (p *threadPrompter) autoDeadline(asked time.Time, suggested bool) *time.Tim
 		return nil
 	}
 	var at time.Time
-	switch autoAnswerMode(t) {
+	switch autoAnswerMode(t, p.m.isFolder(t.ProjectID)) {
 	case AutoAnswerNow:
 		at = time.Now()
 	case AutoAnswerDelay:
@@ -1121,7 +1169,7 @@ func (p *threadPrompter) wait(ctx context.Context, kind, tool, question string, 
 		reason = "Approve: " + question
 	}
 	waiting, _ := p.m.update(p.threadID, func(t *db.Thread) { t.Status, t.WaitReason = db.ThreadWaiting, reason })
-	if waiting != nil && waiting.ProjectID != "" && p.m.OnWait != nil {
+	if waiting != nil && p.m.OnWait != nil {
 		p.m.OnWait(*waiting)
 	}
 

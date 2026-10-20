@@ -64,11 +64,11 @@ func call(id, name string, input any) llm.ToolCall {
 	return llm.ToolCall{ID: id, Name: name, Input: b}
 }
 
-func waitMessages(t *testing.T, store *db.Store, projectID string, cond func([]db.ProjectMessage) bool) []db.ProjectMessage {
+func waitMessages(t *testing.T, store *db.Store, projectID string, cond func([]db.ThreadEvent) bool) []db.ThreadEvent {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		msgs, err := store.ListProjectMessages(projectID, 0)
+		msgs, err := store.ListThreadEvents(mainThread(t, store, projectID))
 		require.NoError(t, err)
 		if cond(msgs) {
 			return msgs
@@ -76,7 +76,7 @@ func waitMessages(t *testing.T, store *db.Store, projectID string, cond func([]d
 		if time.Now().After(deadline) {
 			var dump []string
 			for _, m := range msgs {
-				dump = append(dump, m.Role+"/"+m.Kind+": "+m.Content)
+				dump = append(dump, m.Kind+": "+m.Content)
 			}
 			t.Fatalf("condition not met; messages:\n%s", strings.Join(dump, "\n"))
 		}
@@ -84,7 +84,7 @@ func waitMessages(t *testing.T, store *db.Store, projectID string, cond func([]d
 	}
 }
 
-func countKind(msgs []db.ProjectMessage, kind string) int {
+func countKind(msgs []db.ThreadEvent, kind string) int {
 	n := 0
 	for _, m := range msgs {
 		if m.Kind == kind {
@@ -124,11 +124,12 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 		}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, ai)
+	t.Cleanup(func() { settleCoordinator(coord) })
 
-	_, err := coord.Post(f.project.ID, "Update the docs, and fix the login bug.", nil)
+	_, err := coord.Post(f.project.ID, "Update the docs, and fix the login bug.", nil, Source{})
 	require.NoError(t, err)
 
-	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ProjectMessage) bool {
+	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ThreadEvent) bool {
 		for _, x := range m {
 			if strings.Contains(x.Content, "keep the legacy flag?") {
 				return true
@@ -136,8 +137,8 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 		}
 		return false
 	})
-	assert.Equal(t, 1, countKind(msgs, db.MsgThreadStarted))
-	assert.Equal(t, 2, countKind(msgs, db.MsgThreadUpdate))
+	assert.Equal(t, 1, countKind(msgs, db.EvThreadStarted))
+	assert.Equal(t, 2, countKind(msgs, db.EvThreadUpdate))
 	for _, m := range msgs {
 		assert.NotEqual(t, noUpdate, m.Content, "NO_UPDATE is never posted")
 	}
@@ -157,7 +158,7 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 	assert.Contains(t, first.System, "Ship it")
 
 	// Coordination preferences go to memory.
-	_, err = coord.Post(f.project.ID, "Please run only two at a time.", nil)
+	_, err = coord.Post(f.project.ID, "Please run only two at a time.", nil, Source{})
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		return strings.Contains(f.threads.layout.memoryIndexText(f.project.ID), "max 2 parallel threads")
@@ -184,38 +185,39 @@ func TestProposeThenStartSuggestions(t *testing.T) {
 		}})}}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, ai)
-	_, err := coord.Post(f.project.ID, "Plan the migration first.", nil)
+	t.Cleanup(func() { settleCoordinator(coord) })
+	_, err := coord.Post(f.project.ID, "Plan the migration first.", nil, Source{})
 	require.NoError(t, err)
-	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ProjectMessage) bool { return countKind(m, db.MsgSuggestions) == 1 })
+	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ThreadEvent) bool { return countKind(m, db.EvSuggestions) == 1 })
 	threads, _ := f.store.ListThreads(f.project.ID)
 	assert.Empty(t, threads, "proposals do not start threads")
 
-	var sug db.ProjectMessage
+	var sug db.ThreadEvent
 	for _, m := range msgs {
-		if m.Kind == db.MsgSuggestions {
+		if m.Kind == db.EvSuggestions {
 			sug = m
 		}
 	}
-	updated, err := coord.StartSuggestions(context.Background(), f.project.ID, sug.ID, []int{1})
+	updated, err := coord.StartSuggestions(context.Background(), f.project.MainThreadID, sug.ID, []int{1})
 	require.NoError(t, err)
 	assert.Contains(t, updated.Payload, `"thread_id"`)
 	threads, _ = f.store.ListThreads(f.project.ID)
 	require.Len(t, threads, 1)
 	assert.Equal(t, "B", threads[0].Title)
 
-	_, err = coord.StartSuggestions(context.Background(), f.project.ID, sug.ID, nil)
+	_, err = coord.StartSuggestions(context.Background(), f.project.MainThreadID, sug.ID, nil)
 	require.NoError(t, err)
 	threads, _ = f.store.ListThreads(f.project.ID)
 	assert.Len(t, threads, 2, "start all starts only the remaining one")
 }
 
 func TestRenderHistoryAlternates(t *testing.T) {
-	msgs := renderHistory([]db.ProjectMessage{
-		{Role: db.RoleAssistant, Kind: db.MsgText, Content: "dropped: before first user"},
-		{Role: db.RoleUser, Kind: db.MsgText, Content: "a"},
-		{Role: db.RoleUser, Kind: db.MsgText, Content: "b"},
-		{Role: db.RoleAssistant, Kind: db.MsgThreadStarted, Payload: `{"thread_ids":["0123456789"]}`},
-		{Role: db.RoleSystem, Kind: db.MsgThreadUpdate, Content: "done", Payload: `{"thread_id":"0123456789","title":"T","kind":"finished","status":"idle"}`},
+	msgs := renderHistory([]db.ThreadEvent{
+		{Kind: db.EvAssistant, Content: "dropped: before first user"},
+		{Kind: db.EvUser, Content: "a"},
+		{Kind: db.EvUser, Content: "b"},
+		{Kind: db.EvThreadStarted, Payload: `{"thread_ids":["0123456789"]}`},
+		{Kind: db.EvThreadUpdate, Content: "done", Payload: `{"thread_id":"0123456789","title":"T","kind":"finished","status":"idle"}`},
 	}, "")
 	require.Len(t, msgs, 3)
 	assert.Equal(t, "user", msgs[0].Role)

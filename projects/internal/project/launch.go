@@ -38,11 +38,24 @@ var (
 	ErrBusy       = errors.New("stop or wait for the current turn first")
 )
 
+// folderThread loads a thread of a folder project: profile and model are a
+// folder thread's own choice, while a project's threads run the project's.
+func (m *Threads) folderThread(id string) (*db.Thread, error) {
+	t, err := m.store.GetThread(id)
+	if err != nil {
+		return nil, err
+	}
+	if !m.isFolder(t.ProjectID) {
+		return nil, ErrNotFolderProject
+	}
+	return t, nil
+}
+
 // SetProfile sets the profile the session's next turn launches with. A model
 // the new profile cannot run is cleared rather than refused.
 func (m *Threads) SetProfile(ctx context.Context, id, profile string) (*db.Thread, error) {
 	profile = strings.TrimSpace(profile)
-	t, err := m.store.GetSession(id)
+	t, err := m.folderThread(id)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +83,7 @@ func (m *Threads) SetProfile(ctx context.Context, id, profile string) (*db.Threa
 // profile's default).
 func (m *Threads) SetModel(ctx context.Context, id, model string) (*db.Thread, error) {
 	model = strings.TrimSpace(model)
-	t, err := m.store.GetSession(id)
+	t, err := m.folderThread(id)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +106,7 @@ func (m *Threads) SetModel(ctx context.Context, id, model string) (*db.Thread, e
 func (m *Threads) Handoff(id string) (string, error) {
 	// A message sent while the process was closing waited for it.
 	defer m.next(id)
-	t, err := m.store.GetSession(id)
+	t, err := m.store.GetThread(id)
 	if err != nil {
 		return "", err
 	}
@@ -113,7 +126,7 @@ func (m *Threads) Handoff(id string) (string, error) {
 	if t.Model != "" {
 		argv = append(argv, "--model", t.Model)
 	}
-	return terminalCommand(runtime.GOOS, t.Worktree, argv), nil
+	return terminalCommand(runtime.GOOS, t.Cwd, argv), nil
 }
 
 // terminalCommand runs argv in dir, written for the shell a person pastes

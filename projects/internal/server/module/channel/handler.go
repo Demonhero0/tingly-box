@@ -1,5 +1,5 @@
-// Package channel serves the bindings between IM chats and projects: which
-// project a chat talks to. Moving messages is the host's job (see
+// Package channel serves the bindings between IM chats and threads: which
+// thread a chat talks to. Moving messages is the host's job (see
 // .design/projects-im.md); this module only owns the table.
 package channel
 
@@ -20,12 +20,16 @@ type BindingsResponse struct {
 	Bindings []db.ChannelBinding `json:"bindings"`
 }
 
-// BindChannelRequest binds an IM chat to a project. A chat that is already
-// bound moves to the project.
+// BindChannelRequest binds an IM chat to a thread. A chat that is already
+// bound moves to the thread.
 type BindChannelRequest struct {
-	Platform  string `json:"platform" binding:"required"`
-	ChatID    string `json:"chat_id" binding:"required"`
-	ProjectID string `json:"project_id" binding:"required"`
+	Platform string `json:"platform" binding:"required"`
+	ChatID   string `json:"chat_id" binding:"required"`
+	// ThreadID is the thread to talk to. Either it or ProjectID is given.
+	ThreadID string `json:"thread_id,omitempty"`
+	// ProjectID is resolved to the project's main thread (a project only; bind
+	// a folder's thread by thread_id).
+	ProjectID string `json:"project_id,omitempty"`
 	// ChatTitle is an optional display name for the chat.
 	ChatTitle string `json:"chat_title,omitempty"`
 }
@@ -50,11 +54,12 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api := r.API
 	tag := swagger.WithTags("projects")
 	api.GET("/projects/channel-bindings", h.list, tag,
-		swagger.WithDescription("List the IM chats bound to projects, all of them or one project's"),
-		swagger.WithQuery("project_id", "string", "Only this project's bindings"),
+		swagger.WithDescription("List the IM chats bound to threads, all of them or one project's or thread's"),
+		swagger.WithQuery("project_id", "string", "Only chats bound to a thread of this project"),
+		swagger.WithQuery("thread_id", "string", "Only chats bound to this thread"),
 		swagger.WithResponseModel(BindingsResponse{}))
 	api.PUT("/projects/channel-bindings", h.bind, tag,
-		swagger.WithDescription("Bind an IM chat to a project; binding a bound chat again moves it"),
+		swagger.WithDescription("Bind an IM chat to a thread (or to a project, meaning its main thread); binding a bound chat again moves it"),
 		swagger.WithRequestModel(BindChannelRequest{}),
 		swagger.WithResponseModel(db.ChannelBinding{}))
 	api.DELETE("/projects/channel-bindings/:id", h.unbind, tag,
@@ -63,7 +68,7 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 }
 
 func (h *Handler) list(c *gin.Context) {
-	out, err := h.svc.Store.ListChannelBindings(c.Query("project_id"))
+	out, err := h.svc.Store.ListChannelBindings(db.BindingFilter{ProjectID: c.Query("project_id"), ThreadID: c.Query("thread_id")})
 	if err != nil {
 		apierr.Store(c, err, "bindings")
 		return
@@ -76,15 +81,15 @@ func (h *Handler) bind(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	b, err := h.svc.BindChannel(req.Platform, req.ChatID, req.ChatTitle, req.ProjectID)
+	b, err := h.svc.BindChannel(req.Platform, req.ChatID, req.ChatTitle, req.ThreadID, req.ProjectID)
 	switch {
 	case err == nil:
 		c.JSON(http.StatusOK, b)
 	case errors.Is(err, db.ErrNotFound):
-		apierr.Store(c, err, "project")
+		apierr.Store(c, err, "thread or project")
 	case errors.Is(err, rt.ErrArchived):
 		apierr.Message(c, http.StatusConflict, err.Error())
-	case errors.Is(err, rt.ErrBindingInvalid):
+	case errors.Is(err, rt.ErrBindingInvalid), errors.Is(err, rt.ErrBindFolder):
 		apierr.BadRequest(c, err.Error())
 	default:
 		apierr.Message(c, http.StatusInternalServerError, err.Error())

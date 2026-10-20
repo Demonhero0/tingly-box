@@ -84,7 +84,7 @@ func rootCmd() *cobra.Command {
 }
 
 func runServe(cfg config.Config) error {
-	store, err := db.Open(cfg.DBPath())
+	store, err := db.Open(cfg.DBPath(), db.WithProjectsDir(cfg.ProjectsDir()))
 	if err != nil {
 		return err
 	}

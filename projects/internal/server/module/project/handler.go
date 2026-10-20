@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -52,9 +51,16 @@ type ProjectDetailResponse struct {
 	CoordinatorBusy bool `json:"coordinator_busy"`
 }
 
-// CreateProjectRequest is the New project dialog.
+// CreateProjectRequest is the New project dialog, or opens a folder.
 type CreateProjectRequest struct {
-	Name string `json:"name" binding:"required"`
+	// Type is project (the default) or folder.
+	Type string `json:"type,omitempty" enum:"project,folder"`
+	// Name is required for a project; a folder is named after its folder
+	// unless a name is given.
+	Name string `json:"name,omitempty"`
+	// Path is the folder to open for type folder: it must exist, and the
+	// folder's project is returned when it already has one.
+	Path string `json:"path,omitempty"`
 	Goal string `json:"goal,omitempty"`
 	// Repos are local repository paths; each thread branches from the
 	// repository's current branch.
@@ -73,24 +79,6 @@ type UpdateProjectRequest struct {
 	Starred              *bool     `json:"starred,omitempty"`
 	Paused               *bool     `json:"paused,omitempty"`
 	Archived             *bool     `json:"archived,omitempty"`
-}
-
-// MessagesResponse is the project conversation.
-type MessagesResponse struct {
-	Messages []db.ProjectMessage `json:"messages"`
-}
-
-// PostMessageRequest sends work or a question to the coordinator.
-type PostMessageRequest struct {
-	// Content may be empty when attachments are sent.
-	Content string `json:"content"`
-	// Attachments are paths returned by the attachments upload.
-	Attachments []string `json:"attachments,omitempty"`
-}
-
-// StartSuggestionsRequest starts proposed threads; empty indexes start all.
-type StartSuggestionsRequest struct {
-	Indexes []int `json:"indexes,omitempty"`
 }
 
 // MemoryResponse lists memory files.
@@ -183,12 +171,12 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 	api := r.API
 	tag := swagger.WithTags("projects")
 	api.GET("/projects", h.list, tag,
-		swagger.WithDescription("List projects with thread counts per Overview group"),
-		swagger.WithQuery("q", "string", "Search name and goal"),
+		swagger.WithDescription("List projects and folders (each has a type) with thread counts per Overview group"),
+		swagger.WithQuery("q", "string", "Search name, goal and folder path"),
 		swagger.WithQuery("archived", "boolean", "List archived projects"),
 		swagger.WithResponseModel(ProjectListResponse{}))
 	api.POST("/projects", h.create, tag,
-		swagger.WithDescription("Create a project"),
+		swagger.WithDescription("Create a project, or open a folder (type folder with its path; the folder's existing project is returned when there is one)"),
 		swagger.WithRequestModel(CreateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
 	api.GET("/projects/models", h.models, tag,
@@ -205,27 +193,18 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithDescription("Get a project with its threads"),
 		swagger.WithResponseModel(ProjectDetailResponse{}))
 	api.PATCH("/projects/:id", h.update, tag,
-		swagger.WithDescription("Update project settings; pause, resume, archive, unarchive, star"),
+		swagger.WithDescription("Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400."),
 		swagger.WithRequestModel(UpdateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
 	api.DELETE("/projects/:id", h.delete, tag,
-		swagger.WithDescription("Delete a project with its threads, memory and library. Branches are kept."),
+		swagger.WithDescription("Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted"),
 		swagger.WithResponseModel(OKResponse{}))
 
-	api.GET("/projects/:id/messages", h.messages, tag,
-		swagger.WithDescription("The project conversation"),
-		swagger.WithQuery("limit", "integer", "Latest N messages"),
-		swagger.WithResponseModel(MessagesResponse{}))
-	api.POST("/projects/:id/messages", h.post, tag,
-		swagger.WithDescription("Send work or a question to the coordinator; its reply arrives on the event stream"),
-		swagger.WithRequestModel(PostMessageRequest{}),
-		swagger.WithResponseModel(db.ProjectMessage{}))
-	api.POST("/projects/:id/messages/:mid/start", h.startSuggestions, tag,
-		swagger.WithDescription("Start threads the coordinator proposed"),
-		swagger.WithRequestModel(StartSuggestionsRequest{}),
-		swagger.WithResponseModel(db.ProjectMessage{}))
+	api.GET("/projects/events", h.allEvents, tag,
+		swagger.WithDescription("Server-sent events for every project (project, thread, thread_event, coordinator), for the sidebar; streamed coordinator text is left out"),
+		swagger.WithResponseModel(rt.Event{}))
 	api.GET("/projects/:id/events", h.events, tag,
-		swagger.WithDescription("Server-sent events for the project page: message, message_delta, thread, thread_event, project"),
+		swagger.WithDescription("Server-sent events for one project: message_delta (streamed coordinator text), thread, thread_event (a main thread's are the project conversation), project, coordinator"),
 		swagger.WithResponseModel(rt.Event{}))
 
 	api.GET("/projects/:id/memory", h.listMemory, tag,
@@ -312,12 +291,17 @@ func (h *Handler) create(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	p, err := h.svc.Create(c.Request.Context(), rt.NewProjectSpec{Name: req.Name, Goal: req.Goal, Repos: req.Repos})
+	p, err := h.svc.Create(c.Request.Context(), rt.NewProjectSpec{Type: req.Type, Name: req.Name, Goal: req.Goal, Repos: req.Repos, Path: req.Path})
 	if err != nil {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, p)
+	status := http.StatusCreated
+	if p.Type == db.ProjectFolder {
+		// Opening a folder returns its project, new or not.
+		status = http.StatusOK
+	}
+	c.JSON(status, p)
 }
 
 func (h *Handler) models(c *gin.Context) {
@@ -390,6 +374,10 @@ func (h *Handler) update(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if p.Type == db.ProjectFolder && (req.Repos != nil || req.ThreadModel != nil) {
+		apierr.BadRequest(c, "repos and thread_model do not apply to a folder")
+		return
+	}
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if name == "" {
@@ -451,59 +439,13 @@ func (h *Handler) delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.svc.Delete(c.Request.Context(), p); err != nil {
-		apierr.Store(c, err, "project")
-		return
+	if p.ArchivedAt == nil {
+		if err := h.svc.SetArchived(p, true); err != nil {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
 	}
 	c.JSON(http.StatusOK, OKResponse{OK: true})
-}
-
-func (h *Handler) messages(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
-	msgs, err := h.svc.Store.ListProjectMessages(c.Param("id"), limit)
-	if err != nil {
-		apierr.Store(c, err, "messages")
-		return
-	}
-	if msgs == nil {
-		msgs = []db.ProjectMessage{}
-	}
-	c.JSON(http.StatusOK, MessagesResponse{Messages: msgs})
-}
-
-func (h *Handler) post(c *gin.Context) {
-	var req PostMessageRequest
-	if !apierr.Bind(c, &req) {
-		return
-	}
-	if strings.TrimSpace(req.Content) == "" && len(req.Attachments) == 0 {
-		apierr.BadRequest(c, "message is empty")
-		return
-	}
-	atts, err := h.svc.Layout.ResolveAttachments(c.Param("id"), req.Attachments)
-	if err != nil {
-		apierr.BadRequest(c, err.Error())
-		return
-	}
-	m, err := h.svc.Coordinator.Post(c.Param("id"), req.Content, atts)
-	if err != nil {
-		storeErr(c, err, "project")
-		return
-	}
-	c.JSON(http.StatusCreated, m)
-}
-
-func (h *Handler) startSuggestions(c *gin.Context) {
-	var req StartSuggestionsRequest
-	if !apierr.Bind(c, &req) {
-		return
-	}
-	m, err := h.svc.Coordinator.StartSuggestions(c.Request.Context(), c.Param("id"), c.Param("mid"), req.Indexes)
-	if err != nil {
-		storeErr(c, err, "message")
-		return
-	}
-	c.JSON(http.StatusOK, m)
 }
 
 func (h *Handler) events(c *gin.Context) {
@@ -511,7 +453,13 @@ func (h *Handler) events(c *gin.Context) {
 	if !ok {
 		return
 	}
-	ch, cancel := h.svc.Hub.Subscribe(p.ID)
+	h.stream(c, p.ID)
+}
+
+func (h *Handler) allEvents(c *gin.Context) { h.stream(c, rt.AllProjects) }
+
+func (h *Handler) stream(c *gin.Context, key string) {
+	ch, cancel := h.svc.Hub.Subscribe(key)
 	defer cancel()
 	w := c.Writer
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -640,7 +588,13 @@ func (h *Handler) uploadAttachments(c *gin.Context) {
 		apierr.BadRequest(c, `expected multipart form with field "files"`)
 		return
 	}
-	atts, err := h.svc.Layout.SaveUploads(p.ID, form.File["files"], maxUpload)
+	// A folder has no library: its uploads wait in the draft area until the
+	// thread they are for exists.
+	owner := p.ID
+	if p.Type == db.ProjectFolder {
+		owner = rt.DraftOwner
+	}
+	atts, err := h.svc.Layout.SaveUploads(owner, form.File["files"], maxUpload)
 	if err != nil {
 		apierr.BadRequest(c, err.Error())
 		return

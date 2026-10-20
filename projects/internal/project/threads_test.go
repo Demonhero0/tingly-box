@@ -61,11 +61,11 @@ func newFixture(t *testing.T, script func(turn *enginetest.Turn) error) *testFix
 	layout := Layout{Root: t.TempDir()}
 	repo := newRepo(t)
 	p := &db.Project{Name: "Demo", Goal: "Ship it", Instructions: "Be careful.", Repos: []db.Repo{{Path: repo, BaseBranch: "main"}}}
-	require.NoError(t, store.CreateProject(p))
+	mkProject(t, store, p)
 	require.NoError(t, layout.Ensure(p.ID))
 	a := &enginetest.Agent{Script: script}
 	th := NewThreads(store, layout, NewHub(), Agents{Service: a.Service()}, staticEnv{})
-	t.Cleanup(func() { th.Shutdown(context.Background()) })
+	t.Cleanup(func() { shutdownAndSettle(th) })
 	f := &testFixture{store: store, threads: th, agent: a, project: p, repo: repo, reports: make(chan Report, 10)}
 	th.OnReport = func(rep Report) { f.reports <- rep }
 	return f
@@ -124,7 +124,7 @@ func TestThreadCommitsBecomeReadyAndMerge(t *testing.T) {
 	spec := f.agent.Launches()[0]
 	assert.False(t, spec.Resume)
 	assert.Equal(t, th.SessionID, spec.SessionID)
-	assert.Equal(t, th.Worktree, spec.ProjectPath)
+	assert.Equal(t, th.Cwd, spec.ProjectPath)
 	assert.Equal(t, DefaultPermissionMode, spec.PermissionMode)
 	assert.Equal(t, "default-model", spec.Model)
 	assert.Contains(t, spec.AppendSystemPrompt, "Be careful.")
@@ -215,7 +215,7 @@ func TestNeedsInputAndFollowUpResumes(t *testing.T) {
 	got := waitStatus(t, f.store, th.ID, db.ThreadWaiting)
 	assert.Equal(t, "Should I use Postgres or SQLite?", got.WaitReason)
 
-	_, err = f.threads.Send(context.Background(), th.ID, "SQLite", "user", nil)
+	_, err = f.threads.Send(context.Background(), th.ID, "SQLite", Source{}, nil)
 	require.NoError(t, err)
 	rep = f.report(t)
 	assert.Equal(t, "Used SQLite", rep.Text)
@@ -245,7 +245,7 @@ func TestStopAndPausedProject(t *testing.T) {
 
 	f.project.Paused = true
 	require.NoError(t, f.store.SaveProject(f.project))
-	_, err = f.threads.Send(context.Background(), th.ID, "go on", "user", nil)
+	_, err = f.threads.Send(context.Background(), th.ID, "go on", Source{}, nil)
 	assert.ErrorIs(t, err, ErrPaused)
 }
 
@@ -276,7 +276,7 @@ func TestThreadOnScriptedClaudeCLI(t *testing.T) {
 	t.Cleanup(func() { store.Close() })
 	layout := Layout{Root: t.TempDir()}
 	p := &db.Project{Name: "Demo"}
-	require.NoError(t, store.CreateProject(p))
+	mkProject(t, store, p)
 	require.NoError(t, layout.Ensure(p.ID))
 
 	script := fixture.Script{
@@ -290,7 +290,7 @@ func TestThreadOnScriptedClaudeCLI(t *testing.T) {
 	require.NoError(t, err)
 	svc.RegisterAgent(agentboot.AgentTypeClaude, claude.NewAgentWithFactory(claude.Config{}, fixture.Factory(script)))
 	th := NewThreads(store, layout, NewHub(), Agents{Service: svc}, staticEnv{})
-	t.Cleanup(func() { th.Shutdown(context.Background()) })
+	t.Cleanup(func() { shutdownAndSettle(th) })
 	reports := make(chan Report, 1)
 	th.OnReport = func(r Report) { reports <- r }
 
@@ -331,7 +331,7 @@ func TestMessageDuringATurnRunsNext(t *testing.T) {
 	th, err := f.threads.Start(context.Background(), f.project, StartSpec{Task: "first"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, th.ID, db.ThreadWorking)
-	_, err = f.threads.Send(context.Background(), th.ID, "second", "user", nil)
+	_, err = f.threads.Send(context.Background(), th.ID, "second", Source{}, nil)
 	require.NoError(t, err)
 	close(release)
 
@@ -361,7 +361,7 @@ func TestMessageSentAfterStopRuns(t *testing.T) {
 	<-started
 	f.threads.Stop(th.ID)
 	<-stopping
-	_, err = f.threads.Send(context.Background(), th.ID, "instead", "user", nil)
+	_, err = f.threads.Send(context.Background(), th.ID, "instead", Source{}, nil)
 	require.NoError(t, err)
 	close(hold)
 
@@ -523,7 +523,7 @@ func TestSessionQuestionsWaitByDefault(t *testing.T) {
 		}})
 		return err
 	})
-	s, err := f.threads.StartSession(SessionSpec{Folder: f.repo, Task: "pick"})
+	s, err := f.startFolder(f.repo, FolderThreadSpec{Task: "pick"})
 	require.NoError(t, err)
 	assert.Equal(t, "main", s.HeadBranch, "a session names the branch its folder is on")
 	waitStatus(t, f.store, s.ID, db.ThreadWaiting)

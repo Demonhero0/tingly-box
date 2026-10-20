@@ -56,8 +56,8 @@ func TestAttachmentRefusals(t *testing.T) {
 
 func TestRenderHistoryListsAttachments(t *testing.T) {
 	dir := t.TempDir()
-	msgs := renderHistory([]db.ProjectMessage{{
-		Role: db.RoleUser, Kind: db.MsgText, Content: "look",
+	msgs := renderHistory([]db.ThreadEvent{{
+		Kind: db.EvUser, Content: "look",
 		Payload: AttachmentsPayload([]Attachment{{Name: "a.txt", Path: "uploads/aaaaaaaaaaaa-a.txt", Type: "text/plain", Size: 1}}),
 	}}, dir)
 	require.Len(t, msgs, 1)

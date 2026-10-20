@@ -94,6 +94,6 @@ func TestEmbeddedOpenAPI(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(spec), &doc))
 	require.NotEmpty(t, doc.Paths)
 	for path := range doc.Paths {
-		assert.True(t, strings.HasPrefix(path, "/api/v1/projects"), "path outside /projects: %s", path)
+		assert.True(t, strings.HasPrefix(path, "/api/v1/projects") || strings.HasPrefix(path, "/api/v1/threads"), "path outside /projects and /threads: %s", path)
 	}
 }

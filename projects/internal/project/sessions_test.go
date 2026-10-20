@@ -16,16 +16,21 @@ import (
 	"github.com/tingly-dev/tingly-box/projects/internal/db"
 )
 
-func TestSessionRunsInFolderWithoutProject(t *testing.T) {
+func TestFolderThreadRunsInItsFolder(t *testing.T) {
 	f := newFixture(t, func(turn *enginetest.Turn) error {
 		turn.Say("Looked around.", 7, 3)
 		return nil
 	})
 	folder := t.TempDir()
-	s, err := f.threads.StartSession(SessionSpec{Folder: folder, Task: "what is here?", PermissionMode: "plan"})
+	s, err := f.startFolder(folder, FolderThreadSpec{Task: "what is here?", PermissionMode: "plan"})
 	require.NoError(t, err)
-	assert.Equal(t, "", s.ProjectID)
-	assert.Equal(t, folder, s.Worktree)
+	folderProject, err := f.store.FindFolder(folder)
+	require.NoError(t, err)
+	assert.Equal(t, folderProject.ID, s.ProjectID)
+	assert.Empty(t, s.ParentID, "a folder thread has no main thread above it")
+	assert.Equal(t, 1, s.Seq)
+	assert.Equal(t, db.AgentClaudeCode, s.Agent)
+	assert.Equal(t, folder, s.Cwd)
 
 	got := waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	assert.EqualValues(t, 7, got.InputTokens)
@@ -49,16 +54,21 @@ func TestSessionRunsInFolderWithoutProject(t *testing.T) {
 		assert.NotEqual(t, db.EvReport, e.Kind)
 	}
 
-	// The folder is kept, and sessions stay apart from project threads.
-	saved, _ := f.store.ListWorkdirs()
-	require.Len(t, saved, 1)
-	assert.Equal(t, folder, saved[0].Path)
-	sessions, _ := f.store.ListSessions("")
-	assert.Len(t, sessions, 1)
+	// The folder is a project of its own, apart from the project's threads.
+	assert.Equal(t, db.ProjectFolder, folderProject.Type)
+	assert.Equal(t, folder, folderProject.Path)
+	inFolder, _ := f.store.ListThreads(folderProject.ID)
+	assert.Len(t, inFolder, 1)
 	threads, _ := f.store.ListThreads(f.project.ID)
 	assert.Empty(t, threads)
-	_, err = f.store.GetSession("nope")
-	assert.ErrorIs(t, err, db.ErrNotFound)
+
+	// A second thread in the same folder is the same project, numbered next.
+	again, err := f.startFolder(folder+"/", FolderThreadSpec{Task: "more"})
+	require.NoError(t, err)
+	assert.Equal(t, folderProject.ID, again.ProjectID)
+	assert.Equal(t, 2, again.Seq)
+	// Let it finish: a turn still writing into the folder races its cleanup.
+	waitStatus(t, f.store, again.ID, db.ThreadIdle)
 }
 
 func TestSessionNeedsAFolderAndAMode(t *testing.T) {
@@ -66,12 +76,12 @@ func TestSessionNeedsAFolderAndAMode(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "f.txt")
 	require.NoError(t, os.WriteFile(file, nil, 0o644))
 	for _, folder := range []string{"", "relative/dir", file, filepath.Join(t.TempDir(), "missing")} {
-		_, err := f.threads.StartSession(SessionSpec{Folder: folder, Task: "x"})
+		_, err := f.startFolder(folder, FolderThreadSpec{Task: "x"})
 		assert.Error(t, err, folder)
 	}
-	_, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "x", PermissionMode: "yolo"})
+	_, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "x", PermissionMode: "yolo"})
 	assert.ErrorIs(t, err, ErrBadPermission)
-	_, err = f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "  "})
+	_, err = f.startFolder(t.TempDir(), FolderThreadSpec{Task: "  "})
 	assert.Error(t, err)
 }
 
@@ -84,7 +94,7 @@ func TestSessionApprovalsMessagesAndModeChange(t *testing.T) {
 		turn.Say(map[bool]string{true: "listed", false: "denied"}[resp.Approved], 1, 1)
 		return nil
 	})
-	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "list"})
+	s, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "list"})
 	require.NoError(t, err)
 	got := waitStatus(t, f.store, s.ID, db.ThreadWaiting)
 	assert.Equal(t, "Approve: Run `ls`", got.WaitReason)
@@ -97,7 +107,7 @@ func TestSessionApprovalsMessagesAndModeChange(t *testing.T) {
 	require.NoError(t, err)
 	_, err = f.threads.SetPermissionMode(s.ID, "yolo")
 	assert.ErrorIs(t, err, ErrBadPermission)
-	_, err = f.threads.Send(context.Background(), s.ID, "again", "user", nil)
+	_, err = f.threads.Send(context.Background(), s.ID, "again", Source{}, nil)
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadWaiting)
 	require.NoError(t, f.threads.Respond(s.ID, "req-1", Answer{Allow: false}))
@@ -111,7 +121,7 @@ func TestSessionApprovalsMessagesAndModeChange(t *testing.T) {
 	archived, err := f.threads.Resolve(s.ID)
 	require.NoError(t, err)
 	assert.Equal(t, db.ThreadResolved, archived.Status)
-	_, err = f.threads.Send(context.Background(), s.ID, "late", "user", nil)
+	_, err = f.threads.Send(context.Background(), s.ID, "late", Source{}, nil)
 	assert.ErrorIs(t, err, ErrResolved)
 	reopened, err := f.threads.Reopen(s.ID)
 	require.NoError(t, err)
@@ -120,7 +130,7 @@ func TestSessionApprovalsMessagesAndModeChange(t *testing.T) {
 
 func TestSessionIsNeverAutoArchived(t *testing.T) {
 	f := newFixture(t, func(turn *enginetest.Turn) error { turn.Say("ok", 1, 1); return nil })
-	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "hi"})
+	s, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "hi"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	f.threads.AutoResolve(-time.Hour)
@@ -128,30 +138,65 @@ func TestSessionIsNeverAutoArchived(t *testing.T) {
 	assert.Equal(t, db.ThreadIdle, got.Status)
 }
 
-func TestWorkdirsListSavedAndUsed(t *testing.T) {
+func TestFolderIsArchivedNotRemoved(t *testing.T) {
 	f := newFixture(t, func(turn *enginetest.Turn) error {
 		_, err := turn.Approve("r", "Bash", map[string]any{"command": "ls"})
 		return err
 	})
-	svc := &Service{Store: f.store, Threads: f.threads}
-	saved, used := t.TempDir(), t.TempDir()
-	require.NoError(t, f.store.SaveWorkdir(saved))
-	s, err := f.threads.StartSession(SessionSpec{Folder: used, Task: "go"})
+	svc := &Service{Store: f.store, Threads: f.threads, Hub: f.threads.hub}
+	folder := t.TempDir()
+	s, err := f.startFolder(folder, FolderThreadSpec{Task: "go"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadWaiting)
-	require.NoError(t, f.store.RemoveWorkdir(used))
-
-	list, err := svc.Workdirs()
+	p, err := f.store.GetProject(s.ProjectID)
 	require.NoError(t, err)
-	require.Len(t, list, 2)
-	assert.Equal(t, Workdir{Path: saved, Saved: true}, list[0])
-	assert.Equal(t, Workdir{Path: used, Waiting: 1, Sessions: 1}, list[1], "a folder with a session is listed even when not kept")
-	f.threads.Stop(s.ID)
+
+	require.NoError(t, svc.SetArchived(p, true))
+	waitStatus(t, f.store, s.ID, db.ThreadIdle) // archiving stops the folder's threads; they stay
+	_, err = f.threads.Send(context.Background(), s.ID, "late", Source{}, nil)
+	assert.ErrorIs(t, err, ErrArchived)
+	again, err := f.startFolder(folder, FolderThreadSpec{Task: "again"})
+	require.NoError(t, err, "opening the folder again brings it back")
+	waitStatus(t, f.store, again.ID, db.ThreadWaiting)
+	f.threads.Stop(again.ID)
+	waitStatus(t, f.store, again.ID, db.ThreadIdle)
+	back, _ := f.store.GetProject(p.ID)
+	assert.Nil(t, back.ArchivedAt)
+}
+
+func TestProjectsAreCreatedWithAMainThreadAndFoldersWithout(t *testing.T) {
+	f := newFixture(t, func(*enginetest.Turn) error { return nil })
+	svc := &Service{Store: f.store, Layout: f.threads.layout, Threads: f.threads, Hub: f.threads.hub}
+	p, err := svc.Create(context.Background(), NewProjectSpec{Name: "Fresh"})
+	require.NoError(t, err)
+	assert.Equal(t, db.ProjectProject, p.Type)
+	main, err := f.store.GetThread(p.MainThreadID)
+	require.NoError(t, err)
+	assert.Equal(t, db.AgentLLM, main.Agent)
+	assert.Equal(t, filepath.Join(svc.Layout.Root, p.ID), main.Cwd)
+
+	folder := t.TempDir()
+	fp, err := svc.Create(context.Background(), NewProjectSpec{Type: db.ProjectFolder, Path: folder})
+	require.NoError(t, err)
+	assert.Equal(t, db.ProjectFolder, fp.Type)
+	assert.Empty(t, fp.MainThreadID)
+	again, err := svc.Create(context.Background(), NewProjectSpec{Type: db.ProjectFolder, Path: folder + "/"})
+	require.NoError(t, err)
+	assert.Equal(t, fp.ID, again.ID)
+	_, err = svc.Create(context.Background(), NewProjectSpec{Type: db.ProjectFolder, Path: filepath.Join(folder, "missing")})
+	assert.Error(t, err)
+
+	// Only a project's main thread starts threads in it, and a main thread is
+	// not an agent session to send to directly.
+	_, err = f.threads.Start(context.Background(), fp, StartSpec{Task: "x"})
+	assert.ErrorIs(t, err, ErrNotProject)
+	_, err = f.threads.Send(context.Background(), main.ID, "x", Source{}, nil)
+	assert.ErrorIs(t, err, ErrMainThread)
 }
 
 func TestSessionKeepsSubagentsAndTasksProjectThreadsDoNot(t *testing.T) {
 	f := newFixture(t, func(turn *enginetest.Turn) error { turn.Say("ok", 1, 1); return nil })
-	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "go"})
+	s, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "go"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	th, err := f.threads.Start(context.Background(), f.project, StartSpec{Task: "go", Repo: "none"})
@@ -223,11 +268,11 @@ func (profiles) HandoffLaunch(profile string) []string {
 
 func TestSessionWithoutLauncherHasNoProfiles(t *testing.T) {
 	f := newFixture(t, func(*enginetest.Turn) error { return nil })
-	_, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "x", Profile: "work"})
+	_, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "x", Profile: "work"})
 	assert.ErrorIs(t, err, ErrNoProfiles)
 
 	folder := t.TempDir()
-	s, err := f.threads.StartSession(SessionSpec{Folder: folder, Task: "x"})
+	s, err := f.startFolder(folder, FolderThreadSpec{Task: "x"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	_, err = f.threads.SetProfile(context.Background(), s.ID, "work")
@@ -248,9 +293,9 @@ func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 	f.threads.env = profiles{settings: work}
 	ctx := context.Background()
 
-	_, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "x", Profile: "nope"})
+	_, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "x", Profile: "nope"})
 	assert.Error(t, err)
-	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Task: "x", Profile: "work"})
+	s, err := f.startFolder(t.TempDir(), FolderThreadSpec{Task: "x", Profile: "work"})
 	require.NoError(t, err)
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	spec := f.agent.Launches()[0]
@@ -279,7 +324,7 @@ func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 
 	_, err = f.threads.SetProfile(ctx, s.ID, "")
 	require.NoError(t, err)
-	_, err = f.threads.Send(ctx, s.ID, "again", "user", nil)
+	_, err = f.threads.Send(ctx, s.ID, "again", Source{}, nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return len(f.agent.Launches()) == 2 }, 5*time.Second, 10*time.Millisecond)
 	spec = f.agent.Launches()[1]
@@ -299,7 +344,7 @@ func TestSessionLaunchesUnderItsProfile(t *testing.T) {
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)
 	cmd, err := f.threads.Handoff(s.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "cd '"+s.Worktree+"' && tb cc --resume "+s.SessionID, cmd)
+	assert.Equal(t, "cd '"+s.Cwd+"' && tb cc --resume "+s.SessionID, cmd)
 }
 
 func TestTerminalCommandQuotesForTheShell(t *testing.T) {
@@ -319,7 +364,7 @@ func TestSessionFirstMessageCarriesAttachments(t *testing.T) {
 	atts, err := f.threads.layout.ResolveAttachments(DraftOwner, []string{a.Path})
 	require.NoError(t, err)
 
-	s, err := f.threads.StartSession(SessionSpec{Folder: t.TempDir(), Attachments: atts})
+	s, err := f.startFolder(t.TempDir(), FolderThreadSpec{Attachments: atts})
 	require.NoError(t, err, "a file alone is a first message")
 	assert.Equal(t, "log.txt", s.Title)
 	waitStatus(t, f.store, s.ID, db.ThreadIdle)

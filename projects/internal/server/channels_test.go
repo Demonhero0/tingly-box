@@ -21,21 +21,24 @@ func TestChannelBindingRoutes(t *testing.T) {
 	require.Equal(t, 200, c.do("GET", "/projects/channel-bindings", nil, &l))
 	assert.Empty(t, l.Bindings)
 
+	// A project id is resolved to its main thread; the response carries both.
 	var bound db.ChannelBinding
 	require.Equal(t, 200, c.do("PUT", "/projects/channel-bindings", map[string]any{
 		"platform": "telegram", "chat_id": "42", "project_id": a.ID, "chat_title": "Me",
 	}, &bound))
 	assert.NotEmpty(t, bound.ID)
-	assert.Equal(t, "project", bound.TargetKind)
+	assert.Equal(t, a.MainThreadID, bound.ThreadID)
 	assert.Equal(t, a.ID, bound.ProjectID)
 	assert.Equal(t, "Me", bound.ChatTitle)
 
-	// Binding the chat again moves it rather than adding a second row.
+	// Binding the chat again moves it rather than adding a second row; a
+	// thread id binds that thread.
 	var moved db.ChannelBinding
 	require.Equal(t, 200, c.do("PUT", "/projects/channel-bindings", map[string]any{
-		"platform": "telegram", "chat_id": "42", "project_id": b.ID,
+		"platform": "telegram", "chat_id": "42", "thread_id": b.MainThreadID,
 	}, &moved))
 	assert.Equal(t, bound.ID, moved.ID)
+	assert.Equal(t, b.MainThreadID, moved.ThreadID)
 	assert.Equal(t, b.ID, moved.ProjectID)
 
 	require.Equal(t, 200, c.do("GET", "/projects/channel-bindings", nil, &l))
@@ -44,6 +47,9 @@ func TestChannelBindingRoutes(t *testing.T) {
 	assert.Empty(t, l.Bindings)
 	require.Equal(t, 200, c.do("GET", "/projects/channel-bindings?project_id="+b.ID, nil, &l))
 	require.Len(t, l.Bindings, 1)
+	require.Equal(t, 200, c.do("GET", "/projects/channel-bindings?thread_id="+b.MainThreadID, nil, &l))
+	require.Len(t, l.Bindings, 1)
+	assert.Equal(t, b.ID, l.Bindings[0].ProjectID)
 
 	// The static route does not shadow the project routes around it.
 	var detail struct {
@@ -53,7 +59,14 @@ func TestChannelBindingRoutes(t *testing.T) {
 	assert.Equal(t, "B", detail.Project.Name)
 
 	require.Equal(t, 400, c.do("PUT", "/projects/channel-bindings", map[string]any{"platform": "telegram", "chat_id": "1"}, nil))
+	require.Equal(t, 400, c.do("PUT", "/projects/channel-bindings", map[string]any{"platform": "telegram", "chat_id": "1", "project_id": a.ID, "thread_id": a.MainThreadID}, nil))
 	require.Equal(t, 404, c.do("PUT", "/projects/channel-bindings", map[string]any{"platform": "telegram", "chat_id": "1", "project_id": "nope"}, nil))
+	require.Equal(t, 404, c.do("PUT", "/projects/channel-bindings", map[string]any{"platform": "telegram", "chat_id": "1", "thread_id": "nope"}, nil))
+
+	// A folder has no main thread: bind one of its threads instead.
+	var f db.Project
+	require.Equal(t, 200, c.do("POST", "/projects", map[string]any{"type": "folder", "path": t.TempDir()}, &f))
+	require.Equal(t, 400, c.do("PUT", "/projects/channel-bindings", map[string]any{"platform": "telegram", "chat_id": "1", "project_id": f.ID}, nil))
 
 	require.Equal(t, 200, c.do("DELETE", "/projects/channel-bindings/"+bound.ID, nil, nil))
 	require.Equal(t, 404, c.do("DELETE", "/projects/channel-bindings/"+bound.ID, nil, nil))
@@ -68,7 +81,12 @@ func TestPostingToABoundProjectStillWorksWithoutAnIMHost(t *testing.T) {
 	var p db.Project
 	require.Equal(t, 201, c.do("POST", "/projects", map[string]any{"name": "P"}, &p))
 	require.Equal(t, 200, c.do("PUT", "/projects/channel-bindings", map[string]any{"platform": "telegram", "chat_id": "1", "project_id": p.ID}, nil))
-	var m db.ProjectMessage
-	require.Equal(t, 201, c.do("POST", "/projects/"+p.ID+"/messages", map[string]any{"content": "hi"}, &m))
-	assert.Empty(t, m.Source, "a web message has no source")
+	require.Equal(t, 200, c.do("POST", "/threads/"+p.MainThreadID+"/messages", map[string]any{"content": "hi"}, nil))
+	var evs struct {
+		Events []db.ThreadEvent `json:"events"`
+	}
+	require.Equal(t, 200, c.do("GET", "/threads/"+p.MainThreadID+"/events", nil, &evs))
+	require.NotEmpty(t, evs.Events)
+	assert.Equal(t, db.EvUser, evs.Events[0].Kind)
+	assert.Empty(t, evs.Events[0].Source, "a web message has no source")
 }

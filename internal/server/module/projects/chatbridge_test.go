@@ -188,7 +188,8 @@ func TestChatToProjectAndBack(t *testing.T) {
 	}
 
 	var p struct {
-		ID string `json:"id"`
+		ID           string `json:"id"`
+		MainThreadID string `json:"main_thread_id"`
 	}
 	require.Equal(t, http.StatusCreated, call("POST", "/projects", map[string]any{"name": "Atlas"}, &p))
 	ctx := context.Background()
@@ -213,20 +214,20 @@ func TestChatToProjectAndBack(t *testing.T) {
 
 	// The conversation the web shows has both sides, the first marked as IM.
 	var msgs struct {
-		Messages []struct {
-			Role         string `json:"role"`
+		Events []struct {
+			Kind         string `json:"kind"`
 			Source       string `json:"source"`
 			SourceChatID string `json:"source_chat_id"`
-		} `json:"messages"`
+		} `json:"events"`
 	}
 	require.Eventually(t, func() bool {
-		call("GET", "/projects/"+p.ID+"/messages", nil, &msgs)
-		return len(msgs.Messages) == 2
+		call("GET", "/threads/"+p.MainThreadID+"/events", nil, &msgs)
+		return len(msgs.Events) == 2
 	}, 5*time.Second, 20*time.Millisecond)
-	assert.Equal(t, "user", msgs.Messages[0].Role)
-	assert.Equal(t, "im", msgs.Messages[0].Source)
-	assert.Equal(t, "42", msgs.Messages[0].SourceChatID)
-	assert.Equal(t, "assistant", msgs.Messages[1].Role)
+	assert.Equal(t, "user", msgs.Events[0].Kind)
+	assert.Equal(t, "im", msgs.Events[0].Source)
+	assert.Equal(t, "42", msgs.Events[0].SourceChatID)
+	assert.Equal(t, "assistant", msgs.Events[1].Kind)
 
 	// Unbinding returns the chat to the usual routing.
 	var list struct {

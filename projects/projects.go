@@ -2,7 +2,7 @@
 //
 // The host builds an App with its own model access (Host), mounts the routes
 // on one of its swagger groups and starts the runtime. Everything under
-// /projects is served the same way the standalone tingly-project binary
+// /projects and /threads is served the same way the standalone tingly-project binary
 // serves it, so the web UI talks to either one unchanged.
 //
 // The dependency runs one way: the host imports this package; this module
@@ -89,7 +89,7 @@ func New(opts Options) (*App, error) {
 		cfg := config.Config{DataDir: opts.DataDir}
 		dbPath, root = cfg.DBPath(), cfg.ProjectsDir()
 	}
-	store, err := db.Open(dbPath)
+	store, err := db.Open(dbPath, db.WithProjectsDir(root))
 	if err != nil {
 		return nil, err
 	}
@@ -99,23 +99,23 @@ func New(opts Options) (*App, error) {
 
 // Register mounts every Projects route on api, the host's /api/v1 group
 // (behind whatever authentication the host applies to it). All paths start
-// with /projects.
+// with /projects or /threads.
 func (a *App) Register(api *swagger.RouteGroup) {
 	module.Mount(&module.Routes{API: api}, a.mods...)
 }
 
-// PostFromChannel hands a message typed in an IM chat to the project the chat
-// is bound to, as a user message to its coordinator (the reply comes back
+// PostFromChannel hands a message typed in an IM chat to the thread the chat
+// is bound to (a project's main thread is its coordinator), as Send does (replies come back
 // through the host's ChannelSink). handled is false when the chat is not
 // bound, so the host carries on as it did before.
 func (a *App) PostFromChannel(platform, chatID, text string) (handled bool, err error) {
 	return a.svc.PostFromChannel(platform, chatID, text)
 }
 
-// ChannelBound reports whether an IM chat is bound to a project.
+// ChannelBound reports whether an IM chat is bound to a thread.
 func (a *App) ChannelBound(platform, chatID string) bool {
 	b, err := a.store.GetChannelBinding(platform, chatID)
-	return err == nil && b.TargetKind == db.ChannelTargetProject
+	return err == nil && b.ThreadID != ""
 }
 
 // Start recovers threads interrupted by a restart and runs housekeeping

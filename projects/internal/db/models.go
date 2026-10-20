@@ -15,8 +15,19 @@ type Repo struct {
 // Project is one ongoing stream of work: a goal, standing instructions, the
 // repositories threads work in, and the coordinator conversation that routes
 // work to threads. Memory and library files live on disk in the project dir.
+//
+// A Project of type folder is a plain folder: no goal, memory or main thread,
+// just a path and the threads that work in it. See
+// .design/projects-sessions.md.
 type Project struct {
-	ID           string `gorm:"primaryKey;size:36" json:"id"`
+	ID string `gorm:"primaryKey;size:36" json:"id"`
+	// Type is project or folder.
+	Type string `gorm:"size:20;not null;default:project;index" json:"type"`
+	// Path is a folder project's canonical path (unique); empty for a project.
+	Path string `gorm:"size:1000" json:"path,omitempty"`
+	// MainThreadID is the project's conversation, the thread its coordinator
+	// talks in; empty for a folder.
+	MainThreadID string `gorm:"size:36" json:"main_thread_id,omitempty"`
 	Name         string `gorm:"size:200;not null" json:"name"`
 	Goal         string `gorm:"type:text" json:"goal"`
 	Instructions string `gorm:"type:text" json:"instructions"`
@@ -33,35 +44,24 @@ type Project struct {
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
-// Project message kinds.
+// Project types.
 const (
-	MsgText          = "text"           // plain user or coordinator text
-	MsgThreadStarted = "thread_started" // coordinator started threads (payload: thread ids)
-	MsgSuggestions   = "suggestions"    // coordinator proposed threads (payload: suggestions)
-	MsgThreadUpdate  = "thread_update"  // a thread finished, failed or needs input
-	MsgError         = "error"          // the coordinator turn failed
+	ProjectProject = "project"
+	ProjectFolder  = "folder"
 )
 
-// ProjectMessage is one entry of the project conversation.
-type ProjectMessage struct {
-	ID        string `gorm:"primaryKey;size:36" json:"id"`
-	ProjectID string `gorm:"size:36;index;not null" json:"project_id"`
-	// Role is user, assistant (the coordinator) or system.
-	Role    string `gorm:"size:20;not null" json:"role"`
-	Kind    string `gorm:"size:30;not null" json:"kind"`
-	Content string `gorm:"type:text" json:"content"`
-	// Payload is kind-specific JSON.
-	Payload string `gorm:"type:text" json:"payload,omitempty"`
-	// Source says where a user message came from: im, or empty for the web.
-	// SourcePlatform and SourceChatID name the IM chat for source "im".
-	Source         string    `gorm:"size:10" json:"source,omitempty"`
-	SourcePlatform string    `gorm:"size:40" json:"source_platform,omitempty"`
-	SourceChatID   string    `gorm:"size:200" json:"source_chat_id,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-}
+// Event sources: where an event came from. Empty is the web.
+const (
+	SourceIM     = "im"     // an IM chat (SourcePlatform, SourceChatID)
+	SourceThread = "thread" // another thread (SourceRef is its id)
+	SourceSystem = "system"
+)
 
-// SourceIM marks a message that came from an IM chat.
-const SourceIM = "im"
+// Thread agents: who runs a thread.
+const (
+	AgentLLM        = "llm"         // a project's main thread: the coordinator's loop
+	AgentClaudeCode = "claude-code" // a Claude Code session
+)
 
 // Thread statuses, matching the Overview groups.
 const (
@@ -72,17 +72,23 @@ const (
 	ThreadResolved = "resolved"
 )
 
-// Thread is one worker: a Claude Code session on its own branch.
-//
-// A thread with an empty ProjectID is a folder session: Claude Code working
-// in a plain folder (Worktree is that folder) with no coordinator, branch
-// or merge. See .design/projects-desk-absorption.md.
+// Thread is the one unit of conversation: a project's main thread (the
+// coordinator's loop, agent llm), a worker on its own branch (parent_id is the
+// main thread) or a Claude Code session in a folder project. See
+// .design/projects-sessions.md.
 type Thread struct {
 	ID        string `gorm:"primaryKey;size:36" json:"id"`
 	ProjectID string `gorm:"size:36;index;not null" json:"project_id"`
-	Title     string `gorm:"size:300" json:"title"`
-	Task      string `gorm:"type:text" json:"task"`
-	Status    string `gorm:"size:20;index" json:"status"`
+	// ParentID is the main thread a worker was started from; empty for a
+	// main thread and for a folder's threads.
+	ParentID string `gorm:"size:36;index" json:"parent_id,omitempty"`
+	// Seq numbers the project's threads from 1, never reused (0: a main thread).
+	Seq int `json:"seq"`
+	// Agent is llm or claude-code.
+	Agent  string `gorm:"size:20" json:"agent"`
+	Title  string `gorm:"size:300" json:"title"`
+	Task   string `gorm:"type:text" json:"task"`
+	Status string `gorm:"size:20;index" json:"status"`
 	// WaitReason says why a waiting thread needs the user.
 	WaitReason string `gorm:"type:text" json:"wait_reason,omitempty"`
 	// Origin is coordinator, suggestion or user.
@@ -90,11 +96,14 @@ type Thread struct {
 	RepoPath   string `gorm:"type:text" json:"repo_path,omitempty"`
 	BaseBranch string `gorm:"size:200" json:"base_branch,omitempty"`
 	Branch     string `gorm:"size:200" json:"branch,omitempty"`
-	Worktree   string `gorm:"type:text" json:"worktree"`
-	SessionID  string `gorm:"size:64" json:"session_id,omitempty"`
-	Model      string `gorm:"size:200" json:"model,omitempty"`
+	// Cwd is the directory the agent runs in: the folder itself for a folder
+	// thread, the thread's worktree or scratch directory for a worker, the
+	// project directory for a main thread.
+	Cwd       string `gorm:"type:text" json:"cwd"`
+	SessionID string `gorm:"size:64" json:"session_id,omitempty"`
+	Model     string `gorm:"size:200" json:"model,omitempty"`
 	// PermissionMode overrides the project's permission mode for this
-	// thread; folder sessions have no project, so it is their only mode.
+	// thread; a folder has no project mode, so it is a folder thread's only mode.
 	PermissionMode string `gorm:"size:40" json:"permission_mode,omitempty"`
 	LastReport     string `gorm:"type:text" json:"last_report,omitempty"`
 	CommitsAhead   int    `json:"commits_ahead"`
@@ -103,14 +112,14 @@ type Thread struct {
 	Turns          int    `json:"turns"`
 	InputTokens    int64  `json:"input_tokens"`
 	OutputTokens   int64  `json:"output_tokens"`
-	// Profile is a folder session's launch profile, named by the host
+	// Profile is a folder thread's launch profile, named by the host
 	// (Tingly Box: a Claude Code profile); empty for the host's default.
 	Profile string `gorm:"size:100" json:"profile,omitempty"`
 	// AutoAnswer says when a question with a suggested answer is answered
 	// without the user: off, delay or now. Empty is the kind's default
-	// (delay for a project thread, off for a folder session).
+	// (delay for a project thread, off for a folder thread).
 	AutoAnswer string `gorm:"size:10" json:"auto_answer,omitempty"`
-	// HeadBranch is the branch a folder session's folder is on, read when
+	// HeadBranch is the branch a folder thread's folder is on, read when
 	// the session starts and after each turn; empty outside a repository.
 	HeadBranch string `gorm:"size:200" json:"head_branch,omitempty"`
 	// MergedAt is set when the branch was merged from the Overview.
@@ -130,8 +139,12 @@ const (
 	EvAsk        = "ask"         // a question for the user
 	EvSystem     = "system"      // lifecycle notes
 	EvError      = "error"
-	EvReport     = "report" // end-of-turn summary sent to the coordinator
-	// Kept for folder sessions only (their pages render subagents and
+	// The project conversation (a main thread's events).
+	EvThreadStarted = "thread_started" // the coordinator started threads (payload: thread ids)
+	EvSuggestions   = "suggestions"    // the coordinator proposed threads (payload: suggestions)
+	EvThreadUpdate  = "thread_update"  // a thread finished, failed or needs input
+	EvReport        = "report"         // end-of-turn summary sent to the coordinator
+	// Kept for folder threads only (their pages render subagents and
 	// background tasks; project threads still show the plain transcript).
 	EvTask  = "task"  // a task event of a subagent or background command (payload: the event)
 	EvUsage = "usage" // one turn's token usage (payload: the usage)
@@ -144,8 +157,12 @@ type ThreadEvent struct {
 	Kind     string `gorm:"size:20;not null" json:"kind"`
 	Content  string `gorm:"type:text" json:"content"`
 	Payload  string `gorm:"type:text" json:"payload,omitempty"`
-	// From says who sent a user event: user or coordinator.
-	From string `gorm:"size:20" json:"from,omitempty"`
+	// Source says where a user event came from: empty for the web, im,
+	// thread (SourceRef is the sending thread) or system.
+	Source         string `gorm:"size:10" json:"source,omitempty"`
+	SourceRef      string `gorm:"size:36" json:"source_ref,omitempty"`
+	SourcePlatform string `gorm:"size:40" json:"source_platform,omitempty"`
+	SourceChatID   string `gorm:"size:200" json:"source_chat_id,omitempty"`
 	// RequestID ties a tool call to its result and task events.
 	RequestID string `gorm:"size:100" json:"request_id,omitempty"`
 	// Parent is the Agent call whose subagent produced this event; empty for
@@ -192,35 +209,30 @@ type Setting struct {
 	UpdatedAt time.Time
 }
 
-// Workdir is a folder the user keeps in the sidebar, whether or not it has
-// sessions yet. A folder with sessions is listed either way.
-type Workdir struct {
-	Path       string    `gorm:"primaryKey;size:1000" json:"path"`
-	CreatedAt  time.Time `json:"created_at"`
-	LastUsedAt time.Time `json:"last_used_at"`
-}
-
-// ChannelTargetProject is the only binding target served for now; the
-// target_kind column and ChannelBinding.WorkdirID are there so binding a
-// working folder needs no migration. See .design/projects-im.md.
-const ChannelTargetProject = "project"
-
-// ChannelBinding says where an IM chat is bound: one row per (platform,
-// chat). A project can have many chats; a chat has exactly one binding, and
-// binding it again moves it.
+// ChannelBinding says which thread an IM chat talks to: one row per
+// (platform, chat). A thread can have many chats; a chat has exactly one
+// binding, and binding it again moves it.
 type ChannelBinding struct {
 	ID       string `gorm:"primaryKey;size:36" json:"id"`
 	Platform string `gorm:"size:40;not null;uniqueIndex:idx_channel_chat" json:"platform"`
 	ChatID   string `gorm:"size:200;not null;uniqueIndex:idx_channel_chat" json:"chat_id"`
 	// ChatTitle is a display name for the chat, when the caller knows one.
-	ChatTitle  string `gorm:"size:300" json:"chat_title"`
-	TargetKind string `gorm:"size:20;not null" json:"target_kind"`
-	ProjectID  string `gorm:"size:36;index" json:"project_id,omitempty"`
-	// WorkdirID is for working-folder bindings (not served yet).
-	WorkdirID *string `gorm:"size:36" json:"workdir_id,omitempty"`
-	// FocusThreadID is the thread a project-bound chat talks to instead of
-	// the coordinator (not served yet); empty is the coordinator.
-	FocusThreadID *string   `gorm:"size:36" json:"focus_thread_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ChatTitle string `gorm:"size:300" json:"chat_title"`
+	ThreadID  string `gorm:"size:36;index" json:"thread_id"`
+	// ProjectID is the thread's project, filled in when read.
+	ProjectID string    `gorm:"->;-:migration" json:"project_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// EventRole is the role a conversation event plays in the coordinator's
+// history (what a project message's role used to say).
+func EventRole(kind string) string {
+	switch kind {
+	case EvUser:
+		return RoleUser
+	case EvThreadUpdate:
+		return RoleSystem
+	}
+	return RoleAssistant
 }

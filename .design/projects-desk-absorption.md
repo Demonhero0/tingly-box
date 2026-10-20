@@ -2,6 +2,10 @@
 
 Diagrams: [projects-desk-absorption.pencil.md](./projects-desk-absorption.pencil.md).
 
+> Superseded in part by [projects-sessions.md](./projects-sessions.md): the
+> Workdir table and `/projects/sessions|workdirs` routes are gone; a working
+> folder is now a `type=folder` project and its sessions are threads.
+>
 > Status: 已实施 (phases 1–4). Desk is gone; working in a plain folder is a
 > Projects working-folder session. Phase 5 is still open. This note supersedes
 > the "out of scope: merging the two products" line of TEP #2063.
@@ -167,7 +171,7 @@ until phase 4.
    `@cc` sessions (`ChatID="web"`). Projects owns its storage to stand alone,
    with no live sharing and no import; showing IM sessions in the panel can
    come back as a TB-only section later.
-2. **Data model.** Chosen: thread without a project (above). Say if you want
+2. **Data model.** Chosen: thread without a project (above). *Superseded by [projects-im.md](./projects-im.md): a working folder becomes a project with `kind=workdir`, so every thread has a `project_id`.* Say if you want
    the one-thread-project alternative instead.
 3. **Flag** (decided). The `desk` flag is removed as a whole and everything is under `projects`: no migration and no alias, since Desk never shipped. Its gate, nav entry and experimental toggle are deleted.
 4. **Cutover timing.** Phase 4 only after phase 3 reaches parity, one release

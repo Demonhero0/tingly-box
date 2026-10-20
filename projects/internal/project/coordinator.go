@@ -39,7 +39,7 @@ type Coordinator struct {
 	llm     LLMSource
 	// OnFinal is called with each finished coordinator reply, thread report
 	// and error, once, in order. It must not block.
-	OnFinal func(db.ProjectMessage)
+	OnFinal func(db.ThreadEvent)
 
 	mu     sync.Mutex
 	queues map[string]*queue
@@ -58,35 +58,30 @@ func NewCoordinator(store *db.Store, layout Layout, hub *Hub, threads *Threads, 
 	return c
 }
 
-func (c *Coordinator) publishMessage(m *db.ProjectMessage) {
-	c.hub.Publish(Event{Type: EventMessage, ProjectID: m.ProjectID, Data: m})
+func (c *Coordinator) publishEvent(projectID string, e *db.ThreadEvent) {
+	c.hub.Publish(Event{Type: EventThreadEvent, ProjectID: projectID, Data: e})
 }
 
-func (c *Coordinator) addMessage(m *db.ProjectMessage) *db.ProjectMessage {
-	if err := c.store.AddProjectMessage(m); err != nil {
-		logrus.WithError(err).Warn("save project message")
-		return m
+// addEvent appends to the project's conversation, which is its main thread's
+// events.
+func (c *Coordinator) addEvent(projectID string, e *db.ThreadEvent) *db.ThreadEvent {
+	p, err := c.store.GetProject(projectID)
+	if err != nil || p.MainThreadID == "" {
+		logrus.WithError(err).Warn("project has no main thread")
+		return e
 	}
-	c.publishMessage(m)
-	return m
+	e.ThreadID = p.MainThreadID
+	if err := c.store.AddThreadEvent(e); err != nil {
+		logrus.WithError(err).Warn("save conversation event")
+		return e
+	}
+	c.publishEvent(projectID, e)
+	return e
 }
 
-// Post adds a user message to the conversation and runs a coordinator turn.
-func (c *Coordinator) Post(projectID, text string, atts []Attachment) (*db.ProjectMessage, error) {
-	return c.PostFrom(projectID, text, atts, Source{})
-}
-
-// Source says where a user message came from. The zero value is the web.
-type Source struct {
-	// Kind is db.SourceIM for an IM chat, empty for the web.
-	Kind     string
-	Platform string
-	ChatID   string
-}
-
-// PostFrom is Post for a message that may come from an IM chat; the source is
-// kept on the stored message.
-func (c *Coordinator) PostFrom(projectID, text string, atts []Attachment, src Source) (*db.ProjectMessage, error) {
+// Post adds a user message to the project's conversation (its main thread)
+// and runs a coordinator turn. src says where the message came from.
+func (c *Coordinator) Post(projectID, text string, atts []Attachment, src Source) (*db.ThreadEvent, error) {
 	p, err := c.store.GetProject(projectID)
 	if err != nil {
 		return nil, err
@@ -97,8 +92,9 @@ func (c *Coordinator) PostFrom(projectID, text string, atts []Attachment, src So
 	if p.Paused {
 		return nil, ErrPaused
 	}
-	m := c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleUser, Kind: db.MsgText, Content: text, Payload: AttachmentsPayload(atts),
-		Source: src.Kind, SourcePlatform: src.Platform, SourceChatID: src.ChatID})
+	m := &db.ThreadEvent{Kind: db.EvUser, Content: text, Payload: AttachmentsPayload(atts)}
+	src.stamp(m)
+	c.addEvent(projectID, m)
 	_ = c.store.TouchProject(projectID)
 	c.schedule(projectID, func(q *queue) { q.user = true })
 	return m, nil
@@ -114,15 +110,15 @@ func (c *Coordinator) Busy(projectID string) bool {
 
 // final hands a message the coordinator is done with (a finished reply, a
 // thread's report, an error) to OnFinal, where the host's IM chats hear it.
-func (c *Coordinator) final(m *db.ProjectMessage) {
+func (c *Coordinator) final(m *db.ThreadEvent) {
 	if c.OnFinal != nil && m != nil {
 		c.OnFinal(*m)
 	}
 }
 
 func (c *Coordinator) onReport(r Report) {
-	c.final(c.addMessage(&db.ProjectMessage{
-		ProjectID: r.Thread.ProjectID, Role: db.RoleSystem, Kind: db.MsgThreadUpdate,
+	c.final(c.addEvent(r.Thread.ProjectID, &db.ThreadEvent{
+		Kind:    db.EvThreadUpdate,
 		Content: r.Text,
 		Payload: jsonString(map[string]any{"thread_id": r.Thread.ID, "title": r.Thread.Title, "kind": r.Kind, "status": r.Thread.Status}),
 	}))
@@ -166,7 +162,7 @@ func (c *Coordinator) work(projectID string, q *queue) {
 		c.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		if err := c.turn(ctx, projectID, user, reports); err != nil {
-			c.final(c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgError, Content: err.Error()}))
+			c.final(c.addEvent(projectID, &db.ThreadEvent{Kind: db.EvError, Content: err.Error()}))
 		}
 		cancel()
 	}
@@ -186,7 +182,7 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 	if err != nil {
 		return fmt.Errorf("coordinator unavailable: %w", err)
 	}
-	history, err := c.store.ListProjectMessages(projectID, historyLimit)
+	history, err := c.store.ListRecentThreadEvents(p.MainThreadID, historyLimit)
 	if err != nil {
 		return err
 	}
@@ -205,7 +201,7 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 		threads, _ := c.store.ListThreads(projectID)
 		system := coordinatorSystemPrompt(c.layout, p, threads, time.Now())
 
-		var live *db.ProjectMessage
+		var live *db.ThreadEvent
 		var streamed strings.Builder
 		onDelta := func(d string) {
 			if !userTriggered {
@@ -213,7 +209,7 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 			}
 			streamed.WriteString(d)
 			if live == nil {
-				live = c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgText, Content: streamed.String()})
+				live = c.addEvent(projectID, &db.ThreadEvent{Kind: db.EvAssistant, Content: streamed.String()})
 				return
 			}
 			c.hub.Publish(Event{Type: EventMessageDelta, ProjectID: projectID, Data: map[string]string{"id": live.ID, "text": d}})
@@ -226,11 +222,11 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 			if text == "" {
 				live.Content = streamed.String()
 			}
-			_ = c.store.UpdateProjectMessage(live)
-			c.publishMessage(live)
+			_ = c.store.UpdateThreadEvent(live)
+			c.publishEvent(projectID, live)
 			c.final(live)
 		case text != "" && text != noUpdate && !strings.HasPrefix(text, noUpdate):
-			c.final(c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgText, Content: text}))
+			c.final(c.addEvent(projectID, &db.ThreadEvent{Kind: db.EvAssistant, Content: text}))
 		}
 		if err != nil {
 			return fmt.Errorf("coordinator (%s): %w", model, err)
@@ -246,7 +242,7 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 			results = append(results, llm.ToolResult{CallID: call.ID, Content: out, IsError: isErr})
 		}
 		if len(started) > 0 {
-			c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgThreadStarted,
+			c.addEvent(projectID, &db.ThreadEvent{Kind: db.EvThreadStarted,
 				Payload: jsonString(map[string]any{"thread_ids": started})})
 		}
 		msgs = append(msgs,
@@ -270,7 +266,7 @@ func appendUser(msgs []llm.Message, text string) []llm.Message {
 }
 
 // renderHistory turns the stored conversation into alternating model turns.
-func renderHistory(history []db.ProjectMessage, libraryDir string) []llm.Message {
+func renderHistory(history []db.ThreadEvent, libraryDir string) []llm.Message {
 	var out []llm.Message
 	add := func(role, text string) {
 		text = strings.TrimSpace(text)
@@ -285,19 +281,17 @@ func renderHistory(history []db.ProjectMessage, libraryDir string) []llm.Message
 	}
 	for _, m := range history {
 		switch m.Kind {
-		case db.MsgText:
-			if m.Role == db.RoleUser {
-				add("user", withAttachments(m.Content, libraryDir, ParseAttachments(m.Payload)))
-			} else {
-				add("assistant", m.Content)
-			}
-		case db.MsgThreadStarted:
+		case db.EvUser:
+			add("user", withAttachments(m.Content, libraryDir, ParseAttachments(m.Payload)))
+		case db.EvAssistant:
+			add("assistant", m.Content)
+		case db.EvThreadStarted:
 			var pl struct {
 				ThreadIDs []string `json:"thread_ids"`
 			}
 			_ = json.Unmarshal([]byte(m.Payload), &pl)
 			add("assistant", fmt.Sprintf("(I started %d thread(s): %s)", len(pl.ThreadIDs), shortIDs(pl.ThreadIDs)))
-		case db.MsgSuggestions:
+		case db.EvSuggestions:
 			var pl suggestionsPayload
 			_ = json.Unmarshal([]byte(m.Payload), &pl)
 			var parts []string
@@ -309,7 +303,7 @@ func renderHistory(history []db.ProjectMessage, libraryDir string) []llm.Message
 				parts = append(parts, fmt.Sprintf("%d. %s (%s)", i+1, s.Title, state))
 			}
 			add("assistant", "(I proposed threads: "+strings.Join(parts, "; ")+")")
-		case db.MsgThreadUpdate:
+		case db.EvThreadUpdate:
 			var pl struct {
 				ThreadID string `json:"thread_id"`
 				Title    string `json:"title"`
@@ -491,7 +485,7 @@ func (c *Coordinator) runTool(ctx context.Context, p *db.Project, call llm.ToolC
 		if len(in.Threads) == 0 {
 			return "threads is empty", true, nil
 		}
-		c.addMessage(&db.ProjectMessage{ProjectID: p.ID, Role: db.RoleAssistant, Kind: db.MsgSuggestions,
+		c.addEvent(p.ID, &db.ThreadEvent{Kind: db.EvSuggestions,
 			Payload: jsonString(suggestionsPayload{Suggestions: in.Threads})})
 		return fmt.Sprintf("proposed %d threads; the user can start them from the card", len(in.Threads)), false, nil
 	case "message_thread":
@@ -500,7 +494,7 @@ func (c *Coordinator) runTool(ctx context.Context, p *db.Project, call llm.ToolC
 			return fail(err)
 		}
 		busy := c.threads.Running(t.ID)
-		if _, err := c.threads.Send(ctx, t.ID, in.Message, "coordinator", nil); err != nil {
+		if _, err := c.threads.Send(ctx, t.ID, in.Message, fromThread(p.MainThreadID), nil); err != nil {
 			return fail(err)
 		}
 		if busy {
@@ -564,24 +558,23 @@ func orNone(s string) string {
 	return s
 }
 
-// StartSuggestions starts proposed threads from a suggestions message.
-// indexes selects which; empty starts every one not started yet.
-func (c *Coordinator) StartSuggestions(ctx context.Context, projectID, messageID string, indexes []int) (*db.ProjectMessage, error) {
-	p, err := c.store.GetProject(projectID)
+// StartSuggestions starts proposed threads from a suggestions event of a main
+// thread. indexes selects which; empty starts every one not started yet.
+func (c *Coordinator) StartSuggestions(ctx context.Context, mainThreadID, eventID string, indexes []int) (*db.ThreadEvent, error) {
+	main, err := c.store.GetThread(mainThreadID)
 	if err != nil {
 		return nil, err
 	}
-	msgs, err := c.store.ListProjectMessages(projectID, 0)
+	p, err := c.store.GetProject(main.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-	var m *db.ProjectMessage
-	for i := range msgs {
-		if msgs[i].ID == messageID && msgs[i].Kind == db.MsgSuggestions {
-			m = &msgs[i]
-		}
+	projectID := p.ID
+	m, err := c.store.GetThreadEvent(eventID)
+	if err != nil {
+		return nil, err
 	}
-	if m == nil {
+	if m.ThreadID != main.ID || m.Kind != db.EvSuggestions {
 		return nil, db.ErrNotFound
 	}
 	var pl suggestionsPayload
@@ -604,9 +597,9 @@ func (c *Coordinator) StartSuggestions(ctx context.Context, projectID, messageID
 		s.ThreadID = t.ID
 	}
 	m.Payload = jsonString(pl)
-	if err := c.store.UpdateProjectMessage(m); err != nil {
+	if err := c.store.UpdateThreadEvent(m); err != nil {
 		return nil, err
 	}
-	c.publishMessage(m)
+	c.publishEvent(projectID, m)
 	return m, nil
 }

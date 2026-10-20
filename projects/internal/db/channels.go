@@ -10,48 +10,69 @@ import (
 
 // ---- IM channel bindings ----
 
-// ListChannelBindings returns the bindings of one project, or all of them
-// when projectID is empty, newest first.
-func (s *Store) ListChannelBindings(projectID string) ([]ChannelBinding, error) {
+// bindingSelect reads bindings with the project of their thread.
+const bindingSelect = "channel_bindings.*, COALESCE(threads.project_id, '') AS project_id"
+
+func (s *Store) bindings() *gorm.DB {
+	return s.db.Table("channel_bindings").Select(bindingSelect).
+		Joins("LEFT JOIN threads ON threads.id = channel_bindings.thread_id")
+}
+
+// BindingFilter narrows ListChannelBindings; both empty lists all.
+type BindingFilter struct {
+	// ProjectID lists the chats bound to any thread of the project.
+	ProjectID string
+	// ThreadID lists the chats bound to exactly this thread.
+	ThreadID string
+}
+
+// ListChannelBindings returns bindings, newest first.
+func (s *Store) ListChannelBindings(f BindingFilter) ([]ChannelBinding, error) {
 	out := []ChannelBinding{}
-	q := s.db.Order("created_at DESC, rowid DESC")
-	if projectID != "" {
-		q = q.Where("project_id = ?", projectID)
+	q := s.bindings().Order("channel_bindings.created_at DESC, channel_bindings.rowid DESC")
+	if f.ProjectID != "" {
+		q = q.Where("threads.project_id = ?", f.ProjectID)
 	}
-	err := q.Find(&out).Error
+	if f.ThreadID != "" {
+		q = q.Where("channel_bindings.thread_id = ?", f.ThreadID)
+	}
+	err := q.Scan(&out).Error
+	return out, err
+}
+
+// ListChannelBindingsOf returns the bindings of any of the given threads.
+func (s *Store) ListChannelBindingsOf(threadIDs []string) ([]ChannelBinding, error) {
+	out := []ChannelBinding{}
+	if len(threadIDs) == 0 {
+		return out, nil
+	}
+	err := s.bindings().Where("channel_bindings.thread_id IN ?", threadIDs).
+		Order("channel_bindings.created_at, channel_bindings.rowid").Scan(&out).Error
 	return out, err
 }
 
 // GetChannelBinding loads the binding of an IM chat.
 func (s *Store) GetChannelBinding(platform, chatID string) (*ChannelBinding, error) {
 	var b ChannelBinding
-	if err := s.db.First(&b, "platform = ? AND chat_id = ?", platform, chatID).Error; err != nil {
-		return nil, notFound(err)
+	res := s.bindings().Where("channel_bindings.platform = ? AND channel_bindings.chat_id = ?", platform, chatID).Limit(1).Scan(&b)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, ErrNotFound
 	}
 	return &b, nil
 }
 
-// GetChannelBindingByID loads a binding by its id.
-func (s *Store) GetChannelBindingByID(id string) (*ChannelBinding, error) {
-	var b ChannelBinding
-	if err := s.db.First(&b, "id = ?", id).Error; err != nil {
-		return nil, notFound(err)
-	}
-	return &b, nil
-}
-
-// UpsertChannelBinding binds b.Platform/b.ChatID to a project. A chat that
-// is already bound moves to the new project (its id and created_at stay, any
-// thread focus is dropped, and a known title is kept when b has none). b is
-// filled in with the stored row.
+// UpsertChannelBinding binds b.Platform/b.ChatID to the thread b.ThreadID. A
+// chat that is already bound moves to the new thread (its id and created_at
+// stay, and a known title is kept when b has none). b is filled in with the
+// stored row.
 func (s *Store) UpsertChannelBinding(b *ChannelBinding) error {
 	b.Platform = strings.TrimSpace(b.Platform)
 	b.ChatID = strings.TrimSpace(b.ChatID)
-	if b.TargetKind == "" {
-		b.TargetKind = ChannelTargetProject
-	}
 	now := time.Now()
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var cur ChannelBinding
 		err := tx.First(&cur, "platform = ? AND chat_id = ?", b.Platform, b.ChatID).Error
 		switch {
@@ -61,7 +82,7 @@ func (s *Store) UpsertChannelBinding(b *ChannelBinding) error {
 		case err != nil:
 			return err
 		}
-		cur.TargetKind, cur.ProjectID, cur.WorkdirID, cur.FocusThreadID = b.TargetKind, b.ProjectID, b.WorkdirID, nil
+		cur.ThreadID = b.ThreadID
 		if t := strings.TrimSpace(b.ChatTitle); t != "" {
 			cur.ChatTitle = t
 		}
@@ -72,6 +93,13 @@ func (s *Store) UpsertChannelBinding(b *ChannelBinding) error {
 		*b = cur
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if t, err := s.GetThread(b.ThreadID); err == nil {
+		b.ProjectID = t.ProjectID
+	}
+	return nil
 }
 
 // DeleteChannelBinding unbinds a chat.

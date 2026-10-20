@@ -10,6 +10,9 @@ Contents:
 - What a chat binds to
 - Inbound: from a message to a thread
 - Outbound: from thread events to chats
+- One entity, two kinds (superseded by Threads)
+- Threads as the unit: parent and agent are attributes
+- Migration: what happens to existing folder sessions
 - Addressing a thread from a project-bound chat
 - Approval with two surfaces open
 - UI: where each Remote piece goes
@@ -110,6 +113,52 @@ chat
 
 coordinator thread_update  ──▶  one folded line in IM ("2 thread updates")
 approval / ask             ──▶  an interactive message (buttons) in every bound chat
+```
+
+## One entity, two kinds (superseded: see Threads as the unit below)
+
+```
+TODAY                                              AFTER (M2a)
+─────                                              ───────────
+projects ──┬─ threads (project_id = p)             projects (kind = project | workdir)
+           └─ project_messages (coordinator)         │
+                                                     ├─ kind=project ─┬─ threads (project_id = p)
+workdirs (path, no id)                               │                └─ project_messages (coordinator)
+   ▲ "saved folders" only                            │
+threads with project_id = ""   ◀─ folder sessions    └─ kind=workdir ─── threads (project_id = w)
+   worktree = the folder path                                            path = the folder, unique
+                                                  ChannelBinding(platform, chat_id) ──▶ project_id
+two identities for "a place":  id  /  path           one identity: id; kind says who answers
+
+what kind decides
+                       project                         workdir
+  who answers          coordinator                     the current session
+  threads              own branch + worktree           in the folder, no branch
+  goal / memory / lib  yes                             hidden
+  review / merge       yes                             no
+  sidebar group        Projects                        Working folders
+  IM binding           → project conversation          → current session  (/new, /stop)
+
+address = project_id[/thread_id]      (a thread is not a kind; it is a level below)
+  bind project_id only        project → coordinator      workdir → current session
+  bind + focus_thread_id      → that thread directly     (/focus)
+  @N / quote-reply            → that thread, this message only; binding unchanged
+```
+
+## Migration: what happens to existing folder sessions
+
+```
+before                                   after (one idempotent step at startup)
+
+workdirs: ~/work/billing                 projects: id=w1 kind=workdir path=~/work/billing  name=billing
+          ~/work/scratch                           id=w2 kind=workdir path=~/work/scratch  name=scratch
+threads:  s1 (project_id="", ~/work/billing)       threads: s1.project_id = w1
+          s2 (project_id="", ~/work/billing)                s2.project_id = w1
+          s3 (project_id="", ~/code/site)                   s3.project_id = w3   ← w3 created from the thread's path
+          t9 (project_id=p1)                                t9 unchanged
+
+checks:  every thread has a project_id · thread count before = after · one workdir project per normalized path
+rollback room: the workdirs table stays one release, unread
 ```
 
 ## Addressing a thread from a project-bound chat
@@ -232,4 +281,30 @@ until M5, so nothing breaks while the milestones land one by one.
 
 M1 deliberately leaves out: folder binding, approvals in IM (IM gets one line "a thread needs you, open the web"),
 thread addressing, removing the old path.
+```
+
+## Threads as the unit
+
+```
+Claude Code today                          Ours
+─────────────────                          ────
+session  (sessionId, one transcript)       Thread    (id, one event stream)
+ └ subagent = its own transcript             ├ main thread   parent = none     agent = llm
+     agentId · spawnDepth · toolUseId        ├ child thread  parent = main     branch + cwd
+     own worktree + branch                   └ folder thread in a folder, no parent
+message.origin = human | peer | task-…     Event.source = web | im | thread | system
+session.entrypoint = remote_projects         (channel is a property of the event)
+
+Project (shared context)  type = project | folder
+  project ── main thread ── child, child, ...
+  folder  ── thread, thread, ...
+
+ChannelBinding(platform, chat_id) ──▶ thread_id
+  bind a project   → its main thread
+  bind a folder    → current thread              /new  → new thread, move binding
+  /focus #2        → rebind to thread 2          /back → rebind to parent_id
+  @2 … / quote     → send one message to #2, binding unchanged
+
+who a chat hears:  its thread's events + "needs you" events of all descendants
+Send(thread_id, text, source)  is the only way to talk to a thread
 ```

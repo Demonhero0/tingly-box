@@ -22,18 +22,19 @@ import (
 // and cleaned up on its own, and the Library tab shows it.
 const UploadsDir = "uploads"
 
-// SessionOwner is the upload owner of one folder session. Sessions have no
-// project, so each gets its own area under the data root, outside the folder
-// it works in (nothing lands in the person's repository).
+// SessionOwner is the upload owner of one folder thread. A folder has no
+// library, so each thread gets its own area under the data root, outside the
+// folder it works in (nothing lands in the person's repository).
 func SessionOwner(sessionID string) string { return "_sessions/" + sessionID }
 
-// DraftOwner holds uploads made before the session exists (the first message
-// of a new session); StartSession moves them into the session's own area.
+// DraftOwner holds uploads made before the folder thread exists (the first
+// message of a new one); StartFolderThread moves them into its own area.
 const DraftOwner = "_sessions/_new"
 
-// UploadOwner is whose uploads a thread reads: its project's, or its own.
-func UploadOwner(t *db.Thread) string {
-	if t.ProjectID == "" {
+// UploadOwner is whose uploads a thread reads: its project's, or its own when
+// the project is a folder.
+func UploadOwner(p *db.Project, t *db.Thread) string {
+	if p.Type == db.ProjectFolder {
 		return SessionOwner(t.ID)
 	}
 	return t.ProjectID

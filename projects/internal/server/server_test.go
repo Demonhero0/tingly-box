@@ -273,15 +273,18 @@ func TestProjectEndToEnd(t *testing.T) {
 	sse := bufio.NewScanner(resp.Body)
 	require.True(t, sse.Scan()) // ": connected"
 
-	require.Equal(t, 201, c.do("POST", "/projects/"+p.ID+"/messages", map[string]any{"content": "Users can't log in, please fix."}, nil))
+	require.NotEmpty(t, p.MainThreadID)
+	assert.Equal(t, db.ProjectProject, p.Type)
+	main := "/threads/" + p.MainThreadID
+	require.Equal(t, 200, c.do("POST", main+"/messages", map[string]any{"content": "Users can't log in, please fix."}, nil))
 
 	// The coordinator starts a thread; it commits and the coordinator relays the report.
 	var msgs struct {
-		Messages []db.ProjectMessage `json:"messages"`
+		Events []db.ThreadEvent `json:"events"`
 	}
 	require.Eventually(t, func() bool {
-		c.do("GET", "/projects/"+p.ID+"/messages", nil, &msgs)
-		for _, m := range msgs.Messages {
+		c.do("GET", main+"/events?limit=200", nil, &msgs)
+		for _, m := range msgs.Events {
 			if strings.Contains(m.Content, "ready for review") {
 				return true
 			}
@@ -289,10 +292,10 @@ func TestProjectEndToEnd(t *testing.T) {
 		return false
 	}, 10*time.Second, 50*time.Millisecond)
 	kinds := []string{}
-	for _, m := range msgs.Messages {
+	for _, m := range msgs.Events {
 		kinds = append(kinds, m.Kind)
 	}
-	assert.Equal(t, []string{"text", "thread_started", "text", "thread_update", "text"}, kinds)
+	assert.Equal(t, []string{"user", "thread_started", "assistant", "thread_update", "assistant"}, kinds)
 
 	var detail struct {
 		Threads []db.Thread `json:"threads"`
@@ -302,6 +305,23 @@ func TestProjectEndToEnd(t *testing.T) {
 	require.Len(t, detail.Threads, 1)
 	th := detail.Threads[0]
 	assert.Equal(t, db.ThreadReady, th.Status)
+	assert.Equal(t, p.MainThreadID, th.ParentID)
+	assert.Equal(t, 1, th.Seq)
+	assert.Equal(t, db.AgentClaudeCode, th.Agent)
+	var started []db.ThreadEvent
+	for _, m := range msgs.Events {
+		if m.Kind == db.EvThreadStarted {
+			started = append(started, m)
+		}
+	}
+	require.Len(t, started, 1)
+	var worker struct {
+		Events []db.ThreadEvent `json:"events"`
+	}
+	c.do("GET", "/threads/"+th.ID+"/events", nil, &worker)
+	require.NotEmpty(t, worker.Events)
+	assert.Equal(t, db.SourceThread, worker.Events[0].Source, "the coordinator's task is a message from the main thread")
+	assert.Equal(t, p.MainThreadID, worker.Events[0].SourceRef)
 	assert.Equal(t, 1, detail.Counts["ready"])
 
 	var gotEvent bool
@@ -321,15 +341,25 @@ func TestProjectEndToEnd(t *testing.T) {
 		}
 	}
 
-	// A thread is only reachable under its own project.
-	require.Equal(t, 404, c.do("GET", "/projects/not-this-one/threads/"+th.ID, nil, nil))
+	// Threads are addressed by id alone; the project is read from the thread.
+	var got struct {
+		Thread db.Thread `json:"thread"`
+	}
+	require.Equal(t, 200, c.do("GET", "/threads/"+th.ID, nil, &got))
+	assert.Equal(t, p.ID, got.Thread.ProjectID)
+	require.Equal(t, 404, c.do("GET", "/threads/not-a-thread", nil, nil))
+	var listed struct {
+		Threads []db.Thread `json:"threads"`
+	}
+	require.Equal(t, 200, c.do("GET", "/projects/"+p.ID+"/threads", nil, &listed))
+	require.Len(t, listed.Threads, 1, "the main thread is the conversation, not one of the project's threads")
 
 	var diff map[string]any
-	require.Equal(t, 200, c.do("GET", "/projects/"+p.ID+"/threads/"+th.ID+"/diff", nil, &diff))
+	require.Equal(t, 200, c.do("GET", "/threads/"+th.ID+"/diff", nil, &diff))
 	assert.Contains(t, diff["patch"], "fix.txt")
 
 	var merged db.Thread
-	require.Equal(t, 200, c.do("POST", "/projects/"+p.ID+"/threads/"+th.ID+"/merge", nil, &merged))
+	require.Equal(t, 200, c.do("POST", "/threads/"+th.ID+"/merge", nil, &merged))
 	assert.Equal(t, db.ThreadResolved, merged.Status)
 	assert.FileExists(t, filepath.Join(repo, "fix.txt"))
 
@@ -346,13 +376,17 @@ func TestProjectEndToEnd(t *testing.T) {
 
 	// Pause blocks new work; archive then delete.
 	require.Equal(t, 200, c.do("PATCH", "/projects/"+p.ID, map[string]any{"paused": true}, nil))
-	assert.Equal(t, 409, c.do("POST", "/projects/"+p.ID+"/messages", map[string]any{"content": "more"}, nil))
+	assert.Equal(t, 409, c.do("POST", main+"/messages", map[string]any{"content": "more"}, nil))
 	require.Equal(t, 200, c.do("PATCH", "/projects/"+p.ID, map[string]any{"paused": false, "archived": true}, nil))
 	var list map[string][]map[string]any
 	c.do("GET", "/projects?archived=true", nil, &list)
 	assert.Len(t, list["projects"], 1)
+	// DELETE archives too: nothing is removed, the threads stay readable.
+	require.Equal(t, 200, c.do("PATCH", "/projects/"+p.ID, map[string]any{"archived": false}, nil))
 	require.Equal(t, 200, c.do("DELETE", "/projects/"+p.ID, nil, nil))
+	c.do("GET", "/projects?archived=true", nil, &list)
+	assert.Len(t, list["projects"], 1)
 	_, err = store.GetThread(th.ID)
-	assert.ErrorIs(t, err, db.ErrNotFound)
-	assert.NoDirExists(t, th.Worktree)
+	require.NoError(t, err)
+	assert.DirExists(t, th.Cwd)
 }

@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -59,26 +60,47 @@ func (f *fakeSink) none(t *testing.T) {
 // channelFixture is a project with a coordinator whose replies go to chats.
 func channelFixture(t *testing.T) (*testFixture, *Service, *fakeSink) {
 	t.Helper()
-	f := newFixture(t, func(turn *enginetest.Turn) error {
+	return channelFixtureWith(t, func(turn *enginetest.Turn) error {
 		turn.Say("ok", 1, 1)
 		return nil
 	})
+}
+
+// waitQuiet waits until a thread's turn has fully ended and the relay has
+// delivered everything queued, so a later binding cannot catch a late reply.
+func waitQuiet(t *testing.T, f *testFixture, svc *Service, threadID string) {
+	t.Helper()
+	require.Eventually(t, func() bool { return !f.threads.Running(threadID) }, 5*time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return !svc.Coordinator.Busy(f.project.ID) }, 5*time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool {
+		svc.Relay.mu.Lock()
+		defer svc.Relay.mu.Unlock()
+		return !svc.Relay.running && len(svc.Relay.queue) == 0
+	}, 5*time.Second, 5*time.Millisecond)
+}
+
+func channelFixtureWith(t *testing.T, script func(turn *enginetest.Turn) error) (*testFixture, *Service, *fakeSink) {
+	t.Helper()
+	f := newFixture(t, script)
 	src := &fakeLLM{fn: func(req llm.Request) llm.Result {
 		return llm.Result{Text: "Echo: " + lastUserText(req)}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, src)
+	t.Cleanup(func() { settleCoordinator(coord) })
 	sink := newFakeSink()
 	relay := NewRelay(f.store, sink)
 	coord.OnFinal = relay.Message
 	f.threads.OnWait = relay.NeedsUser
+	f.threads.OnReply = relay.ThreadReply
 	return f, &Service{Store: f.store, Layout: f.threads.layout, Hub: f.threads.hub, Threads: f.threads, Coordinator: coord, Relay: relay}, sink
 }
 
 func TestChannelMessageReachesTheCoordinatorAndTheReplyComesBack(t *testing.T) {
 	f, svc, sink := channelFixture(t)
-	b, err := svc.BindChannel("telegram", "42", "Me", f.project.ID)
+	b, err := svc.BindChannel("telegram", "42", "Me", "", f.project.ID)
 	require.NoError(t, err)
-	assert.Equal(t, db.ChannelTargetProject, b.TargetKind)
+	assert.Equal(t, f.project.MainThreadID, b.ThreadID, "a project is bound through its main thread")
+	assert.Equal(t, f.project.ID, b.ProjectID)
 
 	handled, err := svc.PostFromChannel("telegram", "42", "How is it going?")
 	require.NoError(t, err)
@@ -91,19 +113,19 @@ func TestChannelMessageReachesTheCoordinatorAndTheReplyComesBack(t *testing.T) {
 
 	// The question is a user message of the project conversation, marked as
 	// coming from the chat, and the web sees the reply too.
-	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ProjectMessage) bool { return len(m) == 2 })
-	assert.Equal(t, db.RoleUser, msgs[0].Role)
+	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ThreadEvent) bool { return len(m) == 2 })
+	assert.Equal(t, db.EvUser, msgs[0].Kind)
 	assert.Equal(t, db.SourceIM, msgs[0].Source)
 	assert.Equal(t, "telegram", msgs[0].SourcePlatform)
 	assert.Equal(t, "42", msgs[0].SourceChatID)
-	assert.Equal(t, db.RoleAssistant, msgs[1].Role)
+	assert.Equal(t, db.EvAssistant, msgs[1].Kind)
 	assert.Empty(t, msgs[1].Source)
 
 	// A message typed on the web is not echoed to the chat.
-	_, err = svc.Coordinator.Post(f.project.ID, "From the web", nil)
+	_, err = svc.Coordinator.Post(f.project.ID, "From the web", nil, Source{})
 	require.NoError(t, err)
 	assert.Equal(t, "[Demo] Echo: From the web", sink.next(t).text)
-	waitMessages(t, f.store, f.project.ID, func(m []db.ProjectMessage) bool { return len(m) == 4 })
+	waitMessages(t, f.store, f.project.ID, func(m []db.ThreadEvent) bool { return len(m) == 4 })
 	sink.none(t)
 }
 
@@ -113,13 +135,13 @@ func TestUnboundChatIsNotHandled(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, handled)
 	sink.none(t)
-	msgs, _ := f.store.ListProjectMessages(f.project.ID, 0)
+	msgs := convo(t, f.store, f.project.ID)
 	assert.Empty(t, msgs, "an unbound chat never touches a conversation")
 }
 
 func TestBoundPausedProjectReportsTheErrorToTheCaller(t *testing.T) {
 	f, svc, _ := channelFixture(t)
-	_, err := svc.BindChannel("telegram", "1", "", f.project.ID)
+	_, err := svc.BindChannel("telegram", "1", "", "", f.project.ID)
 	require.NoError(t, err)
 	p, _ := f.store.GetProject(f.project.ID)
 	require.NoError(t, svc.SetPaused(p, true))
@@ -132,7 +154,7 @@ func TestBoundPausedProjectReportsTheErrorToTheCaller(t *testing.T) {
 func TestRepliesGoToEveryBoundChat(t *testing.T) {
 	f, svc, sink := channelFixture(t)
 	for _, c := range []string{"phone", "group"} {
-		_, err := svc.BindChannel("telegram", c, "", f.project.ID)
+		_, err := svc.BindChannel("telegram", c, "", "", f.project.ID)
 		require.NoError(t, err)
 	}
 	_, err := svc.PostFromChannel("telegram", "phone", "ping")
@@ -144,41 +166,41 @@ func TestRepliesGoToEveryBoundChat(t *testing.T) {
 func TestMovingAChatChangesWhereRepliesGo(t *testing.T) {
 	f, svc, sink := channelFixture(t)
 	other := &db.Project{Name: "Other"}
-	require.NoError(t, f.store.CreateProject(other))
+	mkProject(t, f.store, other)
 	require.NoError(t, svc.Layout.Ensure(other.ID))
 
-	_, err := svc.BindChannel("telegram", "1", "", f.project.ID)
+	_, err := svc.BindChannel("telegram", "1", "", "", f.project.ID)
 	require.NoError(t, err)
-	_, err = svc.BindChannel("telegram", "1", "", other.ID)
+	_, err = svc.BindChannel("telegram", "1", "", "", other.ID)
 	require.NoError(t, err)
 
 	_, err = svc.PostFromChannel("telegram", "1", "hi")
 	require.NoError(t, err)
 	assert.Equal(t, "[Other] Echo: hi", sink.next(t).text)
-	none, _ := f.store.ListProjectMessages(f.project.ID, 0)
+	none := convo(t, f.store, f.project.ID)
 	assert.Empty(t, none)
 }
 
 func TestBindChannelValidates(t *testing.T) {
 	f, svc, _ := channelFixture(t)
-	_, err := svc.BindChannel("", "1", "", f.project.ID)
+	_, err := svc.BindChannel("", "1", "", "", f.project.ID)
 	assert.ErrorIs(t, err, ErrBindingInvalid)
-	_, err = svc.BindChannel("telegram", "1", "", "no-such-project")
+	_, err = svc.BindChannel("telegram", "1", "", "", "no-such-project")
 	assert.ErrorIs(t, err, db.ErrNotFound)
 
 	p, _ := f.store.GetProject(f.project.ID)
 	require.NoError(t, svc.SetArchived(p, true))
-	_, err = svc.BindChannel("telegram", "1", "", f.project.ID)
+	_, err = svc.BindChannel("telegram", "1", "", "", f.project.ID)
 	assert.ErrorIs(t, err, ErrArchived)
 }
 
 func TestThreadReportsAreFoldedToOneLine(t *testing.T) {
 	f, svc, sink := channelFixture(t)
-	_, err := svc.BindChannel("telegram", "1", "", f.project.ID)
+	_, err := svc.BindChannel("telegram", "1", "", "", f.project.ID)
 	require.NoError(t, err)
 
-	update := func(kind, text string) db.ProjectMessage {
-		return db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleSystem, Kind: db.MsgThreadUpdate, Content: text,
+	update := func(kind, text string) db.ThreadEvent {
+		return db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvThreadUpdate, Content: text,
 			Payload: `{"thread_id":"t1","title":"Fix login","kind":"` + kind + `","status":"idle"}`}
 	}
 	svc.Relay.Message(update(ReportFinished, "Fixed the login bug.\n\nDetails:\n- changed a.go\n- changed b.go"))
@@ -197,23 +219,25 @@ func TestThreadReportsAreFoldedToOneLine(t *testing.T) {
 	assert.Less(t, len([]rune(sink.next(t).text)), 300, "a long report is cut")
 
 	// What the chat or web already shows, and kinds without text, are skipped.
-	svc.Relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleUser, Kind: db.MsgText, Content: "mine"})
-	svc.Relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleAssistant, Kind: db.MsgThreadStarted, Payload: `{"thread_ids":["a"]}`})
-	svc.Relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleAssistant, Kind: db.MsgText, Content: "  "})
+	svc.Relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvUser, Content: "mine"})
+	svc.Relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvThreadStarted, Payload: `{"thread_ids":["a"]}`})
+	svc.Relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvAssistant, Content: "  "})
 	sink.none(t)
 
-	svc.Relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleAssistant, Kind: db.MsgError, Content: "coordinator unavailable"})
+	svc.Relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvError, Content: "coordinator unavailable"})
 	assert.Equal(t, "[Demo] Error: coordinator unavailable", sink.next(t).text)
 }
 
 func TestApprovalsAndAsksSendOneLineAndOnlyOnce(t *testing.T) {
 	f, svc, sink := channelFixture(t)
-	_, err := svc.BindChannel("telegram", "1", "", f.project.ID)
+	_, err := svc.BindChannel("telegram", "1", "", "", f.project.ID)
 	require.NoError(t, err)
 	now := time.Now()
 	svc.Relay.now = func() time.Time { return now }
 
-	th := db.Thread{ID: "t1", ProjectID: f.project.ID, Title: "Fix login"}
+	worker := &db.Thread{ProjectID: f.project.ID, ParentID: f.project.MainThreadID, Title: "Fix login"}
+	require.NoError(t, f.store.CreateThread(worker))
+	th := *worker
 	svc.Relay.NeedsUser(th)
 	assert.Equal(t, `[Demo] Thread "Fix login" needs you. Open Projects in the web UI to answer.`, sink.next(t).text)
 
@@ -224,17 +248,20 @@ func TestApprovalsAndAsksSendOneLineAndOnlyOnce(t *testing.T) {
 	svc.Relay.NeedsUser(th)
 	sink.next(t)
 
-	svc.Relay.NeedsUser(db.Thread{ID: "session", Title: "folder"}) // a folder session has no project
+	// A folder thread nobody bound hears nothing, whoever is bound elsewhere.
+	folderThread := &db.Thread{ProjectID: mkProject(t, f.store, &db.Project{Name: "F"}).ID, Title: "folder"}
+	require.NoError(t, f.store.CreateThread(folderThread))
+	svc.Relay.NeedsUser(*folderThread)
 	sink.none(t)
 }
 
 func TestSinkFailureDoesNotStopLaterMessages(t *testing.T) {
 	f, svc, sink := channelFixture(t)
-	_, err := svc.BindChannel("telegram", "1", "", f.project.ID)
+	_, err := svc.BindChannel("telegram", "1", "", "", f.project.ID)
 	require.NoError(t, err)
 	sink.err = errors.New("bot offline")
-	svc.Relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleAssistant, Kind: db.MsgText, Content: "one"})
-	svc.Relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleAssistant, Kind: db.MsgText, Content: "two"})
+	svc.Relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvAssistant, Content: "one"})
+	svc.Relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvAssistant, Content: "two"})
 	assert.Equal(t, "[Demo] one", sink.next(t).text)
 	assert.Equal(t, "[Demo] two", sink.next(t).text, "delivered in order, after a failure")
 }
@@ -242,12 +269,93 @@ func TestSinkFailureDoesNotStopLaterMessages(t *testing.T) {
 func TestWithoutASinkNothingIsRelayed(t *testing.T) {
 	f := newFixture(t, func(turn *enginetest.Turn) error { return nil })
 	relay := NewRelay(f.store, nil)
-	_, err := (&Service{Store: f.store}).BindChannel("telegram", "1", "", f.project.ID)
+	_, err := (&Service{Store: f.store}).BindChannel("telegram", "1", "", "", f.project.ID)
 	require.NoError(t, err)
-	relay.Message(db.ProjectMessage{ProjectID: f.project.ID, Role: db.RoleAssistant, Kind: db.MsgText, Content: "hi"})
+	relay.Message(db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvAssistant, Content: "hi"})
 	relay.NeedsUser(db.Thread{ID: "t", ProjectID: f.project.ID})
 	relay.mu.Lock()
 	defer relay.mu.Unlock()
 	assert.Empty(t, relay.queue)
 	assert.False(t, relay.running, "standalone hosts have no IM; the relay does nothing")
+}
+
+func TestWorkerTurnEndReachesChatsBoundToThatThreadOnly(t *testing.T) {
+	f, svc, sink := channelFixture(t)
+	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
+	_, err := svc.BindChannel("telegram", "own", "", th.ID, "")
+	require.NoError(t, err)
+	_, err = svc.BindChannel("telegram", "up", "", "", f.project.ID)
+	require.NoError(t, err)
+
+	_, err = svc.Send(context.Background(), th.ID, "again", nil, Source{})
+	require.NoError(t, err)
+
+	// The chat on the worker hears its reply once; the chat on the main thread
+	// hears the coordinator (the folded report and its own reply), never the
+	// worker's raw text as well.
+	byChat := map[string][]string{}
+	deadline := time.After(5 * time.Second)
+	for len(byChat["own"]) < 1 || len(byChat["up"]) < 2 {
+		select {
+		case m := <-sink.ch:
+			byChat[m.chatID] = append(byChat[m.chatID], m.text)
+		case <-deadline:
+			t.Fatalf("got only %v", byChat)
+		}
+	}
+	sink.none(t)
+	assert.Equal(t, []string{"[Demo] ok"}, byChat["own"], "the worker's final text, with the project's name")
+	assert.NotContains(t, byChat["up"], "[Demo] ok")
+	assert.Contains(t, byChat["up"], `[Demo] Thread "Worker" finished: ok`)
+}
+
+func TestWorkerFailureReachesItsChatAsAnError(t *testing.T) {
+	f, svc, sink := channelFixtureWith(t, func(turn *enginetest.Turn) error {
+		if strings.Contains(turn.Prompt, "boom") {
+			return errors.New("it broke")
+		}
+		turn.Say("ok", 1, 1)
+		return nil
+	})
+	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
+	_, err := svc.BindChannel("telegram", "own", "", th.ID, "")
+	require.NoError(t, err)
+
+	_, err = svc.Send(context.Background(), th.ID, "boom", nil, Source{})
+	require.NoError(t, err)
+	assert.Contains(t, sink.next(t).text, "[Demo] Error: ")
+	sink.none(t)
+}
+
+func TestFolderThreadReplyReachesItsChat(t *testing.T) {
+	f, svc, sink := channelFixture(t)
+	dir := t.TempDir()
+	s, err := f.startFolder(dir, FolderThreadSpec{Task: "go"})
+	require.NoError(t, err)
+	waitQuiet(t, f, svc, s.ID)
+	sink.none(t)
+	_, err = svc.BindChannel("telegram", "fold", "", s.ID, "")
+	require.NoError(t, err)
+
+	_, err = svc.Send(context.Background(), s.ID, "more", nil, Source{})
+	require.NoError(t, err)
+	got := sink.next(t)
+	assert.Equal(t, "fold", got.chatID)
+	assert.Equal(t, "["+filepath.Base(dir)+"] ok", got.text, "a folder's name stands for its project")
+}
+
+func TestNeedsUserDoesNotGrowWithoutBound(t *testing.T) {
+	f, svc, _ := channelFixture(t)
+	now := time.Now()
+	svc.Relay.now = func() time.Time { return now }
+	for _, id := range []string{"a", "b", "c"} {
+		svc.Relay.NeedsUser(db.Thread{ID: id, ProjectID: f.project.ID})
+	}
+	now = now.Add(relayNeedsUserEvery + time.Second)
+	svc.Relay.NeedsUser(db.Thread{ID: "d", ProjectID: f.project.ID})
+	svc.Relay.mu.Lock()
+	defer svc.Relay.mu.Unlock()
+	assert.Len(t, svc.Relay.notified, 1, "entries past the window are dropped")
 }

@@ -36,7 +36,7 @@ Instructions, Goal.
   `updated_at`; use the `*Meta` / `Set*` store helpers.
 - LLM access goes through `llm` only (public: an embedding host passes its model client in through it).
 - `projects` is the embedding facade (`New` / `Register` / `Start` / `Host`); this module never imports Tingly Box's root module (`task projects:boundary`, also run in CI).
-- Projects routes all live under `/api/v1/projects`. Settings, Chats and health sit outside it and are standalone-only (`build` in `server_modules.go`).
+- Projects routes live under `/api/v1/projects` (projects, their thread lists) and `/api/v1/threads` (everything addressed by a thread id). Settings, Chats and health sit outside it and are standalone-only (`build` in `server_modules.go`).
 
 ## Frontend
 

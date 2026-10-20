@@ -46,7 +46,7 @@ func (s threadStore) Append(sid string, e engine.Entry) {
 	if err != nil {
 		return
 	}
-	session := t.ProjectID == ""
+	session := s.m.isFolder(t.ProjectID)
 	if e.Parent != "" && !session {
 		return
 	}

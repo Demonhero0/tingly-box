@@ -15,38 +15,48 @@ func newStore(t *testing.T) *Store {
 	return s
 }
 
+// newProject makes a project with its main thread.
+func newProject(t *testing.T, s *Store, name string) (*Project, *Thread) {
+	t.Helper()
+	p, main := &Project{Name: name}, &Thread{}
+	require.NoError(t, s.CreateProjectWithMain(p, main, ""))
+	return p, main
+}
+
 func TestChannelBindingUpsertMovesAChat(t *testing.T) {
 	s := newStore(t)
-	a, b := &Project{Name: "A"}, &Project{Name: "B"}
-	require.NoError(t, s.CreateProject(a))
-	require.NoError(t, s.CreateProject(b))
+	a, aMain := newProject(t, s, "A")
+	b, bMain := newProject(t, s, "B")
 
-	first := &ChannelBinding{Platform: "telegram", ChatID: "42", ChatTitle: "Me", ProjectID: a.ID}
+	first := &ChannelBinding{Platform: "telegram", ChatID: "42", ChatTitle: "Me", ThreadID: aMain.ID}
 	require.NoError(t, s.UpsertChannelBinding(first))
 	assert.NotEmpty(t, first.ID)
-	assert.Equal(t, ChannelTargetProject, first.TargetKind)
+	assert.Equal(t, a.ID, first.ProjectID, "the binding reports its thread's project")
 
 	// Same chat again: it moves, keeping its id, and keeps its title when the
 	// new request has none.
-	moved := &ChannelBinding{Platform: "telegram", ChatID: "42", ProjectID: b.ID}
+	moved := &ChannelBinding{Platform: "telegram", ChatID: "42", ThreadID: bMain.ID}
 	require.NoError(t, s.UpsertChannelBinding(moved))
 	assert.Equal(t, first.ID, moved.ID)
+	assert.Equal(t, bMain.ID, moved.ThreadID)
 	assert.Equal(t, b.ID, moved.ProjectID)
 	assert.Equal(t, "Me", moved.ChatTitle)
 
 	// Another platform's chat with the same id is a different chat.
-	require.NoError(t, s.UpsertChannelBinding(&ChannelBinding{Platform: "feishu", ChatID: "42", ProjectID: a.ID}))
+	require.NoError(t, s.UpsertChannelBinding(&ChannelBinding{Platform: "feishu", ChatID: "42", ThreadID: aMain.ID}))
 
-	all, err := s.ListChannelBindings("")
+	all, err := s.ListChannelBindings(BindingFilter{})
 	require.NoError(t, err)
 	assert.Len(t, all, 2)
-	onB, err := s.ListChannelBindings(b.ID)
+	onB, err := s.ListChannelBindings(BindingFilter{ProjectID: b.ID})
 	require.NoError(t, err)
 	require.Len(t, onB, 1)
 	assert.Equal(t, "telegram", onB[0].Platform)
-	onA, err := s.ListChannelBindings(a.ID)
+	assert.Equal(t, b.ID, onB[0].ProjectID)
+	onA, err := s.ListChannelBindings(BindingFilter{ThreadID: aMain.ID})
 	require.NoError(t, err)
-	assert.Len(t, onA, 1, "moving a chat away from A leaves only the feishu chat there")
+	require.Len(t, onA, 1)
+	assert.Equal(t, "feishu", onA[0].Platform)
 
 	got, err := s.GetChannelBinding("telegram", "42")
 	require.NoError(t, err)
@@ -55,35 +65,94 @@ func TestChannelBindingUpsertMovesAChat(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotFound)
 }
 
-func TestDeleteChannelBindingAndProject(t *testing.T) {
+func TestDeleteChannelBinding(t *testing.T) {
 	s := newStore(t)
-	p := &Project{Name: "P"}
-	require.NoError(t, s.CreateProject(p))
-	b := &ChannelBinding{Platform: "telegram", ChatID: "1", ProjectID: p.ID}
+	_, main := newProject(t, s, "P")
+	b := &ChannelBinding{Platform: "telegram", ChatID: "1", ThreadID: main.ID}
 	require.NoError(t, s.UpsertChannelBinding(b))
-
 	require.NoError(t, s.DeleteChannelBinding(b.ID))
 	assert.ErrorIs(t, s.DeleteChannelBinding(b.ID), ErrNotFound)
-
-	require.NoError(t, s.UpsertChannelBinding(&ChannelBinding{Platform: "telegram", ChatID: "2", ProjectID: p.ID}))
-	require.NoError(t, s.DeleteProject(p.ID))
-	left, err := s.ListChannelBindings("")
+	left, err := s.ListChannelBindings(BindingFilter{})
 	require.NoError(t, err)
-	assert.Empty(t, left, "deleting a project unbinds its chats")
+	assert.Empty(t, left)
 }
 
-func TestProjectMessageKeepsItsSource(t *testing.T) {
+func TestThreadEventKeepsItsSource(t *testing.T) {
 	s := newStore(t)
-	p := &Project{Name: "P"}
-	require.NoError(t, s.CreateProject(p))
-	require.NoError(t, s.AddProjectMessage(&ProjectMessage{ProjectID: p.ID, Role: RoleUser, Kind: MsgText, Content: "web"}))
-	require.NoError(t, s.AddProjectMessage(&ProjectMessage{ProjectID: p.ID, Role: RoleUser, Kind: MsgText, Content: "im",
+	_, main := newProject(t, s, "P")
+	require.NoError(t, s.AddThreadEvent(&ThreadEvent{ThreadID: main.ID, Kind: EvUser, Content: "web"}))
+	require.NoError(t, s.AddThreadEvent(&ThreadEvent{ThreadID: main.ID, Kind: EvUser, Content: "im",
 		Source: SourceIM, SourcePlatform: "telegram", SourceChatID: "42"}))
-	msgs, err := s.ListProjectMessages(p.ID, 0)
+	require.NoError(t, s.AddThreadEvent(&ThreadEvent{ThreadID: main.ID, Kind: EvUser, Content: "from a thread",
+		Source: SourceThread, SourceRef: "t1"}))
+	evs, err := s.ListThreadEvents(main.ID)
 	require.NoError(t, err)
-	require.Len(t, msgs, 2)
-	assert.Empty(t, msgs[0].Source, "empty source is the web")
-	assert.Equal(t, SourceIM, msgs[1].Source)
-	assert.Equal(t, "telegram", msgs[1].SourcePlatform)
-	assert.Equal(t, "42", msgs[1].SourceChatID)
+	require.Len(t, evs, 3)
+	assert.Empty(t, evs[0].Source)
+	assert.Equal(t, SourceIM, evs[1].Source)
+	assert.Equal(t, "telegram", evs[1].SourcePlatform)
+	assert.Equal(t, "42", evs[1].SourceChatID)
+	assert.Equal(t, SourceThread, evs[2].Source)
+	assert.Equal(t, "t1", evs[2].SourceRef)
+
+	recent, err := s.ListRecentThreadEvents(main.ID, 2)
+	require.NoError(t, err)
+	require.Len(t, recent, 2)
+	assert.Equal(t, "im", recent[0].Content, "the latest N, oldest first")
+}
+
+func TestMainThreadIsNotListedOrCounted(t *testing.T) {
+	s := newStore(t)
+	p, main := newProject(t, s, "P")
+	assert.Equal(t, main.ID, p.MainThreadID)
+	assert.Equal(t, AgentLLM, main.Agent)
+
+	for i := 0; i < 2; i++ {
+		require.NoError(t, s.CreateThread(&Thread{ProjectID: p.ID, ParentID: main.ID, Status: ThreadWorking}))
+	}
+	ts, err := s.ListThreads(p.ID)
+	require.NoError(t, err)
+	require.Len(t, ts, 2)
+	seqs := []int{ts[0].Seq, ts[1].Seq}
+	assert.ElementsMatch(t, []int{1, 2}, seqs, "numbered per project from 1; the main thread is 0")
+	assert.Equal(t, AgentClaudeCode, ts[0].Agent)
+
+	counts, err := s.ThreadCounts()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{ThreadWorking: 2}, counts[p.ID])
+	working, err := s.ListThreadsByStatus(ThreadWorking, ThreadIdle)
+	require.NoError(t, err)
+	assert.Len(t, working, 2)
+
+	got, err := s.GetMainThread(p.ID)
+	require.NoError(t, err)
+	assert.Equal(t, main.ID, got.ID)
+
+	line, err := s.Lineage(ts[0].ID)
+	require.NoError(t, err)
+	require.Len(t, line, 2)
+	assert.Equal(t, main.ID, line[1].ID)
+}
+
+func TestOpenFolderIsOneProjectPerFolder(t *testing.T) {
+	s := newStore(t)
+	dir := t.TempDir()
+	a, err := s.OpenFolder(dir, "")
+	require.NoError(t, err)
+	assert.Equal(t, ProjectFolder, a.Type)
+	assert.Empty(t, a.MainThreadID)
+
+	// A trailing slash and a symlink are the same folder.
+	b, err := s.OpenFolder(dir+"/", "")
+	require.NoError(t, err)
+	assert.Equal(t, a.ID, b.ID)
+
+	// Archived, then opened again: it is back.
+	now := a.CreatedAt
+	a.ArchivedAt = &now
+	require.NoError(t, s.SaveProject(a))
+	c, err := s.OpenFolder(dir, "")
+	require.NoError(t, err)
+	assert.Equal(t, a.ID, c.ID)
+	assert.Nil(t, c.ArchivedAt)
 }

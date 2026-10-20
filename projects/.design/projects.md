@@ -79,11 +79,14 @@ threads/<thread-id>.settings.json  线程的 Claude Code 设置（additionalDire
 ```
 
 ### 4.2 数据模型
-- `projects`: id, name, goal, instructions, repos(JSON `[{path, base_branch}]`), coordinator_model, thread_model, thread_permission_mode, paused, starred, archived_at, timestamps。
-- `project_messages`: 项目对话。role(user|assistant|system), kind(text|thread_started|suggestions|thread_update|error), content, payload(JSON), created_at。
+> 统一线程模型后的变化见 `../../.design/projects-sessions.md`：项目对话不再有单独的表，是主线程的事件；`worktree` 改名 `cwd`；工作目录是 `type=folder` 的项目。下面按新名字写。
+
+- `projects`: id, name, type(project|folder), path(folder 的规范化路径), main_thread_id, goal, instructions, repos(JSON `[{path, base_branch}]`), coordinator_model, thread_model, thread_permission_mode, paused, starred, archived_at, timestamps。
+- 项目对话 = 主线程（`agent=llm`）的 `thread_events`：kind(user|assistant|thread_started|suggestions|thread_update|error)，没有 role，由 kind 推出。旧的 `project_messages` 表迁移后只读保留一个版本。
 - 线程回报（`thread_update`）照常传给协调者；对话里按发生的先后各占一条很淡的折叠行（状态、线程名、结果，点开看回报正文），线程卡片只负责实时状态；对话下方有前端开关可隐藏这些行（仅存本机 localStorage）。
-- `threads`: id, project_id, title, task, status, wait_reason, repo_path, base_branch, branch, worktree, session_id, model, last_report, commits_ahead, files_changed, input/output tokens, origin(coordinator|suggestion|user), timestamps, resolved_at。
-- `thread_events`: 线程过程。kind(user|assistant|tool_use|tool_result|approval|ask|system|error|report), content, payload, created_at。
+- `threads`: id, project_id(必填), parent_id, seq(项目内序号，主线程为 0), agent(llm|claude-code), title, task, status, wait_reason, repo_path, base_branch, branch, cwd, session_id, model, last_report, commits_ahead, files_changed, input/output tokens, origin(coordinator|suggestion|user), timestamps, resolved_at。
+- `thread_events`: 线程过程。kind(user|assistant|tool_use|tool_result|approval|ask|system|error|report|thread_started|suggestions|thread_update), content, payload, source(空=网页|im|thread|system), source_ref, source_platform, source_chat_id, created_at。
+- 新线程的目录是 `threads/<thread-id>/`（旧线程保留 `cwd` 里记的 `worktrees/...`）。
 
 ### 4.3 线程状态（与官方 Overview 分组一致）
 

@@ -39,17 +39,18 @@ only in memory or in the conversation.
   age or per owner without touching anything else. Deleting a project already
   removes its library. Age-based cleanup of files never sent is the follow-up.
 
-A working-folder session has no project, so each session gets its own area,
-`<data>/projects/_sessions/<session>/library/uploads/<id>-<name>`. It is outside
+A working folder is a `type=folder` project and its threads are ordinary
+threads; each thread gets its own area,
+`<data>/projects/_sessions/<thread>/library/uploads/<id>-<name>`. It is outside
 the folder the person works in on purpose: files put inside would show up in
 their repository's `git status` and could be committed. Uploads made before
-the session exists (the first message) wait in `_sessions/_new` and move into
-the session when it starts. A session reaches only its own area: its Claude
+the thread exists (the first message) wait in `_sessions/_new` and move into
+the thread when it starts. A thread reaches only its own area: its Claude
 Code settings (the host profile's, if any, merged with one extra allowed
 directory) list that directory and nothing else, so no approval prompt and no
-view of other sessions' files. Routes: `POST /projects/workdirs/attachments`
-for the first message, `POST /projects/sessions/:sid/attachments` and
-`GET .../attachments/file` after.
+view of other threads' files. Routes: `POST /projects/:id/attachments` (on a
+folder project: the draft area for its next thread), `POST /threads/:id/attachments`
+and `GET /threads/:id/attachments/file` after.
 
 ## What the model gets
 
