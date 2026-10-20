@@ -72,18 +72,19 @@ func (t *VendorTransform) applyResponses(ctx *TransformContext, req *responses.R
 	return req
 }
 
-// isClaudeCodeOAuth: a Claude Code OAuth provider, on Anthropic's host or a
-// relay in front of it. Only this chain carries the Claude Code identity
-// (billing header + metadata). Any other credential on Anthropic's host, such
-// as an API key, is plain API usage: the billing header would have Anthropic
-// bill it as Claude Code, which the API credits of Max/Team plans do not
-// cover.
+// isClaudeCodeOAuth reports whether the provider is a Claude Code OAuth
+// provider, on Anthropic's host or a relay in front of it. Only the Claude
+// OAuth chain carries the Claude Code identity (billing header + metadata).
+// Any other credential on Anthropic's host, such as an API key, is plain API
+// usage: the billing header would have Anthropic bill it as Claude Code,
+// which the API credits of Max/Team plans do not cover.
 func isClaudeCodeOAuth(ctx *TransformContext) bool {
 	return ctx != nil && ctx.Provider != nil && ctx.Provider.IsClaudeCodeProvider()
 }
 
-// reconcileAnthropicV1Thinking: Anthropic's wire rules for thinking, before
-// model-specific thinking reconciliation. Only for Anthropic's backend: a
+// reconcileAnthropicV1Thinking applies Anthropic's wire rules for thinking
+// (thinking.ReconcileV1WithRequest), then the model's thinking dialects
+// (ops.ApplyAnthropicV1ModelTransform). Only for Anthropic's backend: a
 // third-party Anthropic-compatible provider gets the request as the client
 // sent it, since rewriting it (thinking on, then off on the next tool turn)
 // invalidated the provider's prompt cache for the whole conversation.
@@ -94,7 +95,7 @@ func reconcileAnthropicV1Thinking(req *anthropic.MessageNewParams) *anthropic.Me
 	return ops.ApplyAnthropicV1ModelTransform(req, string(req.Model))
 }
 
-// reconcileAnthropicBetaThinking: the same for the Beta shape.
+// reconcileAnthropicBetaThinking is reconcileAnthropicV1Thinking for Beta requests.
 func reconcileAnthropicBetaThinking(req *anthropic.BetaMessageNewParams) *anthropic.BetaMessageNewParams {
 	thinking.ReconcileBetaWithRequest(req)
 	return ops.ApplyAnthropicBetaModelTransform(req, string(req.Model))

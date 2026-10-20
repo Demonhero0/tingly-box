@@ -10,9 +10,9 @@ import (
 	"github.com/tingly-dev/tingly-box/internal/typ"
 )
 
-// claudeCodeProvider is a Claude Code OAuth provider at apiBase: the only kind
+// claudeCodeOAuthProvider is a Claude Code OAuth provider at apiBase: the only kind
 // of provider the identity rewrite (billing header + metadata) runs for.
-func claudeCodeProvider(apiBase string) *typ.Provider {
+func claudeCodeOAuthProvider(apiBase string) *typ.Provider {
 	return &typ.Provider{
 		APIBase:  apiBase,
 		AuthType: ai.AuthTypeOAuth,
@@ -65,7 +65,7 @@ func TestVendorTransform_AnthropicBeta_ClaudeCodeVersionSelectsNativeIdentity(t 
 		Messages:  []anthropic.BetaMessageParam{anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock("say hi"))},
 	}
 	ctx := &TransformContext{
-		Provider: claudeCodeProvider("https://api.anthropic.com"),
+		Provider: claudeCodeOAuthProvider("https://api.anthropic.com"),
 		Request:  req,
 		Extra:    map[string]interface{}{"device": "dev", "user_id": "acct"},
 	}
