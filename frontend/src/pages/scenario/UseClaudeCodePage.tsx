@@ -4,6 +4,7 @@ import { api } from '@/services/api';
 import type { AgentApplyResult } from './components/AgentSetupCard';
 import ClaudeCodeConfigModal from './components/ClaudeCodeConfigModal';
 import { type ClaudeCodeDefaultMode, derivePrefsFromRules } from './components/ClaudeCodeQuickConfig';
+import { restoreAppliedClaudeCodePrefs } from './components/claudeCodePrefsState';
 import { AgentPage, type AgentApplyContext, type AgentPageDescriptor, type AgentPageSlot } from './AgentPage';
 
 // Normalize the backend's ApplyConfigResponse into AgentApplyResult. The
@@ -40,6 +41,39 @@ const applyClaudeConfig = async (
 const derivedPrefs = ({ rules, slotMode }: AgentApplyContext) =>
     derivePrefsFromRules({ rules, mode: slotMode ?? 'unified' }) as Record<string, string>;
 
+// A rule's 1M toggle re-applies the config the user already has: the model slots
+// and the auto-compact window follow the toggle, every other applied setting
+// (and the status line) stays. Nothing applied yet means nothing to update.
+const applyContext1M = async (
+    t: TFunction,
+    { rules, slotMode }: AgentApplyContext,
+    change: { enabled: boolean; ruleUuid?: string },
+): Promise<AgentApplyResult> => {
+    try {
+        const applied = await api.getAppliedClaudeConfig();
+        if (!applied?.success) return { success: false, error: applied?.error || t('agentSetup.apply.failed') };
+        if (!applied.exists) return { success: false };
+        // The toggled flag may not have reached `rules` yet: overlay it.
+        const toggled = rules.map(rule =>
+            change.ruleUuid && rule.uuid !== change.ruleUuid
+                ? rule
+                : { ...rule, flags: { ...rule.flags, context1m: change.enabled } });
+        const prefs = restoreAppliedClaudeCodePrefs({
+            generated: derivePrefsFromRules({ rules: toggled, mode: slotMode ?? 'unified' }),
+            applied: applied.preferences || {},
+        });
+        return await applyClaudeConfig(
+            t,
+            prefs as Record<string, string>,
+            !!applied.installStatusLine,
+            (applied.defaultMode || 'acceptEdits') as ClaudeCodeDefaultMode,
+            applied.showThinkingSummaries ?? undefined,
+        );
+    } catch (e: any) {
+        return { success: false, error: e?.message || t('claudeCode.modeChange.applyFailed') };
+    }
+};
+
 const ClaudeCodeSetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
     const { t } = useTranslation();
     return (
@@ -74,6 +108,7 @@ const claudeCode: AgentPageDescriptor = {
         kind: 'auto',
         apply: (t, ctx) => applyClaudeConfig(t, derivedPrefs(ctx), false),
         applyWithStatusLine: (t, ctx) => applyClaudeConfig(t, derivedPrefs(ctx), true),
+        applyContext1M,
         renderDialog: (slot) => <ClaudeCodeSetupDialog slot={slot} />,
     },
     quickStart: {

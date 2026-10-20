@@ -3827,6 +3827,10 @@ export const handlers = [
         success: true, created: true, message: 'Created ~/.codebuddy/models.json',
     })),
 
+    http.post('/api/v1/config/apply/claude', () => HttpResponse.json({
+        success: true, updatedFiles: ['~/.claude/settings.json'], backupPaths: [],
+    })),
+
     http.get('/api/v1/config/claude', () => {
         return HttpResponse.json({
             success: true,

@@ -280,6 +280,12 @@ export default {
       "unconditional": "Unconditional, ignore"
     }
   },
+  "ruleAutoSave": {
+    "saved": "Configuration saved successfully",
+    "failed": "Failed to save: {{error}}",
+    "unknownError": "Unknown error",
+    "error": "Error saving configuration"
+  },
   "ruleHeader": {
     "plugins": "Plugins",
     "pluginsTooltip": "Plugins enabled on this rule",
@@ -347,6 +353,8 @@ export default {
     "enabledBody": "Model names have been updated with [1m] suffix for extended context support.",
     "disabledBody": "The forced [1m] model suffix has been removed. Client requests for 1M are still honored.",
     "requiresApplyHint": "Please apply the configuration below and restart {{client}} for changes to take effect.",
+    "appliedOn": "1M context on. {{client}}'s config is updated; restart {{client}} to take effect.",
+    "appliedOff": "1M context off. {{client}}'s config is updated; restart {{client}} to take effect.",
     "restartOnlyHint": "Please restart {{client}} and re-select the model for changes to take effect."
   }
 };

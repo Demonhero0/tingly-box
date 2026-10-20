@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '@/services/api';
 import type { ConfigRecord, Rule, SmartRouting } from '@/components/RoutingGraphTypes';
 import {
@@ -98,6 +99,7 @@ export function useRuleCardData({ rule, providers }: UseRuleCardDataProps) {
  * Handles auto-save logic with rollback on error
  */
 export function useRuleAutoSave({ rule, onRuleChange, showNotification }: UseRuleAutoSaveProps) {
+    const { t } = useTranslation();
     const autoSave = useCallback(
         async (newConfigRecord: ConfigRecord): Promise<boolean> => {
             if (!isConfigRecordReadyForSave(newConfigRecord)) {
@@ -130,19 +132,19 @@ export function useRuleAutoSave({ rule, onRuleChange, showNotification }: UseRul
                         smart_routing: ruleData.smart_routing,
                         lb_tactic: ruleData.lb_tactic,
                     });
-                    showNotification('Configuration saved successfully', 'success');
+                    showNotification(t('ruleAutoSave.saved'), 'success');
                     return true;
                 } else {
-                    showNotification(`Failed to save: ${result.error || 'Unknown error'}`, 'error');
+                    showNotification(t('ruleAutoSave.failed', { error: result.error || t('ruleAutoSave.unknownError') }), 'error');
                     return false;
                 }
             } catch (error) {
                 console.error('Error saving rule:', error);
-                showNotification('Error saving configuration', 'error');
+                showNotification(t('ruleAutoSave.error'), 'error');
                 return false;
             }
         },
-        [rule, onRuleChange, showNotification]
+        [rule, onRuleChange, showNotification, t]
     );
 
     // Both commit paths normalize tiers (contiguous from 0, per pool) before

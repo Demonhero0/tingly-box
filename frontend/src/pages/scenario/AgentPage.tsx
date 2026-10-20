@@ -51,6 +51,12 @@ export type AgentSetup =
         apply: (t: TFunction, ctx: AgentApplyContext) => Promise<AgentApplyResult>;
         /** Quick Start's second apply button, which also installs the status line (Claude Code). */
         applyWithStatusLine?: (t: TFunction, ctx: AgentApplyContext) => Promise<AgentApplyResult>;
+        /**
+         * Re-apply the client's config for a rule's 1M toggle, keeping what was
+         * applied before. Present: the toggle takes effect directly with a toast.
+         * Absent: the toggle opens the setup dialog.
+         */
+        applyContext1M?: (t: TFunction, ctx: AgentApplyContext, change: { enabled: boolean; ruleUuid?: string }) => Promise<AgentApplyResult>;
         renderDialog: (slot: AgentPageSlot) => React.ReactNode;
     };
 
@@ -99,7 +105,7 @@ export interface AgentPageDescriptor {
     };
     /** The gateway can read this client's config back: show whether it is applied. */
     clientConfigTool?: ClientConfigTool;
-    /** Rules offer the 1M-context toggle; toggling opens the setup dialog. */
+    /** Rules offer the 1M-context toggle; toggling re-applies the config (`setup.applyContext1M`) or opens the setup dialog. */
     context1M?: boolean;
     setup: AgentSetup;
     quickStart?: AgentQuickStart;
@@ -185,6 +191,19 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     }, []);
     const { status: clientConfigStatus } = useClientConfigStatus(agent.clientConfigTool ?? null, [rules, dialogOpen, slotMode]);
     const context1M = useContext1MToggle(() => setDialogOpen(true));
+    // Auto-config agents apply a 1M toggle straight away: no dialog, a toast says so.
+    const handleContext1MToggle = async (enabled: boolean, ruleUuid?: string) => {
+        if (setup.kind !== 'auto' || !setup.applyContext1M) {
+            context1M.handleContext1MToggle(enabled, ruleUuid);
+            return;
+        }
+        const result = await runApply(() => setup.applyContext1M!(t, { rules, slotMode }, { enabled, ruleUuid }));
+        if (result.success) {
+            showNotification(t(enabled ? 'context1M.appliedOn' : 'context1M.appliedOff', { client: agent.title }), 'success');
+        } else if (result.error) {
+            showNotification(result.error, 'error');
+        }
+    };
     // Unified Connect AI add flow (picker + form/OAuth/paste/import dialogs), offered by Quick Start.
     // A new provider refreshes the page's list in place: Quick Start's first
     // step ticks over and the flow carries on to "pick a model" instead of
@@ -402,7 +421,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     {...(agent.rulesTitleKey ? { title: t(agent.rulesTitleKey) } : {})}
                     collapsible={true}
                     hideTroubleshoot
-                    {...(agent.context1M ? { onContext1MToggle: context1M.handleContext1MToggle } : {})}
+                    {...(agent.context1M ? { onContext1MToggle: handleContext1MToggle } : {})}
                 />
 
                 <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />

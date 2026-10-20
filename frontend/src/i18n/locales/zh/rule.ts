@@ -280,6 +280,12 @@ export default {
       "unconditional": "无条件，跳过"
     }
   },
+  "ruleAutoSave": {
+    "saved": "配置已保存",
+    "failed": "保存失败：{{error}}",
+    "unknownError": "未知错误",
+    "error": "保存配置出错"
+  },
   "ruleHeader": {
     "plugins": "插件",
     "pluginsTooltip": "此规则已启用的插件",
@@ -345,6 +351,8 @@ export default {
     "enabledBody": "模型名称已添加 [1m] 后缀，以支持扩展上下文。",
     "disabledBody": "已移除强制添加的 [1m] 模型后缀；客户端主动请求 1M 时仍会生效。",
     "requiresApplyHint": "请应用下方的配置并重启 {{client}} 以使更改生效。",
+    "appliedOn": "已开启 1M 上下文，{{client}} 配置已自动更新，重启 {{client}} 后生效。",
+    "appliedOff": "已关闭 1M 上下文，{{client}} 配置已自动更新，重启 {{client}} 后生效。",
     "restartOnlyHint": "请重启 {{client}} 并重新选择模型以使更改生效。"
   }
 };
