@@ -95,7 +95,9 @@ export default {
       "viewConfigAdvanced": "{{label}} (Advanced)",
       "skip": "Skip",
       "tooltip": "One click to write the proxy configuration to {{agent}}'s settings file.",
-      "failed": "Apply failed"
+      "failed": "Apply failed",
+      "written": "Config written to {{files}}",
+      "backupSaved": "backup saved to {{paths}}"
     }
   },
   "scenarioPage": {

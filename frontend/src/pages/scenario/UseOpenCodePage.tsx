@@ -50,7 +50,14 @@ const OpenCodeSetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
             generateScriptWindows={() => scriptWindows}
             generateScriptUnix={() => scriptUnix}
             copyToClipboard={slot.copyToClipboard}
-            onApply={async () => { await slot.apply(); }}
+            onApply={async () => {
+                const result = await slot.apply();
+                if (result.success) {
+                    slot.closeApplied(result);
+                } else {
+                    slot.showNotification(result.error || t('scenarioPage.opencode.applyFailed'), 'error');
+                }
+            }}
             isApplyLoading={slot.isApplyLoading}
             isLoading={isConfigLoading}
         />

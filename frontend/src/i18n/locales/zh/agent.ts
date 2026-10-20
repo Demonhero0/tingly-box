@@ -94,6 +94,8 @@ export default {
       "skip": "跳过",
       "tooltip": "一键将代理配置写入 {{agent}} 的设置文件。",
       "failed": "应用失败",
+      "written": "配置已写入 {{files}}",
+      "backupSaved": "原文件已备份至 {{paths}}",
     },
   },
   "scenarioPage": {

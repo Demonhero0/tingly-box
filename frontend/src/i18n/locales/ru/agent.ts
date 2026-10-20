@@ -99,7 +99,9 @@ export default {
       "viewConfigAdvanced": "{{label}} (дополнительно)",
       "skip": "Пропустить",
       "tooltip": "Записать настройки прокси в файл конфигурации {{agent}} одним нажатием.",
-      "failed": "Не удалось применить"
+      "failed": "Не удалось применить",
+      "written": "Конфигурация записана в {{files}}",
+      "backupSaved": "резервная копия: {{paths}}"
     }
   },
   "scenarioPage": {

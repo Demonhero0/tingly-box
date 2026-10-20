@@ -38,6 +38,9 @@ interface ClaudeCodeConfigModalProps {
     // returned AgentApplyResult is rendered in-modal so the user sees
     // which files were touched and where the backup landed.
     onApplyWithPrefs?: (prefs: ClaudeCodePrefs, installStatusLine: boolean, defaultMode: ClaudeCodeDefaultMode, showThinkingSummaries: boolean) => Promise<AgentApplyResult>;
+    // A successful apply is handed here (the page closes the modal and toasts
+    // the files); without it, success is shown in-modal like a failure.
+    onApplied?: (result: AgentApplyResult) => void;
     isApplyLoading?: boolean;
     // Pending 1M context change (scoped to the toggled rule) to preview in the modal
     pendingContext1MChange?: { enabled: boolean; ruleUuid?: string } | null;
@@ -126,6 +129,7 @@ const ClaudeCodeConfigModal: React.FC<ClaudeCodeConfigModalProps> = ({
     rules,
     copyToClipboard,
     onApplyWithPrefs,
+    onApplied,
     isApplyLoading = false,
     pendingContext1MChange,
 }) => {
@@ -349,6 +353,10 @@ node -e '${nodeCode.replace(/'/g, "'\\''")}'`;
     const handleApply = async (installStatusLine: boolean) => {
         if (!onApplyWithPrefs) return;
         const result = await onApplyWithPrefs(prefs, installStatusLine, defaultMode, showThinkingSummaries);
+        if (result.success && onApplied) {
+            onApplied(result);
+            return;
+        }
         setApplyResult(result);
     };
 

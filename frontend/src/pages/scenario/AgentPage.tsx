@@ -134,6 +134,8 @@ export interface AgentPageSlot {
     apply: () => Promise<AgentApplyResult>;
     /** Run another apply (e.g. a dialog's, with its own settings) under the same loading state. */
     runApply: (apply: () => Promise<AgentApplyResult>) => Promise<AgentApplyResult>;
+    /** After a dialog's apply succeeds: close the dialog and toast which files were written. */
+    closeApplied: (result: AgentApplyResult) => void;
     isApplyLoading: boolean;
 }
 
@@ -200,6 +202,10 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
         }
     };
     const applyContext: AgentApplyContext = { rules, slotMode };
+    const closeDialog = () => {
+        setDialogOpen(false);
+        context1M.clearPendingContext1MChange();
+    };
 
     const slot: AgentPageSlot = {
         scenario,
@@ -210,16 +216,24 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
         loadRules,
         slotMode,
         dialogOpen,
-        closeDialog: () => {
-            setDialogOpen(false);
-            context1M.clearPendingContext1MChange();
-        },
+        closeDialog,
         pendingContext1MChange: context1M.pendingContext1MChange,
         pendingContext1MRuleUuid: context1M.pendingContext1MRuleUuid,
         apply: () => (setup.kind === 'auto'
             ? runApply(() => setup.apply(t, applyContext))
             : Promise.resolve({ success: false })),
         runApply,
+        closeApplied: (result) => {
+            const files = result.files ?? [];
+            let message = files.length > 0
+                ? t('agentSetup.apply.written', { files: files.join(', ') })
+                : t('agentSetup.apply.success');
+            if ((result.backupPaths?.length ?? 0) > 0) {
+                message += ` (${t('agentSetup.apply.backupSaved', { paths: result.backupPaths!.join(', ') })})`;
+            }
+            showNotification(message, 'success');
+            closeDialog();
+        },
         isApplyLoading,
     };
     const openDialog = () => setDialogOpen(true);

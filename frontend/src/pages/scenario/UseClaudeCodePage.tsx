@@ -53,6 +53,7 @@ const ClaudeCodeSetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
             onApplyWithPrefs={(prefs, installStatusLine, defaultMode, showThinkingSummaries) =>
                 slot.runApply(() => applyClaudeConfig(t, prefs as Record<string, string>, installStatusLine, defaultMode, showThinkingSummaries))
             }
+            onApplied={slot.closeApplied}
             isApplyLoading={slot.isApplyLoading}
             pendingContext1MChange={slot.pendingContext1MChange === null
                 ? null

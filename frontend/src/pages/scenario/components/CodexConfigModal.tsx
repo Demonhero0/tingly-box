@@ -177,6 +177,7 @@ const CodexConfigModal: React.FC<CodexConfigModalProps> = ({
             );
             if (response?.success) {
                 showNotification?.(t('codexConfig.applySuccess'), 'success');
+                onClose();
             } else {
                 showNotification?.(response?.message || t('codexConfig.applyFailed'), 'error');
             }
