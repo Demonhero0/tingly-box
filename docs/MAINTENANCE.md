@@ -120,8 +120,8 @@ the gate for both, then runs the two pipelines in parallel.
 - **Alone, any time**: Actions → "Release GUI" → Run workflow with
   `release_tag=<tag>`. It builds its own frontend and all platforms, creates the
   release if the CLI one is not there yet, attaches the packages (replacing
-  same-named assets) plus `checksums-gui.txt`, then dispatches `npm.yml` for the
-  GUI package only (`publish_gui=true`, waits for `production` approval) and
+  same-named assets) plus `checksums-gui.txt`, then announces the GUI-only
+  `npm.yml` run (`publish_gui=true`; you start it) and
   verifies the result. No CLI build or harness.
 - **npm, on its own**: `npm.yml` with `publish_gui=true`, `publish_cli=false`,
   `build_docker=false` publishes only `tingly-box-gui` (it builds the per-platform
@@ -189,19 +189,17 @@ After a GitHub Release is created, publish NPX packages to npm for easy installa
 
 Publishes npm packages based on an existing GitHub Release.
 
-For a tag push (`v*`), you do not start it by hand: the last job of
-`release-cli.yml` (`trigger-npm-publish`) dispatches it as soon as the GitHub
-Release is created, with `publish_cli=true`, `publish_gui=false`,
-`build_docker=true` and the npm dist-tag inferred from the version
-(`v1.2.3` → `latest`, `v1.2.3-rc1` → `rc`). The run then waits at the
-`production` environment approval gate — approving it is the only manual step
-left. (The explicit dispatch is needed because releases created with the
-workflow's `GITHUB_TOKEN` do not fire the `release: published` trigger.)
-The GUI pipeline (`release-gui.yml`) dispatches a second, GUI-only run
-(`publish_gui=true`) once its packages are attached, so a tag push asks for two
-approvals.
+It only runs when you start it (`workflow_dispatch`); a release never publishes
+to npm by itself. After a tag push, `release-cli.yml` (`announce-npm-publish`)
+and `release-gui.yml` (the last step of `publish`) leave a note in their job
+summary with the suggested inputs (`v1.2.3` → `latest`, `v1.2.3-rc1` → `rc`).
+When `release.yml` runs both pipelines it leaves one combined note
+(`announce-npm`: CLI + GUI + Docker in a single `npm.yml` run, one approval);
+a pipeline run alone announces only its own half. You then run
+the workflow yourself, choose tag, dist-tag and which packages to publish, and
+approve the `production` environment before anything is published.
 
-Run it manually only to re-publish or to override the defaults:
+Run it with:
 
 ### Steps to Publish NPX Packages Manually
 
