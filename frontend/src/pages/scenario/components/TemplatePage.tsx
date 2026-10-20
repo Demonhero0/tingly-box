@@ -120,7 +120,7 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
         handleRuleChange,
         handleProviderModelsChange,
         handleRefreshModels,
-        handleCreateRule: createRule,
+        handleCreateRules: createRules,
     } = useTemplatePageRules({
         rules,
         onRulesChange,
@@ -141,16 +141,17 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
     // above stay anchored to the real, backend-ordered array.
     const {sortMode, toggleSortMode, sortedRules} = useRuleSort(rules);
 
-    // Routed through a ref so onCreateFromModel doesn't capture a stale createRule.
-    const createRuleRef = useRef(createRule);
+    // Routed through a ref so onCreateFromModels doesn't capture a stale createRules.
+    const createRulesRef = useRef(createRules);
     useEffect(() => {
-        createRuleRef.current = createRule;
-    }, [createRule]);
+        createRulesRef.current = createRules;
+    }, [createRules]);
 
-    const runCreateRuleAndScroll = useCallback(async (
-        options?: { providerUuid: string; model: string }
+    // One rule per picked model, then scroll to the first new one.
+    const runCreateRulesAndScroll = useCallback(async (
+        options: { providerUuid: string; model: string }[]
     ) => {
-        const newUuid = await createRuleRef.current(options);
+        const [newUuid] = await createRulesRef.current(options);
         if (newUuid) {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
@@ -171,11 +172,11 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
         rules,
         onRuleChange: handleRuleChange,
         showNotification,
-        onCreateFromModel: (option) => {
-            void runCreateRuleAndScroll({
+        onCreateFromModels: (options) => {
+            void runCreateRulesAndScroll(options.map(option => ({
                 providerUuid: option.provider.uuid,
                 model: option.model,
-            });
+            })));
         },
     });
 

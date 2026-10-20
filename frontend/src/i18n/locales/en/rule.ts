@@ -152,10 +152,10 @@ export default {
           },
           "addModel": {
             "title": "Add your first model",
-            "content": "Each rule maps a request model to one or more models. In an empty rule, click ＋ Add model to pick a connected provider and a model. Need a separate rule for a different request model? Use New Rule in the toolbar.",
+            "content": "Each rule maps a request model to one or more models. In an empty rule, click ＋ Add model to pick a connected provider and a model. Want more models on this agent? Use New Model in the toolbar; turn on Select multiple there to add several at once, one rule each.",
             "annotation": {
               "addModel": "＋ Add model — pick provider + model",
-              "newRule": "New Rule adds another request-model mapping"
+              "newRule": "New Model adds models, one rule each"
             }
           },
           "editModel": {
@@ -296,8 +296,15 @@ export default {
     "collapseAllRules": "Collapse all rules",
     "expandAllRules": "Expand all rules",
     "connectAI": "Connect AI",
-    "newRule": "New Rule",
-    "createNewRule": "Create new routing rule",
+    "newRule": "New Model",
+    "createNewRule": "Add models to this agent; each one gets its own routing rule",
+    "selectedModels_one": "{{count}} model selected",
+    "selectedModels_other": "{{count}} models selected",
+    "multiSelectTitle": "Create a rule for each model",
+    "selectMultiple": "Select multiple",
+    "clearSelection": "Clear",
+    "addModels_one": "Add {{count}} model",
+    "addModels_other": "Add {{count}} models",
     "howRoutingWorks": "How routing works",
     "sortOriginal": "Original order",
     "sortByName": "Name (A→Z)",
@@ -310,7 +317,7 @@ export default {
       "description": "Add an API key provider to start routing requests",
       "action": "Get started"
     },
-    "noRules": "No rules yet. Click \"New Rule\" to add one.",
+    "noRules": "No rules yet. Click \"New Model\" to add one.",
     "copiedToClipboard": "{{label}} copied to clipboard!"
   },
   "decisionsGuide": {

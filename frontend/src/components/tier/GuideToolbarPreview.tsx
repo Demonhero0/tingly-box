@@ -24,7 +24,7 @@ const pulse = keyframes`
 
 /**
  * A non-functional replica of the page toolbar (Troubleshoot · Connect AI ·
- * New Rule), shown inside the routing guide so users can recognise the exact
+ * New Model), shown inside the routing guide so users can recognise the exact
  * button a step is asking them to click. The taught button pulses; a small
  * "Click here" tag points at it.
  */
@@ -136,7 +136,7 @@ export const GuideToolbarPreview: React.FC<GuideToolbarPreviewProps> = ({ highli
                         tabIndex={-1}
                         sx={{ pointerEvents: 'none', ...ring(highlight === 'newRule') }}
                     >
-                        {t('templateActions.newRule', { defaultValue: 'New Rule' })}
+                        {t('templateActions.newRule', { defaultValue: 'New Model' })}
                     </Button>
                 </Box>
             </Stack>

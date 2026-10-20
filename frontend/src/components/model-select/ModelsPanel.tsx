@@ -65,6 +65,11 @@ export interface ModelsPanelProps {
     provider: Provider;
     selectedProvider?: string;
     selectedModel?: string;
+    // Multi-select: which models of this provider are picked. Overrides
+    // selectedProvider/selectedModel for the cards' selected state.
+    isModelSelected?: (model: string) => boolean;
+    // Extra control at the end of the toolbar row, after search (e.g. a mode switch).
+    toolbarEnd?: React.ReactNode;
     columns: number;
     modelsPerPage: number;
     // True until this provider's model list first arrives: the panel shows a
@@ -82,6 +87,8 @@ export function ModelsPanel({
     provider,
     selectedProvider,
     selectedModel,
+    isModelSelected: isModelSelectedProp,
+    toolbarEnd,
     columns,
     modelsPerPage,
     modelsLoading = false,
@@ -134,6 +141,9 @@ export function ModelsPanel({
     }, [refreshTrigger, provider.uuid, fetchModels]);
 
     const isProviderSelected = selectedProvider === provider.uuid;
+    const isModelSelected = (model: string) => isModelSelectedProp
+        ? isModelSelectedProp(model)
+        : isProviderSelected && selectedModel === model;
     const isRefreshing = refreshingProviders.includes(provider.uuid);
     const backendCustomModels = providerModels?.[provider.uuid]?.custom_model || [];
 
@@ -308,6 +318,7 @@ export function ModelsPanel({
                         onKeyDown={(e) => { if (e.key === 'Enter') rememberSearch(searchTerm); }}
                         sx={{ width: 200 }}
                     />
+                    {toolbarEnd}
                 </Stack>
 
                 {/* Recent searches — only while the box is empty, so they never compete with live results */}
@@ -359,6 +370,7 @@ export function ModelsPanel({
                         provider={provider}
                         newModels={newModels[provider.uuid].newModels}
                         selectedModel={isProviderSelected ? selectedModel : undefined}
+                        isModelSelected={isModelSelectedProp}
                         onModelSelect={selectModel}
                         onDismiss={() => clearNewModels(provider.uuid)}
                         columns={columns}
@@ -371,6 +383,7 @@ export function ModelsPanel({
                         provider={provider}
                         recentModels={recentModels[provider.uuid]}
                         selectedModel={isProviderSelected ? selectedModel : undefined}
+                        isModelSelected={isModelSelectedProp}
                         onModelSelect={selectModel}
                         columns={columns}
                     />
@@ -387,7 +400,7 @@ export function ModelsPanel({
                                 <ModelCard
                                     key={`${provider.uuid}:${starModel}`}
                                     model={starModel}
-                                    isSelected={isProviderSelected && selectedModel === starModel}
+                                    isSelected={isModelSelected(starModel)}
                                     onClick={() => selectModel(starModel)}
                                     variant="starred"
                                     description={getDescription(starModel)}
@@ -403,7 +416,7 @@ export function ModelsPanel({
                     <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 0.8 }}>
                         <AddCustomModelCard onClick={() => onCustomModelEdit(provider)} />
                         {paginatedItems.map(({ model, type }) => {
-                            const isModelSelected = isProviderSelected && selectedModel === model;
+                            const modelSelected = isModelSelected(model);
 
                             if (type === 'custom') {
                                 // Determine variant based on custom model source
@@ -420,7 +433,7 @@ export function ModelsPanel({
                                         key={`${provider.uuid}:${model}`}
                                         model={model}
                                         provider={provider}
-                                        isSelected={isModelSelected}
+                                        isSelected={modelSelected}
                                         onEdit={() => onCustomModelEdit(provider, model)}
                                         onDelete={() => onCustomModelDelete(provider, model)}
                                         onSelect={() => selectModel(model)}
@@ -432,7 +445,7 @@ export function ModelsPanel({
                                     <ModelCard
                                         key={`${provider.uuid}:${model}`}
                                         model={model}
-                                        isSelected={isModelSelected}
+                                        isSelected={modelSelected}
                                         onClick={() => selectModel(model)}
                                         variant="standard"
                                         description={getDescription(model)}

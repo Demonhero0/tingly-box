@@ -639,7 +639,7 @@ export const ROUTING_GUIDE_STEPS: GuideStep[] = [
         ],
     },
     {
-        // Step 2: from an empty rule, add your first model; New Rule adds more rules.
+        // Step 2: from an empty rule, add your first model; New Model adds more, one rule each.
         diagram: TierDiagramType.EMPTY,
         mode: 'direct',
         toolbarHighlight: 'newRule',

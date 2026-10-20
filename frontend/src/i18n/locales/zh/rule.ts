@@ -152,10 +152,10 @@ export default {
           },
           "addModel": {
             "title": "添加第一个模型",
-            "content": "每条规则将一个请求模型映射到一个或多个模型。在空规则中点击「＋ 添加模型」，选择已连接的提供商和模型。需要为其他请求模型单独建规则？使用工具栏的「新建规则」。",
+            "content": "每条规则将一个请求模型映射到一个或多个模型。在空规则中点击「＋ 添加模型」，选择已连接的提供商和模型。想给这个 Agent 添加更多模型？使用工具栏的「新建模型」；打开其中的「多选」可一次添加多个，每个模型各建一条规则。",
             "annotation": {
               "addModel": "「＋ 添加模型」——选择提供商和模型",
-              "newRule": "「新建规则」新增一条请求模型映射"
+              "newRule": "「新建模型」添加模型，每个模型一条规则"
             }
           },
           "editModel": {
@@ -296,8 +296,13 @@ export default {
     "collapseAllRules": "收起所有规则",
     "expandAllRules": "展开所有规则",
     "connectAI": "连接 AI",
-    "newRule": "新建规则",
-    "createNewRule": "创建新的路由规则",
+    "newRule": "新建模型",
+    "createNewRule": "为这个 Agent 添加模型，每个模型各建一条路由规则",
+    "selectedModels_other": "已选 {{count}} 个模型",
+    "multiSelectTitle": "为每个模型创建规则",
+    "selectMultiple": "多选",
+    "clearSelection": "清除",
+    "addModels_other": "添加 {{count}} 个模型",
     "howRoutingWorks": "路由原理",
     "sortOriginal": "原始顺序",
     "sortByName": "按名称（A→Z）",
@@ -310,7 +315,7 @@ export default {
       "description": "添加一个 API Key 提供商以开始路由请求",
       "action": "开始使用"
     },
-    "noRules": "还没有规则。点击「新建规则」添加一条。",
+    "noRules": "还没有规则。点击「新建模型」添加。",
     "copiedToClipboard": "{{label}} 已复制到剪贴板！"
   },
   "decisionsGuide": {
