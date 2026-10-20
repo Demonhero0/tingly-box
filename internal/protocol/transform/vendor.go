@@ -74,33 +74,28 @@ func (t *VendorTransform) applyResponses(ctx *TransformContext, req *responses.R
 
 // isClaudeCodeOAuth: a Claude Code OAuth provider, on Anthropic's host or a
 // relay in front of it. Only this chain carries the Claude Code identity
-// (billing header + metadata).
+// (billing header + metadata). Any other credential on Anthropic's host, such
+// as an API key, is plain API usage: the billing header would have Anthropic
+// bill it as Claude Code, which the API credits of Max/Team plans do not
+// cover.
 func isClaudeCodeOAuth(ctx *TransformContext) bool {
 	return ctx != nil && ctx.Provider != nil && ctx.Provider.IsClaudeCodeProvider()
 }
 
-// isAnthropicHost: Anthropic's own API, reached with any other credential
-// (e.g. an API key). That is plain API usage: the billing header would have
-// Anthropic bill it as Claude Code, which the API credits of Max/Team plans
-// do not cover.
-func isAnthropicHost(host string) bool {
-	return host == "api.anthropic.com" || host == "claude.ai"
-}
-
-// anthropicV1WireRules: Anthropic's wire rules for thinking, before
+// reconcileAnthropicV1Thinking: Anthropic's wire rules for thinking, before
 // model-specific thinking reconciliation. Only for Anthropic's backend: a
 // third-party Anthropic-compatible provider gets the request as the client
 // sent it, since rewriting it (thinking on, then off on the next tool turn)
 // invalidated the provider's prompt cache for the whole conversation.
 // Thinking the gateway produces from an OpenAI client's effort is reconciled
 // where it is produced (request.applyOpenAIEffortAsThinking).
-func anthropicV1WireRules(req *anthropic.MessageNewParams) *anthropic.MessageNewParams {
+func reconcileAnthropicV1Thinking(req *anthropic.MessageNewParams) *anthropic.MessageNewParams {
 	thinking.ReconcileV1WithRequest(req)
 	return ops.ApplyAnthropicV1ModelTransform(req, string(req.Model))
 }
 
-// anthropicBetaWireRules: the same for the Beta shape.
-func anthropicBetaWireRules(req *anthropic.BetaMessageNewParams) *anthropic.BetaMessageNewParams {
+// reconcileAnthropicBetaThinking: the same for the Beta shape.
+func reconcileAnthropicBetaThinking(req *anthropic.BetaMessageNewParams) *anthropic.BetaMessageNewParams {
 	thinking.ReconcileBetaWithRequest(req)
 	return ops.ApplyAnthropicBetaModelTransform(req, string(req.Model))
 }
@@ -112,10 +107,10 @@ func (t *VendorTransform) applyAnthropicV1(ctx *TransformContext, req *anthropic
 	host, _ := ops.SplitProviderHostPath(providerURL)
 	switch {
 	case isClaudeCodeOAuth(ctx):
-		req = anthropicV1WireRules(req)
+		req = reconcileAnthropicV1Thinking(req)
 		req = ops.ApplyAnthropicV1MetadataTransform(req, ctx.configExtraForMetadata())
-	case isAnthropicHost(host):
-		req = anthropicV1WireRules(req)
+	case host == "api.anthropic.com" || host == "claude.ai": // any other credential, e.g. an API key
+		req = reconcileAnthropicV1Thinking(req)
 	case host == "api.deepseek.com":
 		ops.SanitizeAnthropicV1ThinkingConfig(req)
 		ops.ApplyAnthropicV1DeepSeekThinkingPatch(req)
@@ -130,10 +125,10 @@ func (t *VendorTransform) applyAnthropicBeta(ctx *TransformContext, req *anthrop
 	host, _ := ops.SplitProviderHostPath(providerURL)
 	switch {
 	case isClaudeCodeOAuth(ctx):
-		req = anthropicBetaWireRules(req)
+		req = reconcileAnthropicBetaThinking(req)
 		req = ops.ApplyAnthropicBetaMetadataTransform(req, ctx.configExtraForMetadata())
-	case isAnthropicHost(host):
-		req = anthropicBetaWireRules(req)
+	case host == "api.anthropic.com" || host == "claude.ai": // any other credential, e.g. an API key
+		req = reconcileAnthropicBetaThinking(req)
 	case host == "api.deepseek.com":
 		ops.SanitizeAnthropicBetaThinkingConfig(req)
 		ops.ApplyAnthropicBetaDeepSeekThinkingPatch(req)
