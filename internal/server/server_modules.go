@@ -22,6 +22,7 @@ import (
 	virtualmodelmodule "github.com/tingly-dev/tingly-box/internal/server/module/virtualmodel"
 	"github.com/tingly-dev/tingly-box/remote/access"
 	"github.com/tingly-dev/tingly-box/remote/channel"
+	"github.com/tingly-dev/tingly-box/remote/control/remoteagent"
 	"github.com/tingly-dev/tingly-box/remote/interaction"
 	remotescenario "github.com/tingly-dev/tingly-box/remote/scenario"
 	"github.com/tingly-dev/tingly-box/remote/scenario/builtin/claudecode"
@@ -96,7 +97,11 @@ func (s *Server) apiModules(ctx context.Context, schema bool) []module.Module {
 	// left a startup race where such a bot could finish starting before the
 	// registry landed and would then never expose a channel until manually
 	// restarted. Schema generation has no registry (s.channelRegistry is nil).
-	imbotHandler, err := imbot.NewHandler(ctx, s.config, s.channelRegistry)
+	//
+	// Chats bound to a Projects project talk to its coordinator instead of
+	// @cc / @tb; the bridge is created now and bound to Projects below.
+	chatBridge := projectsmodule.NewChatBridge()
+	imbotHandler, err := imbot.NewHandler(ctx, s.config, s.channelRegistry, remoteagent.WithProjectRouter(chatBridge))
 	if err != nil {
 		logrus.WithError(err).Warn("Failed to create imbotsettings handler, imbot settings APIs will not be available")
 	} else {
@@ -146,8 +151,13 @@ func (s *Server) apiModules(ctx context.Context, schema bool) []module.Module {
 	// At runtime it keeps its own database in the Projects data dir (--projects-dir) and
 	// starts when the flag is on: at boot, or on the first request after the
 	// flag is switched on.
-	if app := newProjectsApp(s.config, s.projectsDir, schema); app != nil {
+	if app := newProjectsApp(s.config, s.projectsDir, schema, chatBridge); app != nil {
 		start := func() { app.Start(ctx) }
+		var chatDisabled func(string) bool
+		if sm != nil && sm.RemoteChats() != nil {
+			chatDisabled = sm.RemoteChats().IsChatDisabled
+		}
+		chatBridge.Bind(app, s.channelRegistry, s.projectsEnabled, start, chatDisabled)
 		mods = append(mods, projectsmodule.NewHandler(app, s.projectsEnabled, start))
 		if !schema {
 			s.projects = app

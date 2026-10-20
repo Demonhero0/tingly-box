@@ -58,7 +58,7 @@ func (s *Store) DeleteProject(id string) error {
 		if err := tx.Where("thread_id IN (?)", threadIDs).Delete(&ThreadEvent{}).Error; err != nil {
 			return err
 		}
-		for _, m := range []any{&Thread{}, &ProjectMessage{}} {
+		for _, m := range []any{&Thread{}, &ProjectMessage{}, &ChannelBinding{}} {
 			if err := tx.Where("project_id = ?", id).Delete(m).Error; err != nil {
 				return err
 			}

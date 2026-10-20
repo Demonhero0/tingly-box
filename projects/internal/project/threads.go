@@ -76,6 +76,9 @@ type Threads struct {
 	env    ThreadEnv
 	// OnReport is called after each turn that was not stopped by the user.
 	OnReport func(Report)
+	// OnWait is called when a project thread stops to ask the user for an
+	// approval or an answer. It must not block.
+	OnWait func(db.Thread)
 
 	mu      sync.Mutex
 	active  map[string]*activeThread
@@ -1117,7 +1120,10 @@ func (p *threadPrompter) wait(ctx context.Context, kind, tool, question string, 
 	if kind == db.EvApproval {
 		reason = "Approve: " + question
 	}
-	_, _ = p.m.update(p.threadID, func(t *db.Thread) { t.Status, t.WaitReason = db.ThreadWaiting, reason })
+	waiting, _ := p.m.update(p.threadID, func(t *db.Thread) { t.Status, t.WaitReason = db.ThreadWaiting, reason })
+	if waiting != nil && waiting.ProjectID != "" && p.m.OnWait != nil {
+		p.m.OnWait(*waiting)
+	}
 
 	var ans Answer
 	timer := time.NewTimer(time.Hour)

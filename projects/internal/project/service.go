@@ -34,6 +34,7 @@ type Service struct {
 	Hub         *Hub
 	Threads     *Threads
 	Coordinator *Coordinator
+	Relay       *Relay
 	Host        Host
 }
 
@@ -41,10 +42,17 @@ type Service struct {
 func NewService(store *db.Store, layout Layout, agents Agents, host Host) *Service {
 	hub := NewHub()
 	threads := NewThreads(store, layout, hub, agents, host)
+	coord := NewCoordinator(store, layout, hub, threads, host)
+	// The chats bound to a project hear the coordinator when the host can
+	// reach IM (Tingly Box); the standalone app has no sink.
+	sink, _ := host.(ChannelSink)
+	relay := NewRelay(store, sink)
+	coord.OnFinal = relay.Message
+	threads.OnWait = relay.NeedsUser
 	return &Service{
 		Store: store, Layout: layout, Hub: hub, Threads: threads,
-		Coordinator: NewCoordinator(store, layout, hub, threads, host),
-		Host:        host,
+		Coordinator: coord, Relay: relay,
+		Host: host,
 	}
 }
 

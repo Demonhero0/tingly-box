@@ -399,6 +399,103 @@
         }
       }
     },
+    "/api/v1/projects/channel-bindings": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List the IM chats bound to projects, all of them or one project's",
+        "description": "List the IM chats bound to projects, all of them or one project's",
+        "operationId": "apiV1ProjectsChannel-bindingsGet",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "description": "Only this project's bindings",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Bind an IM chat to a project; binding a bound chat again moves it",
+        "description": "Bind an IM chat to a project; binding a bound chat again moves it",
+        "operationId": "apiV1ProjectsChannel-bindingsPut",
+        "requestBody": {
+          "description": "Request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindChannelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelBinding"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/channel-bindings/{id}": {
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Unbind an IM chat",
+        "description": "Unbind an IM chat",
+        "operationId": "apiV1ProjectsChannel-bindingsIdDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/models": {
       "get": {
         "tags": [
@@ -2579,6 +2676,103 @@
           "description"
         ]
       },
+      "BindChannelRequest": {
+        "type": "object",
+        "properties": {
+          "chat_id": {
+            "type": "string",
+            "description": "Field chat_id"
+          },
+          "chat_title": {
+            "type": "string",
+            "description": "Field chat_title"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Field platform"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          }
+        },
+        "required": [
+          "platform",
+          "chat_id",
+          "project_id"
+        ]
+      },
+      "BindingsResponse": {
+        "type": "object",
+        "properties": {
+          "bindings": {
+            "type": "array",
+            "description": "Field bindings",
+            "items": {
+              "$ref": "#/components/schemas/ChannelBinding"
+            }
+          }
+        },
+        "required": [
+          "bindings"
+        ]
+      },
+      "ChannelBinding": {
+        "type": "object",
+        "properties": {
+          "chat_id": {
+            "type": "string",
+            "description": "Field chat_id"
+          },
+          "chat_title": {
+            "type": "string",
+            "description": "Field chat_title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field created_at"
+          },
+          "focus_thread_id": {
+            "type": "string",
+            "description": "Field focus_thread_id"
+          },
+          "id": {
+            "type": "string",
+            "description": "Field id"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Field platform"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Field project_id"
+          },
+          "target_kind": {
+            "type": "string",
+            "description": "Field target_kind"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
+          },
+          "workdir_id": {
+            "type": "string",
+            "description": "Field workdir_id"
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "chat_id",
+          "chat_title",
+          "target_kind",
+          "created_at",
+          "updated_at"
+        ]
+      },
       "ConnectionDraft": {
         "type": "object",
         "properties": {
@@ -3311,6 +3505,18 @@
           "role": {
             "type": "string",
             "description": "Field role"
+          },
+          "source": {
+            "type": "string",
+            "description": "Field source"
+          },
+          "source_chat_id": {
+            "type": "string",
+            "description": "Field source_chat_id"
+          },
+          "source_platform": {
+            "type": "string",
+            "description": "Field source_platform"
           }
         },
         "required": [

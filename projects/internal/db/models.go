@@ -51,9 +51,17 @@ type ProjectMessage struct {
 	Kind    string `gorm:"size:30;not null" json:"kind"`
 	Content string `gorm:"type:text" json:"content"`
 	// Payload is kind-specific JSON.
-	Payload   string    `gorm:"type:text" json:"payload,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	Payload string `gorm:"type:text" json:"payload,omitempty"`
+	// Source says where a user message came from: im, or empty for the web.
+	// SourcePlatform and SourceChatID name the IM chat for source "im".
+	Source         string    `gorm:"size:10" json:"source,omitempty"`
+	SourcePlatform string    `gorm:"size:40" json:"source_platform,omitempty"`
+	SourceChatID   string    `gorm:"size:200" json:"source_chat_id,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
 }
+
+// SourceIM marks a message that came from an IM chat.
+const SourceIM = "im"
 
 // Thread statuses, matching the Overview groups.
 const (
@@ -190,4 +198,29 @@ type Workdir struct {
 	Path       string    `gorm:"primaryKey;size:1000" json:"path"`
 	CreatedAt  time.Time `json:"created_at"`
 	LastUsedAt time.Time `json:"last_used_at"`
+}
+
+// ChannelTargetProject is the only binding target served for now; the
+// target_kind column and ChannelBinding.WorkdirID are there so binding a
+// working folder needs no migration. See .design/projects-im.md.
+const ChannelTargetProject = "project"
+
+// ChannelBinding says where an IM chat is bound: one row per (platform,
+// chat). A project can have many chats; a chat has exactly one binding, and
+// binding it again moves it.
+type ChannelBinding struct {
+	ID       string `gorm:"primaryKey;size:36" json:"id"`
+	Platform string `gorm:"size:40;not null;uniqueIndex:idx_channel_chat" json:"platform"`
+	ChatID   string `gorm:"size:200;not null;uniqueIndex:idx_channel_chat" json:"chat_id"`
+	// ChatTitle is a display name for the chat, when the caller knows one.
+	ChatTitle  string `gorm:"size:300" json:"chat_title"`
+	TargetKind string `gorm:"size:20;not null" json:"target_kind"`
+	ProjectID  string `gorm:"size:36;index" json:"project_id,omitempty"`
+	// WorkdirID is for working-folder bindings (not served yet).
+	WorkdirID *string `gorm:"size:36" json:"workdir_id,omitempty"`
+	// FocusThreadID is the thread a project-bound chat talks to instead of
+	// the coordinator (not served yet); empty is the coordinator.
+	FocusThreadID *string   `gorm:"size:36" json:"focus_thread_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }

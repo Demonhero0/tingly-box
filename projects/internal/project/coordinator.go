@@ -37,6 +37,9 @@ type Coordinator struct {
 	hub     *Hub
 	threads *Threads
 	llm     LLMSource
+	// OnFinal is called with each finished coordinator reply, thread report
+	// and error, once, in order. It must not block.
+	OnFinal func(db.ProjectMessage)
 
 	mu     sync.Mutex
 	queues map[string]*queue
@@ -70,6 +73,20 @@ func (c *Coordinator) addMessage(m *db.ProjectMessage) *db.ProjectMessage {
 
 // Post adds a user message to the conversation and runs a coordinator turn.
 func (c *Coordinator) Post(projectID, text string, atts []Attachment) (*db.ProjectMessage, error) {
+	return c.PostFrom(projectID, text, atts, Source{})
+}
+
+// Source says where a user message came from. The zero value is the web.
+type Source struct {
+	// Kind is db.SourceIM for an IM chat, empty for the web.
+	Kind     string
+	Platform string
+	ChatID   string
+}
+
+// PostFrom is Post for a message that may come from an IM chat; the source is
+// kept on the stored message.
+func (c *Coordinator) PostFrom(projectID, text string, atts []Attachment, src Source) (*db.ProjectMessage, error) {
 	p, err := c.store.GetProject(projectID)
 	if err != nil {
 		return nil, err
@@ -80,7 +97,8 @@ func (c *Coordinator) Post(projectID, text string, atts []Attachment) (*db.Proje
 	if p.Paused {
 		return nil, ErrPaused
 	}
-	m := c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleUser, Kind: db.MsgText, Content: text, Payload: AttachmentsPayload(atts)})
+	m := c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleUser, Kind: db.MsgText, Content: text, Payload: AttachmentsPayload(atts),
+		Source: src.Kind, SourcePlatform: src.Platform, SourceChatID: src.ChatID})
 	_ = c.store.TouchProject(projectID)
 	c.schedule(projectID, func(q *queue) { q.user = true })
 	return m, nil
@@ -94,12 +112,20 @@ func (c *Coordinator) Busy(projectID string) bool {
 	return ok && (q.running || q.user || len(q.reports) > 0)
 }
 
+// final hands a message the coordinator is done with (a finished reply, a
+// thread's report, an error) to OnFinal, where the host's IM chats hear it.
+func (c *Coordinator) final(m *db.ProjectMessage) {
+	if c.OnFinal != nil && m != nil {
+		c.OnFinal(*m)
+	}
+}
+
 func (c *Coordinator) onReport(r Report) {
-	c.addMessage(&db.ProjectMessage{
+	c.final(c.addMessage(&db.ProjectMessage{
 		ProjectID: r.Thread.ProjectID, Role: db.RoleSystem, Kind: db.MsgThreadUpdate,
 		Content: r.Text,
 		Payload: jsonString(map[string]any{"thread_id": r.Thread.ID, "title": r.Thread.Title, "kind": r.Kind, "status": r.Thread.Status}),
-	})
+	}))
 	p, err := c.store.GetProject(r.Thread.ProjectID)
 	if err != nil || p.Paused || p.ArchivedAt != nil {
 		return
@@ -140,7 +166,7 @@ func (c *Coordinator) work(projectID string, q *queue) {
 		c.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		if err := c.turn(ctx, projectID, user, reports); err != nil {
-			c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgError, Content: err.Error()})
+			c.final(c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgError, Content: err.Error()}))
 		}
 		cancel()
 	}
@@ -202,8 +228,9 @@ func (c *Coordinator) turn(ctx context.Context, projectID string, userTriggered 
 			}
 			_ = c.store.UpdateProjectMessage(live)
 			c.publishMessage(live)
+			c.final(live)
 		case text != "" && text != noUpdate && !strings.HasPrefix(text, noUpdate):
-			c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgText, Content: text})
+			c.final(c.addMessage(&db.ProjectMessage{ProjectID: projectID, Role: db.RoleAssistant, Kind: db.MsgText, Content: text}))
 		}
 		if err != nil {
 			return fmt.Errorf("coordinator (%s): %w", model, err)

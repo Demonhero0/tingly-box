@@ -32,6 +32,18 @@ type consumer struct {
 	sessionPool *pool.Pool
 	tbClient    tbclient.TBClient
 	store       bot2.SettingsStore
+	// projectRouter sends chats bound to a project to its coordinator; nil
+	// leaves every chat on @cc / @tb.
+	projectRouter ProjectRouter
+}
+
+// ConsumerOption customises NewConsumer.
+type ConsumerOption func(*consumer)
+
+// WithProjectRouter lets chats bound to a Projects project talk to that
+// project instead of @cc / @tb (see ProjectRouter).
+func WithProjectRouter(r ProjectRouter) ConsumerOption {
+	return func(c *consumer) { c.projectRouter = r }
 }
 
 // NewConsumer builds the consumer that binds a bot to the remote-agent
@@ -44,14 +56,19 @@ func NewConsumer(
 	sessionPool *pool.Pool,
 	tbClient tbclient.TBClient,
 	store bot2.SettingsStore,
+	opts ...ConsumerOption,
 ) bot2.Consumer {
-	return &consumer{
+	c := &consumer{
 		sessionMgr:   sessionMgr,
 		agentService: agentService,
 		sessionPool:  sessionPool,
 		tbClient:     tbClient,
 		store:        store,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // Name identifies this purpose.
@@ -89,6 +106,9 @@ func (c *consumer) Attach(
 		pairing,
 		c.store,
 	)
+	if c.projectRouter != nil {
+		handler.SetProjectRouter(c.projectRouter)
+	}
 
 	attached := &bot2.Attached{
 		// The remote agent is the catch-all consumer: every message that

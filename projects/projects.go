@@ -48,6 +48,10 @@ type (
 	Launcher = project.Launcher
 	// Handoffer names the program that continues a session in a terminal.
 	Handoffer = project.Handoffer
+	// ChannelSink delivers text to an IM chat. Projects sends the
+	// coordinator's replies and thread reports through it to the chats bound
+	// to a project; a host without IM (the standalone binary) has none.
+	ChannelSink = project.ChannelSink
 )
 
 // DefaultDataDir is where Projects keeps its data when the host does not say
@@ -98,6 +102,20 @@ func New(opts Options) (*App, error) {
 // with /projects.
 func (a *App) Register(api *swagger.RouteGroup) {
 	module.Mount(&module.Routes{API: api}, a.mods...)
+}
+
+// PostFromChannel hands a message typed in an IM chat to the project the chat
+// is bound to, as a user message to its coordinator (the reply comes back
+// through the host's ChannelSink). handled is false when the chat is not
+// bound, so the host carries on as it did before.
+func (a *App) PostFromChannel(platform, chatID, text string) (handled bool, err error) {
+	return a.svc.PostFromChannel(platform, chatID, text)
+}
+
+// ChannelBound reports whether an IM chat is bound to a project.
+func (a *App) ChannelBound(platform, chatID string) bool {
+	b, err := a.store.GetChannelBinding(platform, chatID)
+	return err == nil && b.TargetKind == db.ChannelTargetProject
 }
 
 // Start recovers threads interrupted by a restart and runs housekeeping

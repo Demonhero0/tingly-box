@@ -55,6 +55,10 @@ type BotHandler struct {
 
 	// pairing handles TOFU pairing-code verification for direct messages.
 	pairing *bot2.PairingManager
+
+	// projectRouter, when set, takes the messages of chats bound to a
+	// project before @cc / @tb routing. See project_route.go.
+	projectRouter ProjectRouter
 }
 
 // HandlerContext contains per-message context data

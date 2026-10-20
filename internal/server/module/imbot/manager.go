@@ -67,7 +67,7 @@ type BotStatus struct {
 // interaction API would then find "bot not running" for a bot that was, in
 // fact, running). channelRegistry may be nil (e.g. swagger doc generation,
 // which never drives real chats).
-func NewBotManager(ctx context.Context, cfg *config.Config, channelRegistry *channel.Registry) (*BotManager, error) {
+func NewBotManager(ctx context.Context, cfg *config.Config, channelRegistry *channel.Registry, consumerOpts ...remoteagent.ConsumerOption) (*BotManager, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is nil")
 	}
@@ -116,7 +116,7 @@ func NewBotManager(ctx context.Context, cfg *config.Config, channelRegistry *cha
 	// host-side reads that still want db.Settings.
 	settingsStore := adapter.NewSettingsStore(store)
 	sessionPool := pool.New(sessionPoolConfig)
-	remoteAgentConsumer := remoteagent.NewConsumer(sessionMgr, agentService, sessionPool, tbClient, settingsStore)
+	remoteAgentConsumer := remoteagent.NewConsumer(sessionMgr, agentService, sessionPool, tbClient, settingsStore, consumerOpts...)
 
 	// Create internal bot manager
 	internalMgr := bot.NewManager(settingsStore, notifyConsumer, remoteAgentConsumer)

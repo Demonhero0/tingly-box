@@ -70,6 +70,12 @@ func (h *BotHandler) HandleMessage(msg imbot.Message, platform imbot.Platform, b
 
 	// Handle media content (with or without text)
 	if msg.IsMediaContent() {
+		if h.chatBoundToProject(hCtx) {
+			// Attachments are not carried into a project conversation yet;
+			// say so rather than quietly sending them to @cc.
+			h.SendText(hCtx, "This chat talks to a project; attachments are not supported there yet. Send text, or unbind the chat in Projects.")
+			return
+		}
 		media := msg.GetMedia()
 		if len(media) > 0 {
 			h.reactReceived(hCtx)
@@ -105,6 +111,16 @@ func (h *BotHandler) HandleMessage(msg imbot.Message, platform imbot.Platform, b
 
 	// React to indicate the message is being processed (after stop check, before all other handling)
 	h.reactReceived(hCtx)
+
+	// A chat bound to a Projects project talks to that project's coordinator,
+	// ahead of the @cc / @tb handoff words ("@cc fix it", "guide"). Slash
+	// commands stay commands, and a chat in the middle of typing a /cd path is
+	// left to that flow. Chats without a binding are not touched at all.
+	if !strings.HasPrefix(text, "/") && !h.directoryBrowser.IsWaitingInput(hCtx.ChatID) {
+		if h.routeToProject(hCtx, text) {
+			return
+		}
+	}
 
 	// Handoff commands take precedence over the slash dispatcher: /cc, /tb
 	// look like slash commands but they're really handoff sugar. Without

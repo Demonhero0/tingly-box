@@ -22,6 +22,8 @@ import (
 type Host struct {
 	cfg *config.Config
 	cc  *tbclient.TBClientImpl
+	// bridge carries Projects messages to IM chats; see chatbridge.go.
+	bridge *ChatBridge
 }
 
 var _ projectsapp.Host = (*Host)(nil)
