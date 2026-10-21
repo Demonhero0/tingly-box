@@ -43,6 +43,26 @@ the protection error. The audited Codex request formatter clones history without
 unconditionally clearing reasoning IDs, so a normal request containing valid
 reasoning IDs does not exercise the bug.
 
+### Native Responses compaction contract
+
+The first compaction compatibility increment covers Codex OAuth and native
+Responses upstreams on ordinary `POST /responses`:
+
+- Forward `context_management`, including its compaction threshold, and
+  Codex's `compaction_trigger` without interpreting them as summary requests.
+- Keep native `compaction` items and their opaque `encrypted_content` in
+  request history and in streaming/non-streaming output.
+- Forward progress, output-item and completion events in upstream order,
+  retaining extra event/output fields. Codex JSON responses are assembled from
+  the upstream SSE completion as usual.
+- Replay the returned native state to the same compatible backend on the next
+  request. Upstream failures remain failures; no replacement summary is created.
+
+These paths already use the SDK's native types and raw response/event JSON.
+Regression tests cover the client, request parser and authenticated gateway.
+This increment adds no summary codec, cross-protocol adapter, standalone compact
+route or V2 configuration default. Live provider acceptance remains unverified.
+
 ### Compaction branch audit: Codex CLI 0.163.0
 
 Audited upstream tag `rust-v0.163.0`, commit
