@@ -64,7 +64,7 @@ func (h *Handler) RegisterRoutes(rt *module.Routes) {
 	)
 
 	router.GET("/config/workbuddy/status", h.GetWorkBuddyConfigStatus,
-		swagger.WithDescription("Whether ~/.codebuddy/models.json has tingly-box models matching the WorkBuddy rules Auto Config would write now"),
+		swagger.WithDescription("Whether the installed WorkBuddy editions' models.json (~/.workbuddy, ~/.workbuddy-ai) have tingly-box models matching the WorkBuddy rules Auto Config would write now"),
 		swagger.WithTags("config"),
 		swagger.WithResponseModel(ClientConfigStatusResponse{}),
 	)
@@ -98,7 +98,7 @@ func (h *Handler) RegisterRoutes(rt *module.Routes) {
 	)
 
 	router.POST("/config/apply/workbuddy", h.ApplyWorkBuddyConfigFromState,
-		swagger.WithDescription("Merge the WorkBuddy scenario's models into ~/.codebuddy/models.json"),
+		swagger.WithDescription("Merge the WorkBuddy scenario's models into the models.json of every installed WorkBuddy edition (~/.workbuddy, ~/.workbuddy-ai)"),
 		swagger.WithTags("config"),
 		swagger.WithResponseModel(ApplyWorkBuddyConfigResponse{}),
 	)
@@ -150,7 +150,7 @@ func (h *Handler) RegisterRoutes(rt *module.Routes) {
 	)
 
 	router.POST("/config/restore/workbuddy", h.RestoreWorkBuddyConfig,
-		swagger.WithDescription("Restore ~/.codebuddy/models.json from the most recent backup"),
+		swagger.WithDescription("Restore the installed WorkBuddy editions' models.json from their most recent backups"),
 		swagger.WithTags("config"),
 		swagger.WithResponseModel(RestoreConfigResponse{}),
 	)

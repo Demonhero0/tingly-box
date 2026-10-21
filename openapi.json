@@ -1788,8 +1788,8 @@
         "tags": [
           "config"
         ],
-        "summary": "Merge the WorkBuddy scenario's models into ~/.codebuddy/models.json",
-        "description": "Merge the WorkBuddy scenario's models into ~/.codebuddy/models.json",
+        "summary": "Merge the WorkBuddy scenario's models into the models.json of every installed WorkBuddy edition (~/.workbuddy, ~/.workbuddy-ai)",
+        "description": "Merge the WorkBuddy scenario's models into the models.json of every installed WorkBuddy edition (~/.workbuddy, ~/.workbuddy-ai)",
         "operationId": "apiV1ConfigApplyWorkbuddyPost",
         "responses": {
           "200": {
@@ -2162,8 +2162,8 @@
         "tags": [
           "config"
         ],
-        "summary": "Restore ~/.codebuddy/models.json from the most recent backup",
-        "description": "Restore ~/.codebuddy/models.json from the most recent backup",
+        "summary": "Restore the installed WorkBuddy editions' models.json from their most recent backups",
+        "description": "Restore the installed WorkBuddy editions' models.json from their most recent backups",
         "operationId": "apiV1ConfigRestoreWorkbuddyPost",
         "responses": {
           "200": {
@@ -2184,8 +2184,8 @@
         "tags": [
           "config"
         ],
-        "summary": "Whether ~/.codebuddy/models.json has tingly-box models matching the WorkBuddy rules Auto Config would write now",
-        "description": "Whether ~/.codebuddy/models.json has tingly-box models matching the WorkBuddy rules Auto Config would write now",
+        "summary": "Whether the installed WorkBuddy editions' models.json (~/.workbuddy, ~/.workbuddy-ai) have tingly-box models matching the WorkBuddy rules Auto Config would write now",
+        "description": "Whether the installed WorkBuddy editions' models.json (~/.workbuddy, ~/.workbuddy-ai) have tingly-box models matching the WorkBuddy rules Auto Config would write now",
         "operationId": "apiV1ConfigWorkbuddyStatusGet",
         "responses": {
           "200": {
@@ -4924,8 +4924,8 @@
         "tags": [
           "projects"
         ],
-        "summary": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted",
-        "description": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted",
+        "summary": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted",
+        "description": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted",
         "operationId": "apiV1ProjectsIdDelete",
         "parameters": [
           {
@@ -10584,6 +10584,13 @@
           "created": {
             "type": "boolean",
             "description": "Field created"
+          },
+          "files": {
+            "type": "array",
+            "description": "Field files",
+            "items": {
+              "$ref": "#/components/schemas/WorkBuddyFileResult"
+            }
           },
           "message": {
             "type": "string",
@@ -19615,6 +19622,10 @@
             "format": "int64",
             "description": "Field reasoning_tokens"
           },
+          "speed": {
+            "type": "string",
+            "description": "Field speed"
+          },
           "system_tokens": {
             "type": "integer",
             "format": "int64",
@@ -20613,6 +20624,52 @@
           "success",
           "configJson",
           "models"
+        ]
+      },
+      "WorkBuddyFileResult": {
+        "type": "object",
+        "properties": {
+          "backupPath": {
+            "type": "string",
+            "description": "Field backupPath"
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Field created"
+          },
+          "edition": {
+            "type": "string",
+            "description": "Field edition"
+          },
+          "message": {
+            "type": "string",
+            "description": "Field message"
+          },
+          "path": {
+            "type": "string",
+            "description": "Field path"
+          },
+          "skipped": {
+            "type": "array",
+            "description": "Field skipped",
+            "items": {
+              "type": "string"
+            }
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Field success"
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Field updated"
+          }
+        },
+        "required": [
+          "edition",
+          "path",
+          "success",
+          "message"
         ]
       },
       "WriteMemoryRequest": {

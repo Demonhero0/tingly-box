@@ -72,7 +72,7 @@
 | [kimi-config.md](./kimi-config.md) | Kimi Code OAuth & Client Round Trip: Design and Decisions | 设计说明；局部实施状态见正文 |
 | [zcode-oauth.md](./zcode-oauth.md) | ZCode OAuth (GLM Coding Plan) | 设计说明；局部实施状态见正文 |
 | [workbuddy-oauth.md](./workbuddy-oauth.md) | WorkBuddy OAuth、额度 (Tencent WorkBuddy / CodeBuddy) | 已实现；与第三方实测实现对齐，尚未用真实账号验证，见正文 |
-| [workbuddy-agent.md](./workbuddy-agent.md) | WorkBuddy as an agent（自定义模型接入、Auto Config 写 `~/.codebuddy/models.json`） | 已实现；桌面版是否读取该文件尚未实测，见正文 |
+| [workbuddy-agent.md](./workbuddy-agent.md) | WorkBuddy as an agent（自定义模型接入、Auto Config 写已安装版本的 `~/.workbuddy/models.json`（国内版）/ `~/.workbuddy-ai/models.json`（国际版）） | 已实现；2026-10-21 在 Windows 实机确认文件位置与数组格式 |
 | [deepseek.md](./deepseek.md) | DeepSeek | 设计说明；局部实施状态见正文 |
 | [codex.md](./codex.md) | Codex as a Client | 设计说明；局部实施状态见正文 |
 | [codex-auth.md](./codex-auth.md) | Codex Auth Modes: gateway, direct ChatGPT, and hybrid | 设计说明；局部实施状态见正文 |

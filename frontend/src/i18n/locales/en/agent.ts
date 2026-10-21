@@ -176,7 +176,7 @@ export default {
       "restartNote": "Save, then pick the model under the Custom group in the chat model picker. If it doesn't appear, restart WorkBuddy.",
       "applied": "Models written to {{path}}",
       "autoTitle": "Auto Config",
-      "autoDescription": "Auto Config merges one model per rule below into ~/.codebuddy/models.json — the custom-model file Tencent documents, which WorkBuddy still reads alongside the models you add in its settings. Your other models are kept, and the previous file is backed up first.",
+      "autoDescription": "Auto Config merges one model per rule below into each WorkBuddy edition installed on this machine: ~/.workbuddy/models.json (China) and ~/.workbuddy-ai/models.json (international) — both when both are installed. Your other models are kept, and each file is backed up first.",
       "autoCaveat": "Not seeing the model in WorkBuddy afterwards? Quit and reopen WorkBuddy; if it is still missing, use the manual steps below.",
       "manualTitle": "Manual setup",
       "previewLoading": "Loading preview…",

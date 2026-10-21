@@ -23,6 +23,7 @@ func workBuddyTestRouter(t *testing.T, rules []typ.Rule) (*gin.Engine, string) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".workbuddy"), 0o755))
 	cfg, err := config.NewConfig(config.WithConfigDir(t.TempDir()))
 	require.NoError(t, err)
 	cfg.Rules = rules
@@ -33,7 +34,7 @@ func workBuddyTestRouter(t *testing.T, rules []typ.Rule) (*gin.Engine, string) {
 	r.GET("/preview/workbuddy", h.GetWorkBuddyConfigPreview)
 	r.GET("/status/workbuddy", h.GetWorkBuddyConfigStatus)
 	r.POST("/restore/workbuddy", h.RestoreWorkBuddyConfig)
-	return r, filepath.Join(home, ".codebuddy", "models.json")
+	return r, filepath.Join(home, ".workbuddy", "models.json")
 }
 
 func doWB(r *gin.Engine, method, path string) *httptest.ResponseRecorder {
@@ -58,10 +59,12 @@ func TestWorkBuddyConfig_ApplyStatusPreviewRestore(t *testing.T) {
 		{UUID: "wb2", Scenario: typ.ScenarioWorkBuddy, RequestModel: "inactive", Active: false},
 		{UUID: "cc1", Scenario: typ.ScenarioClaudeCode, RequestModel: "other-scenario", Active: true},
 	})
-	require.NoError(t, os.MkdirAll(filepath.Dir(file), 0o755))
-	require.NoError(t, os.WriteFile(file, []byte(`{"models":[{"id":"mine","url":"https://x/v1/chat/completions"}]}`), 0o600))
+	require.NoError(t, os.WriteFile(file, []byte(`[{"id":"mine","url":"https://x/v1/chat/completions"}]`), 0o600))
 
-	assert.Contains(t, doWB(r, http.MethodGet, "/status/workbuddy").Body.String(), `"state":"not_applied"`)
+	status := doWB(r, http.MethodGet, "/status/workbuddy").Body.String()
+	assert.Contains(t, status, `"state":"not_applied"`)
+	assert.Contains(t, status, `~/.workbuddy/models.json`)
+	assert.NotContains(t, status, `.workbuddy-ai`, "only the installed edition is listed")
 
 	prev := doWB(r, http.MethodGet, "/preview/workbuddy").Body.String()
 	assert.Contains(t, prev, `claude-sonnet-5`)

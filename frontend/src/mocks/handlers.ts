@@ -3811,27 +3811,30 @@ export const handlers = [
     })),
     // WorkBuddy: starts "not applied" so Auto Config is the obvious next step.
     http.get('/api/v1/config/workbuddy/status', () => HttpResponse.json({
-        success: true, state: 'not_applied', path: '~/.codebuddy/models.json', differences: [],
+        success: true, state: 'not_applied', path: '~/.workbuddy/models.json, ~/.workbuddy-ai/models.json', differences: [],
     })),
     http.get('/api/v1/config/preview/workbuddy', () => HttpResponse.json({
         success: true,
-        path: '~/.codebuddy/models.json',
+        path: '~/.workbuddy/models.json, ~/.workbuddy-ai/models.json',
         models: ['claude-sonnet-5'],
-        configJson: JSON.stringify({
-            models: [{
-                id: 'claude-sonnet-5',
-                name: 'claude-sonnet-5',
-                vendor: 'Tingly Box',
-                url: 'http://localhost:3000/tingly/workbuddy/v1/chat/completions',
-                apiKey: 'tingly-b…mnop',
-                supportsToolCall: true,
-                supportsImages: false,
-                supportsReasoning: false,
-            }],
-        }, null, 2),
+        configJson: JSON.stringify([{
+            id: 'claude-sonnet-5',
+            name: 'claude-sonnet-5',
+            vendor: 'Tingly Box',
+            url: 'http://localhost:3000/tingly/workbuddy/v1/chat/completions',
+            apiKey: 'tingly-b…mnop',
+            supportsToolCall: true,
+            supportsImages: false,
+            supportsReasoning: false,
+        }], null, 2),
     })),
     http.post('/api/v1/config/apply/workbuddy', () => HttpResponse.json({
-        success: true, created: true, message: 'Created ~/.codebuddy/models.json',
+        success: true, created: true, updated: true,
+        message: 'Created ~/.workbuddy/models.json; Updated ~/.workbuddy-ai/models.json',
+        files: [
+            { edition: 'cn', path: '~/.workbuddy/models.json', success: true, created: true, message: 'Created ~/.workbuddy/models.json' },
+            { edition: 'intl', path: '~/.workbuddy-ai/models.json', success: true, updated: true, message: 'Updated ~/.workbuddy-ai/models.json' },
+        ],
     })),
 
     http.post('/api/v1/config/apply/claude', () => HttpResponse.json({
