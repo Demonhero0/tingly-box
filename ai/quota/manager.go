@@ -254,9 +254,11 @@ func (m *Manager) IsProviderSupported(providerUUID string) bool {
 	if err != nil || provider == nil {
 		return false
 	}
-	providerType := inferProviderType(provider)
-	_, ok := m.registry.Get(providerType)
-	return ok
+	f, ok := m.registry.Get(inferProviderType(provider))
+	if !ok {
+		return false
+	}
+	return f.RequiresAuth() != typ.AuthTypeOAuth || provider.AuthType == typ.AuthTypeOAuth
 }
 
 // fetchProviderQuota fetches and stores quota data for one provider.
@@ -282,6 +284,14 @@ func (m *Manager) fetchProviderQuota(ctx context.Context, provider *typ.Provider
 	f, ok := m.registry.Get(providerType)
 	if !ok {
 		log.Debug("skipping quota fetch: no fetcher for this provider type")
+		_ = m.store.Delete(ctx, provider.UUID)
+		return nil, ErrProviderUnsupported
+	}
+	// An OAuth-only usage endpoint has nothing to say about an API key on the
+	// same host (an Anthropic API key is not a Claude subscription), and asking
+	// anyway stores a 401 that the UI shows as a broken provider.
+	if f.RequiresAuth() == typ.AuthTypeOAuth && provider.AuthType != typ.AuthTypeOAuth {
+		log.Debug("skipping quota fetch: this provider type only reports usage for OAuth credentials")
 		_ = m.store.Delete(ctx, provider.UUID)
 		return nil, ErrProviderUnsupported
 	}

@@ -222,6 +222,13 @@ export function QuotaCell({ quota, refreshing, onRefresh }: QuotaCellProps) {
                             : quota ? t('providerTable.quota.noLimits') : t('providerTable.quota.none')}
                     </Typography>
                 )}
+                {/* A failed read stores no raw response, so the reason upstream
+                    gave is the only thing that says what to fix. */}
+                {lastError && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+                        {lastError}
+                    </Typography>
+                )}
             </Box>
             {/* Actions live in the hover itself — a row menu is where nobody
                 looks. React events bubble through the tooltip's portal, so each

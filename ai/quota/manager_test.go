@@ -298,3 +298,35 @@ func TestInferProviderTypeIgnoresPathAndLocalHosts(t *testing.T) {
 		})
 	}
 }
+
+type oauthOnlyTestFetcher struct{ calls atomic.Int32 }
+
+func (*oauthOnlyTestFetcher) Name() string                 { return "oauth-only-test" }
+func (*oauthOnlyTestFetcher) ProviderType() ProviderType   { return ProviderTypeAnthropic }
+func (*oauthOnlyTestFetcher) Validate(*typ.Provider) error { return nil }
+func (*oauthOnlyTestFetcher) RequiresAuth() typ.AuthType   { return typ.AuthTypeOAuth }
+func (f *oauthOnlyTestFetcher) Fetch(_ context.Context, provider *typ.Provider) (*ProviderUsage, error) {
+	f.calls.Add(1)
+	return &ProviderUsage{ProviderUUID: provider.UUID}, nil
+}
+
+// An Anthropic API key shares its host with Claude subscriptions, whose usage
+// endpoint is OAuth-only: the key is unsupported, not a failed read.
+func TestFetchSkipsAPIKeyForOAuthOnlyFetcher(t *testing.T) {
+	provider := &typ.Provider{UUID: "key", APIBase: "https://api.anthropic.com", AuthType: typ.AuthTypeAPIKey, Enabled: true}
+	fetcher := &oauthOnlyTestFetcher{}
+	manager := NewManager(DefaultConfig(), managerTestStore{}, managerTestProviderManager{[]*typ.Provider{provider}}, logrus.New())
+	if err := manager.RegisterFetcher(fetcher); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := manager.RefreshProvider(context.Background(), provider.UUID); !errors.Is(err, ErrProviderUnsupported) {
+		t.Fatalf("RefreshProvider() error = %v, want ErrProviderUnsupported", err)
+	}
+	if fetcher.calls.Load() != 0 {
+		t.Error("the OAuth usage endpoint was called with an API key")
+	}
+	if manager.IsProviderSupported(provider.UUID) {
+		t.Error("IsProviderSupported() = true for an API key on an OAuth-only fetcher")
+	}
+}
