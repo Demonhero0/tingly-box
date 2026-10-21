@@ -89,6 +89,13 @@ type TokenUsage struct {
 	// SystemTokens represents tokens consumed by system-level operations
 	// such as prompt templates, system instructions, or framework overhead
 	SystemTokens int `json:"system_tokens,omitempty"`
+
+	// Speed is the inference speed mode Anthropic billed this request at
+	// ("standard" or "fast", added in anthropic-sdk-go v1.81.0). Fast mode is
+	// billed at a different rate for the same token counts, so it rides
+	// alongside the usage block rather than as a token count. Empty for
+	// providers that don't report it.
+	Speed string `json:"speed,omitempty"`
 }
 
 // TotalTokens returns the total tokens consumed (input + output, excluding cache).
@@ -131,6 +138,9 @@ func (u *TokenUsage) ToAnthropicUsageMap() map[string]interface{} {
 		usage["output_tokens_details"] = map[string]interface{}{
 			"thinking_tokens": u.ReasoningTokens,
 		}
+	}
+	if u.Speed != "" {
+		usage["speed"] = u.Speed
 	}
 	return usage
 }
