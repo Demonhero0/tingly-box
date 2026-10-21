@@ -23,6 +23,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { isWildcardModelName } from '@/components/rule-card/utils';
 import { notify } from '@/utils/notify';
+import { writeToClipboard } from '@/utils/clipboard';
 import { fontMono, fontSizes } from '@/theme/fonts';
 import type {OpenAIEndpointSelection} from '@/hooks/useResponsesToggle';
 import {CodexCompactChip} from '@/components/rule-card/CodexCompactChip';
@@ -203,9 +204,13 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
         }
     };
 
-    const handleCopy = () => {
-        void navigator.clipboard.writeText(modelName);
-        notify.success(`Model name "${modelName}" copied to clipboard`);
+    const handleCopy = async () => {
+        try {
+            await writeToClipboard(modelName);
+            notify.success(`Model name "${modelName}" copied to clipboard`);
+        } catch {
+            notify.error('Failed to copy to clipboard');
+        }
     };
 
     const isWildcard = isWildcardModelName(modelName);
