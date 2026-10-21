@@ -65,25 +65,29 @@ func FromOpenAIResponses(u responses.ResponseUsage) *protocol.TokenUsage {
 // ThinkingTokens (extended thinking) is a subset of OutputTokens, same
 // relationship as OpenAI's reasoning_tokens -- not subtracted.
 func FromAnthropicMessage(u anthropic.Usage) *protocol.TokenUsage {
-	return protocol.NewTokenUsageFull(
+	usage := protocol.NewTokenUsageFull(
 		int(u.InputTokens)+int(u.CacheCreationInputTokens),
 		int(u.OutputTokens),
 		int(u.CacheReadInputTokens),
 		int(u.CacheCreationInputTokens),
 		int(u.OutputTokensDetails.ThinkingTokens),
 	)
+	usage.Speed = string(u.Speed)
+	return usage
 }
 
 // FromAnthropicBetaMessage extracts normalized TokenUsage from an Anthropic
 // beta BetaMessage usage block. Same normalization as the non-beta path.
 func FromAnthropicBetaMessage(u anthropic.BetaUsage) *protocol.TokenUsage {
-	return protocol.NewTokenUsageFull(
+	usage := protocol.NewTokenUsageFull(
 		int(u.InputTokens)+int(u.CacheCreationInputTokens),
 		int(u.OutputTokens),
 		int(u.CacheReadInputTokens),
 		int(u.CacheCreationInputTokens),
 		int(u.OutputTokensDetails.ThinkingTokens),
 	)
+	usage.Speed = string(u.Speed)
+	return usage
 }
 
 // ChatUsage converts normalized TokenUsage into an OpenAI Chat Completions
