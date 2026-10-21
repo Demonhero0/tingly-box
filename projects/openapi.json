@@ -640,8 +640,8 @@
         "tags": [
           "projects"
         ],
-        "summary": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted",
-        "description": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted",
+        "summary": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted",
+        "description": "Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted",
         "operationId": "apiV1ProjectsIdDelete",
         "parameters": [
           {

@@ -197,7 +197,7 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithRequestModel(UpdateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
 	api.DELETE("/projects/:id", h.delete, tag,
-		swagger.WithDescription("Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted"),
+		swagger.WithDescription("Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted"),
 		swagger.WithResponseModel(OKResponse{}))
 
 	api.GET("/projects/events", h.allEvents, tag,

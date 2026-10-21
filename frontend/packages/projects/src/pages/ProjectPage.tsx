@@ -7,6 +7,7 @@ import { ConversationPane } from '../components/project/ConversationPane';
 import { OverviewPane } from '../components/project/OverviewPane';
 import { ProjectSettingsDialog, type SettingsTab } from '../components/project/ProjectSettingsDialog';
 import { ProjectImTags, useProjectIm } from '../components/im/ProjectImBindings';
+import { IM_BINDINGS_CHANGED } from '../components/im/useImBindings';
 import { ThreadPanel } from '../components/project/ThreadPanel';
 import { FloatingWindow } from '../components/workspace/FloatingWindow';
 import { OverviewBand } from '../components/workspace/OverviewBand';
@@ -191,6 +192,8 @@ export default function ProjectPage() {
     const patch = async (body: { starred?: boolean; paused?: boolean; archived?: boolean }) => {
         try {
             setProject(await unwrap(api.PATCH('/api/v1/projects/{id}', { params: { path: { id } }, body })));
+            // Archiving unbinds the project's IM chats.
+            if (body.archived) window.dispatchEvent(new Event(IM_BINDINGS_CHANGED));
             refresh();
         } catch (e) {
             notify((e as Error).message, 'error');

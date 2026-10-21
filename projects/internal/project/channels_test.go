@@ -3,7 +3,7 @@ package project
 import (
 	"context"
 	"errors"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -201,17 +201,17 @@ func TestThreadReportsAreFoldedToOneLine(t *testing.T) {
 
 	update := func(kind, text string) db.ThreadEvent {
 		return db.ThreadEvent{ThreadID: f.project.MainThreadID, Kind: db.EvThreadUpdate, Content: text,
-			Payload: `{"thread_id":"t1","title":"Fix login","kind":"` + kind + `","status":"idle"}`}
+			Payload: `{"thread_id":"t1","seq":2,"title":"Fix login","kind":"` + kind + `","status":"idle"}`}
 	}
 	svc.Relay.Message(update(ReportFinished, "Fixed the login bug.\n\nDetails:\n- changed a.go\n- changed b.go"))
-	assert.Equal(t, `[Demo] Thread "Fix login" finished: Fixed the login bug.`, sink.next(t).text)
+	assert.Equal(t, `[#2 Fix login] Finished: Fixed the login bug.`, sink.next(t).text)
 
 	svc.Relay.Message(update(ReportFailed, "exit status 1"))
-	assert.Equal(t, `[Demo] Thread "Fix login" failed: exit status 1`, sink.next(t).text)
+	assert.Equal(t, `[#2 Fix login] Failed: exit status 1`, sink.next(t).text)
 
 	svc.Relay.Message(update(ReportNeedsInput, "Keep the legacy flag?"))
 	got := sink.next(t).text
-	assert.Contains(t, got, `Thread "Fix login" needs you: Keep the legacy flag?`)
+	assert.True(t, strings.HasPrefix(got, `[#2 Fix login] Needs you: Keep the legacy flag?`), got)
 	assert.Contains(t, got, "web UI")
 
 	long := strings.Repeat("x", 1000)
@@ -239,7 +239,7 @@ func TestApprovalsAndAsksSendOneLineAndOnlyOnce(t *testing.T) {
 	require.NoError(t, f.store.CreateThread(worker))
 	th := *worker
 	svc.Relay.NeedsUser(th)
-	assert.Equal(t, `[Demo] Thread "Fix login" needs you. Open Projects in the web UI to answer.`, sink.next(t).text)
+	assert.Equal(t, fmt.Sprintf("[#%d Fix login] Needs you. Open Projects in the web UI to answer.", th.Seq), sink.next(t).text)
 
 	svc.Relay.NeedsUser(th) // the next approval of the same thread, right after
 	sink.none(t)
@@ -305,9 +305,10 @@ func TestWorkerTurnEndReachesChatsBoundToThatThreadOnly(t *testing.T) {
 		}
 	}
 	sink.none(t)
-	assert.Equal(t, []string{"[Demo] ok"}, byChat["own"], "the worker's final text, with the project's name")
-	assert.NotContains(t, byChat["up"], "[Demo] ok")
-	assert.Contains(t, byChat["up"], `[Demo] Thread "Worker" finished: ok`)
+	tag := fmt.Sprintf("[#%d Worker] ", th.Seq)
+	assert.Equal(t, []string{tag + "ok"}, byChat["own"], "the worker's final text, named by its number and title")
+	assert.NotContains(t, byChat["up"], tag+"ok")
+	assert.Contains(t, byChat["up"], tag+"Finished: ok")
 }
 
 func TestWorkerFailureReachesItsChatAsAnError(t *testing.T) {
@@ -325,7 +326,7 @@ func TestWorkerFailureReachesItsChatAsAnError(t *testing.T) {
 
 	_, err = svc.Send(context.Background(), th.ID, "boom", nil, Source{})
 	require.NoError(t, err)
-	assert.Contains(t, sink.next(t).text, "[Demo] Error: ")
+	assert.Contains(t, sink.next(t).text, fmt.Sprintf("[#%d Worker] Error: ", th.Seq))
 	sink.none(t)
 }
 
@@ -343,7 +344,42 @@ func TestFolderThreadReplyReachesItsChat(t *testing.T) {
 	require.NoError(t, err)
 	got := sink.next(t)
 	assert.Equal(t, "fold", got.chatID)
-	assert.Equal(t, "["+filepath.Base(dir)+"] ok", got.text, "a folder's name stands for its project")
+	cur, err := f.store.GetThread(s.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, cur.Seq)
+	assert.Equal(t, "["+threadTag(cur.Seq, cur.Title)+"] ok", got.text, "a folder thread is named like any other thread")
+	assert.True(t, strings.HasPrefix(got.text, "[#1"), got.text)
+}
+
+func TestArchivingAProjectUnbindsItsChats(t *testing.T) {
+	f, svc, sink := channelFixture(t)
+	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
+	_, err := svc.BindChannel("telegram", "main", "", "", f.project.ID)
+	require.NoError(t, err)
+	_, err = svc.BindChannel("telegram", "worker", "", th.ID, "")
+	require.NoError(t, err)
+	other := mkProject(t, f.store, &db.Project{Name: "Other"})
+	_, err = svc.BindChannel("telegram", "other", "", "", other.ID)
+	require.NoError(t, err)
+
+	p, err := f.store.GetProject(f.project.ID)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetArchived(p, true))
+
+	for _, chat := range []string{"main", "worker"} {
+		handled, err := svc.PostFromChannel("telegram", chat, "hi")
+		assert.False(t, handled, "%s falls back to what an unbound chat does", chat)
+		assert.NoError(t, err)
+	}
+	_, err = f.store.GetChannelBinding("telegram", "other")
+	assert.NoError(t, err, "another project's chat stays bound")
+
+	require.NoError(t, svc.SetArchived(p, false))
+	left, err := f.store.ListChannelBindings(db.BindingFilter{ProjectID: f.project.ID})
+	require.NoError(t, err)
+	assert.Empty(t, left, "unarchiving does not bind chats again")
+	sink.none(t)
 }
 
 func TestNeedsUserDoesNotGrowWithoutBound(t *testing.T) {

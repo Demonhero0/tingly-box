@@ -9,6 +9,7 @@ import { NewSessionView } from '../components/workdir/NewSessionView';
 import { loadPermissionModes, PermissionModeSelect } from '../components/workdir/PermissionModeSelect';
 import { uploadAttachments } from '../components/attachments';
 import { ProjectImTags, useProjectIm } from '../components/im/ProjectImBindings';
+import { IM_BINDINGS_CHANGED } from '../components/im/useImBindings';
 import { ThreadPanel } from '../components/project/ThreadPanel';
 import { StatusGroups, type StatusGroup } from '../components/workspace/StatusGroups';
 import { WorkspaceLayout, useWorkspacePane } from '../components/workspace/WorkspaceLayout';
@@ -276,6 +277,8 @@ export default function WorkdirPage() {
         try {
             if (!folder) return;
             await unwrap(api.DELETE('/api/v1/projects/{id}', { params: { path: { id: folder.id } } }));
+            // Removing a folder archives it, which unbinds its IM chats.
+            window.dispatchEvent(new Event(IM_BINDINGS_CHANGED));
             refresh();
             reloadList();
             go({});

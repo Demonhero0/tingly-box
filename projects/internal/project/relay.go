@@ -16,7 +16,8 @@ import (
 // chats bound to that thread (a worker's or folder thread's own turn end
 // included), and a descendant's "needs you" to the chats
 // bound to it or to any ancestor. Messages go out one at a time, in the order
-// they finished.
+// they finished. Each starts with where it comes from: `[project name]` for a
+// project conversation, `[#N title]` for any other thread.
 type Relay struct {
 	store *db.Store
 	sink  ChannelSink
@@ -29,10 +30,12 @@ type Relay struct {
 }
 
 type relayJob struct {
-	// threadIDs are the threads whose chats hear it; the first names the
-	// project in the prefix.
+	// threadIDs are the threads whose chats hear it.
 	threadIDs []string
-	text      string
+	// tag is the prefix ("#2 Fix login"); empty names the project of the
+	// first thread instead.
+	tag  string
+	text string
 }
 
 // NewRelay builds the relay; sink may be nil, which makes every call a no-op.
@@ -46,7 +49,7 @@ func (r *Relay) Message(e db.ThreadEvent) {
 	if r == nil || r.sink == nil {
 		return
 	}
-	var text string
+	var tag, text string
 	switch e.Kind {
 	case db.EvAssistant:
 		text = strings.TrimSpace(e.Content)
@@ -55,10 +58,10 @@ func (r *Relay) Message(e db.ThreadEvent) {
 			text = "Error: " + c
 		}
 	case db.EvThreadUpdate:
-		text = foldThreadUpdate(e)
+		tag, text = foldThreadUpdate(e)
 	}
 	if text != "" {
-		r.enqueue([]string{e.ThreadID}, text)
+		r.enqueue([]string{e.ThreadID}, tag, text)
 	}
 }
 
@@ -77,7 +80,7 @@ func (r *Relay) ThreadReply(rep Report) {
 	if rep.Kind == ReportFailed {
 		text = "Error: " + text
 	}
-	r.enqueue([]string{rep.Thread.ID}, text)
+	r.enqueue([]string{rep.Thread.ID}, threadTag(rep.Thread.Seq, rep.Thread.Title), text)
 }
 
 // NeedsUser tells the chats of a thread, and of its ancestors, that it is
@@ -108,32 +111,42 @@ func (r *Relay) NeedsUser(t db.Thread) {
 	for i, a := range lineage {
 		ids[i] = a.ID
 	}
-	r.enqueue(ids, fmt.Sprintf("%s needs you. Open Projects in the web UI to answer.", threadLabel(t.Title)))
+	r.enqueue(ids, threadTag(t.Seq, t.Title), "Needs you. Open Projects in the web UI to answer.")
 }
 
-func threadLabel(title string) string {
-	if title = strings.TrimSpace(title); title == "" {
-		return "A thread"
+// threadTag names a thread in a chat: "#2 Fix login", the same number the web
+// shows. A thread without a number (a main thread) is named by its title.
+func threadTag(seq int, title string) string {
+	title = strings.TrimSpace(title)
+	switch {
+	case seq > 0 && title != "":
+		return fmt.Sprintf("#%d %s", seq, title)
+	case seq > 0:
+		return fmt.Sprintf("#%d", seq)
+	case title != "":
+		return title
 	}
-	return fmt.Sprintf("Thread %q", title)
+	return "Thread"
 }
 
-// foldThreadUpdate is a thread's report as the one line a chat gets.
-func foldThreadUpdate(m db.ThreadEvent) string {
+// foldThreadUpdate is a thread's report as the one line a chat gets, and the
+// tag of the thread it is about.
+func foldThreadUpdate(m db.ThreadEvent) (tag, text string) {
 	var p struct {
+		Seq   int    `json:"seq"`
 		Title string `json:"title"`
 		Kind  string `json:"kind"`
 	}
 	_ = json.Unmarshal([]byte(m.Payload), &p)
-	label := threadLabel(p.Title)
 	body := oneLine(m.Content)
+	tag = threadTag(p.Seq, p.Title)
 	switch p.Kind {
 	case ReportFailed:
-		return join(label+" failed", body)
+		return tag, join("Failed", body)
 	case ReportNeedsInput:
-		return join(label+" needs you", body) + ". Open Projects in the web UI to answer."
+		return tag, join("Needs you", body) + ". Open Projects in the web UI to answer."
 	default:
-		return join(label+" finished", body)
+		return tag, join("Finished", body)
 	}
 }
 
@@ -159,9 +172,9 @@ func oneLine(s string) string {
 	return ""
 }
 
-func (r *Relay) enqueue(threadIDs []string, text string) {
+func (r *Relay) enqueue(threadIDs []string, tag, text string) {
 	r.mu.Lock()
-	r.queue = append(r.queue, relayJob{threadIDs: threadIDs, text: text})
+	r.queue = append(r.queue, relayJob{threadIDs: threadIDs, tag: tag, text: text})
 	start := !r.running
 	r.running = true
 	r.mu.Unlock()
@@ -186,21 +199,25 @@ func (r *Relay) drain() {
 }
 
 // deliver sends one message to every chat bound to the job's threads,
-// prefixed with the project's name so a chat never forgets where it is.
+// prefixed with where it comes from so a chat never forgets where it is.
 func (r *Relay) deliver(job relayJob) {
 	bindings, err := r.store.ListChannelBindingsOf(job.threadIDs)
 	if err != nil || len(bindings) == 0 {
 		return
 	}
-	first, err := r.store.GetThread(job.threadIDs[0])
-	if err != nil {
-		return
+	tag := job.tag
+	if tag == "" {
+		first, err := r.store.GetThread(job.threadIDs[0])
+		if err != nil {
+			return
+		}
+		p, err := r.store.GetProject(first.ProjectID)
+		if err != nil {
+			return
+		}
+		tag = p.Name
 	}
-	p, err := r.store.GetProject(first.ProjectID)
-	if err != nil {
-		return
-	}
-	text := "[" + p.Name + "] " + job.text
+	text := "[" + tag + "] " + job.text
 	for _, b := range bindings {
 		ctx, cancel := context.WithTimeout(context.Background(), relaySendTimeout)
 		if err := r.sink.SendChannelText(ctx, b.Platform, b.ChatID, text); err != nil {

@@ -65,7 +65,9 @@ func (s *Service) SetPaused(p *db.Project, paused bool) error {
 
 // SetArchived archives (stopping its threads) or unarchives a project or a
 // folder. Archiving is the only way to remove either: threads, worktrees,
-// branches and memory stay.
+// branches and memory stay. Its IM chats are unbound, so they go back to what
+// an unbound chat does instead of failing on every message; unarchiving does
+// not bind them again.
 func (s *Service) SetArchived(p *db.Project, archived bool) error {
 	if archived {
 		now := time.Now()
@@ -74,7 +76,11 @@ func (s *Service) SetArchived(p *db.Project, archived bool) error {
 	} else {
 		p.ArchivedAt = nil
 	}
-	return s.Save(p)
+	if err := s.Save(p); err != nil || !archived {
+		return err
+	}
+	_, err := s.Store.DeleteProjectChannelBindings(p.ID)
+	return err
 }
 
 // Send gives a thread a message, the one way anything talks to a thread: the

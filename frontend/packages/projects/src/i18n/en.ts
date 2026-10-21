@@ -190,7 +190,7 @@ export const en = {
             bypassPermissions: 'never ask', bypassPermissionsHelp: 'Threads run any command without asking. Only for disposable environments.',
         },
         pause: 'Pause project', resume: 'Resume project', pauseHelp: 'Stops every running thread at once and accepts no new work until resumed.',
-        archive: 'Archive project', unarchive: 'Unarchive project', archiveHelp: 'Hides the project and stops its threads. Everything stays readable.',
+        archive: 'Archive project', unarchive: 'Unarchive project', archiveHelp: 'Hides the project, stops its threads and unbinds its IM chats. Everything stays readable.',
         instructions: 'Project instructions',
         instructionsHelp: 'The brief every new thread and the coordinator start from: what the project is for, where the work happens, how a thread checks its work, what needs your go-ahead.',
         instructionsPlaceholder: '- Branch from main; one thread per change.\n- Before calling work done, run `make test` and paste the summary.\n- If something you need is missing, say exactly what and stop. Don’t mock or guess.\n- Don’t change CI configuration without asking me.',

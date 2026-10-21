@@ -120,7 +120,7 @@ func (c *Coordinator) onReport(r Report) {
 	c.final(c.addEvent(r.Thread.ProjectID, &db.ThreadEvent{
 		Kind:    db.EvThreadUpdate,
 		Content: r.Text,
-		Payload: jsonString(map[string]any{"thread_id": r.Thread.ID, "title": r.Thread.Title, "kind": r.Kind, "status": r.Thread.Status}),
+		Payload: jsonString(map[string]any{"thread_id": r.Thread.ID, "seq": r.Thread.Seq, "title": r.Thread.Title, "kind": r.Kind, "status": r.Thread.Status}),
 	}))
 	p, err := c.store.GetProject(r.Thread.ProjectID)
 	if err != nil || p.Paused || p.ArchivedAt != nil {

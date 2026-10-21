@@ -1,8 +1,14 @@
 # IM chats in Projects — Pencil Graph
 
 Visual companion to [`projects-im.md`](./projects-im.md), which stays the
-authority on decisions and status. Everything here is a **proposal** (TEP
-#2143): the diagrams show the target, not what exists today.
+authority on decisions and status. TEP #2143.
+
+> **Partly superseded.** The data model is now [projects-sessions.md](./projects-sessions.md):
+> a binding is `(platform, chat_id) -> thread_id`, nothing else. Diagrams that
+> draw `target_kind`, `workdir_id` or `focus_thread_id` ("What a chat binds to",
+> "One entity, two kinds", the address table) are history; read `kind=workdir`
+> as a `type=folder` project and "focus" as rebinding to a child thread. M1 and
+> the unified model have shipped; the IM routing past M1 is still a proposal.
 
 Contents:
 
@@ -42,6 +48,9 @@ Projects ── threads ── engine ── threads store                     �
 ```
 
 ## What a chat binds to
+
+> Superseded: a binding holds only `thread_id` (a project's main thread, or a
+> folder's thread). See "Threads as the unit".
 
 ```
                     ┌────────────────────────── Projects ───────────────────────────┐

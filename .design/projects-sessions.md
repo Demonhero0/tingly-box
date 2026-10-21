@@ -1,6 +1,6 @@
 # Projects 的统一模型：一切会话都是 Thread
 
-> 状态：已定方向，待实现。取代 [projects-im.md](./projects-im.md) 里“统一到 Project ID”一节，
+> 状态：已实施（#2151 后端、#2154 前端，迁移修复 #2155）。取代 [projects-im.md](./projects-im.md) 里“统一到 Project ID”一节，
 > 也取代 [projects-desk-absorption.md](./projects-desk-absorption.md) 的数据模型决定。图见
 > [projects-im.pencil.md](./projects-im.pencil.md) 的 “Threads as the unit”。文件名沿用 `projects-sessions.md`。
 

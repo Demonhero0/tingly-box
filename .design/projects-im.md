@@ -1,8 +1,10 @@
 # IM 聊天并入 Projects
 
-> 状态：提案（TEP #2143）。承接 [projects-desk-absorption.md](./projects-desk-absorption.md)：Desk 已并入，
+> 状态：部分实施（TEP #2143）。M1（#2147）和统一模型（#2151、#2154）已落地：chat 绑到线程（项目对话或文件夹里的线程），
+> 消息走 Web 同一条路径，回复和线程汇报发回 chat。M2b 起（`/new`、`/stop`、IM 里审批、点名线程、下线旧路径、路由）仍是提案，
+> 见“里程碑”。承接 [projects-desk-absorption.md](./projects-desk-absorption.md)：Desk 已并入，
 > 这里把 Remote 的 IM 聊天（`@cc`）也并进来，并**重新打开**那篇 Decisions §1“`@cc` 不共享、不导入”。
-> 本文里的 schema、API 和里程碑都是提案，不是现状。图见 [projects-im.pencil.md](./projects-im.pencil.md)。
+> 图见 [projects-im.pencil.md](./projects-im.pencil.md)（其中按 `target_kind`/`workdir_id`/`focus_thread_id` 画的图已被取代）。
 >
 > **数据模型以 [projects-sessions.md](./projects-sessions.md) 为准**：一切会话都是 Thread，IM 绑定指向线程（`thread_id`），
 > 不再是 `project_id`/`workdir_id`/`focus_thread_id`。下面“数据模型”和“统一到 Project ID”两节保留为演变记录，其中与之冲突处以新文档为准。
@@ -82,7 +84,8 @@ IM 入站 ──▶ 访问控制（Remote：配对/白名单/Disabled，不变�
 Projects 事件 ──▶ 订阅了该落点的 binding ──▶ 渲染到 chat
 ```
 
-- 回复前缀：已绑定时每条回复带落点短名（例：`[tingly-box] …`），避免用户忘了自己在哪。
+- 回复前缀：每条消息带它来自哪里，避免用户忘了自己在哪：项目对话是项目名（`[tingly-box] …`），其他线程（项目的子线程、
+  文件夹里的线程）是编号和标题（`[#2 修登录] …`），与 Web 上的编号一致。
 - 一个 chat 同一时刻只绑一个落点；一个落点可以被多个 chat 绑定（手机和群各一个），出站按 binding 广播。
 
 ## 统一到 Project ID（已被取代）
@@ -132,9 +135,9 @@ project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说�
 
 | | 范围 | 不做 | 状态 |
 |---|---|---|---|
-| **M1 只到 coordinator**（先做） | `ChannelBinding`（只支持 project）、消息来源字段、绑定的增删查接口；绑了项目的 chat 的消息进项目对话，coordinator 的回复和折叠后的线程汇报发回 chat；前端：侧栏 IM 入口、项目页头标签、绑定弹窗、对话里的来源图标 | working folder 绑定、IM 里的审批/提问（只发一行“有线程等你，请到 Web 处理”）、点名线程、下线旧路径 | 后端已实现（见下“M1 后端的落地”）；前端另行 |
-| **统一模型** | 见 [projects-sessions.md](./projects-sessions.md) 的交付：一次变更，后端和前端两个叠放的 PR | IM 路由、前端新功能 | |
-| **M2b 文件夹绑定** | 绑定已是 `thread_id`；绑文件夹、`/new`、`/stop`；弹窗列项目和文件夹 | 同 M1 | |
+| **M1 只到 coordinator**（先做） | `ChannelBinding`（只支持 project）、消息来源字段、绑定的增删查接口；绑了项目的 chat 的消息进项目对话，coordinator 的回复和折叠后的线程汇报发回 chat；前端：侧栏 IM 入口、项目页头标签、绑定弹窗、对话里的来源图标 | working folder 绑定、IM 里的审批/提问（只发一行“有线程等你，请到 Web 处理”）、点名线程、下线旧路径 | 已实施（#2147） |
+| **统一模型** | 见 [projects-sessions.md](./projects-sessions.md) 的交付：一次变更，后端和前端两个叠放的 PR | IM 路由、前端新功能 | 已实施（#2151、#2154）；绑定文件夹里的线程、弹窗列项目和文件夹随之可用 |
+| **M2b 文件夹绑定** | 绑定已是 `thread_id`；`/new`、`/stop`；已绑定 chat 的斜杠命令不再落到旧 `@cc` | 同 M1 | |
 | **M3 审批与提问进 IM** | 线程审批/提问发到所有绑定的 chat，按钮，先答为准，另一边改写为“已处理” | | |
 | **M4 点名线程** | `Thread.Seq`、`@N`、引用回复、`/threads`、`/focus` | | |
 | **M5 收尾** | 未绑定走 coordinator；删 SmartGuide、Remote 页面、`remote/session`；旧绑定转换 | | |
@@ -147,13 +150,13 @@ M3 之前，需要审批的线程在 IM 里只有提示，靠 Web 处理，这�
 
 对应上面的提案，落地时的具体形状（与提案不同或提案没写到的地方）：
 
-- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（统一模型折成 `thread_id`，`target_kind`、`workdir_id`、`focus_thread_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
+- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（统一模型折成 `thread_id`，`target_kind`、`workdir_id`、`focus_thread_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`（统一模型后在事件上）。**归档**项目或移除文件夹会解绑它所有线程的 chat，chat 回到未绑定时的行为（今天是旧 `@cc`/`@tb` 路径），而不是每条消息都报“项目已归档”；取消归档不会重新绑定（chat 可能已改作他用，要用户显式再绑）。线程归档（resolve）暂不解绑：文件夹的 chat 由 M2b 的 `/new` 换到新线程，子线程的 chat 按 M4 退回父线程。
 - **接口**（`/api/v1/projects` 下）：`GET /channel-bindings?project_id=`、`PUT /channel-bindings`（`platform`、`chat_id`、`project_id`，可选 `chat_title`；已绑定的 chat 再绑即**改绑**，同一行）、`DELETE /channel-bindings/:id`。归档的项目不能被绑定。
 - **入站**：`remoteagent.ProjectRouter`（小接口，`BotHandler` 可选持有）在 `HandleMessage` 里、`@cc`/`@tb` 握手词检测**之前**取走**已绑定 chat 的非斜杠文本**；斜杠命令（`/help`、`/bind`、`/cd`…）、正在输入 `/cd` 路径的 chat、以及访问控制/配对/黑名单都照旧在它前面或旁边。没有绑定的 chat 不受任何影响。绑定了项目的 chat 发附件，回一句“暂不支持”，而不是悄悄送去 `@cc`。投递失败（如项目已暂停）会把原因回给 chat。
 - **走 Web 同一条路径**：入站只是 `Service.PostFromChannel`（解析绑定的线程，再调 `Service.Send(thread, text, source)`，来源记为 `im`），所以排队、暂停/归档检查、事件推送都和 Web 一致。
-- **出站**：Projects 的可选 Host 能力 `ChannelSink.SendChannelText(platform, chatID, text)`（类型断言，独立版没有，不发送）。`Relay` 在 `Coordinator.OnFinal`（主线程的助手回复、线程汇报、出错）、`Threads.OnReply`（非主线程每轮结束的文本或错误，只发给绑在该线程自己上的 chat）和 `Threads.OnWait`（线程要审批/提问）上挂钩，**按完成顺序逐条**发给项目绑定的**所有** chat，前缀 `[项目名] `；线程汇报折成一行（首行，最多 240 字）；审批/提问只发一行“某线程需要你，请到 Web 处理”，同一线程 5 分钟内只提醒一次。用户自己发的消息不回显。
+- **出站**：Projects 的可选 Host 能力 `ChannelSink.SendChannelText(platform, chatID, text)`（类型断言，独立版没有，不发送）。`Relay` 在 `Coordinator.OnFinal`（主线程的助手回复、线程汇报、出错）、`Threads.OnReply`（非主线程每轮结束的文本或错误，只发给绑在该线程自己上的 chat）和 `Threads.OnWait`（线程要审批/提问）上挂钩，**按完成顺序逐条**发给项目绑定的**所有** chat，前缀是消息来自的地方：项目对话 `[项目名] `，其他线程 `[#N 标题] `（线程汇报的事件载荷带 `seq`）；线程汇报折成一行（`[#2 修登录] Finished: 首行`，最多 240 字）；审批/提问只发一行“`[#2 修登录] Needs you`，请到 Web 处理”，同一线程 5 分钟内只提醒一次。用户自己发的消息不回显。
 - **Tingly Box 一侧**：`internal/server/module/projects.ChatBridge` 同时实现 `ProjectRouter` 和 `ChannelSink`，经 bot 的 `remote/channel.Channel.Send` 发送（与通知同一条路径，微信的 `context_token` 等照常）。哪个 bot 发：优先该 chat 最近一次入站所用的 bot；重启后还没收到过消息时，依次试该平台的 bot。被屏蔽（disabled）的 chat 不发。Projects 开关关闭时桥不接任何消息。
-- **没做**：working folder 绑定、IM 里审批（M3）、`@N`、聚焦、媒体入站、`chat_title` 的自动获取（现在只有显式传入）。
+- **没做**：文件夹 chat 的 `/new`、`/stop`（M2b）、IM 里审批（M3）、`@N`、聚焦、媒体入站、`chat_title` 的自动获取（现在只有显式传入）。
 
 ## 待定
 

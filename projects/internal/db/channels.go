@@ -113,3 +113,11 @@ func (s *Store) DeleteChannelBinding(id string) error {
 	}
 	return nil
 }
+
+// DeleteProjectChannelBindings unbinds every chat bound to a thread of the
+// project and returns how many there were.
+func (s *Store) DeleteProjectChannelBindings(projectID string) (int64, error) {
+	res := s.db.Where("thread_id IN (?)", s.db.Model(&Thread{}).Select("id").Where("project_id = ?", projectID)).
+		Delete(&ChannelBinding{})
+	return res.RowsAffected, res.Error
+}

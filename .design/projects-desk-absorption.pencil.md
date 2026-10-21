@@ -1,7 +1,12 @@
 # Projects absorbs Desk — Pencil Graph
 
 Visual companion to [`projects-desk-absorption.md`](./projects-desk-absorption.md),
-which stays the authority on decisions and status. This file shows what changed
+which stays the authority on decisions and status.
+
+> **Superseded in part** by [projects-sessions.md](./projects-sessions.md): the
+> Workdir table and the `/api/v1/projects/sessions` and `/api/v1/projects/workdirs`
+> routes drawn below are gone. A working folder is a `type=folder` project, its
+> sessions are threads, and they are addressed as `/api/v1/threads/:id/*`. This file shows what changed
 across the stack: where things lived before, where they live now, how Tingly
 Box plugs its own parts in, and what happens to old Desk data at cutover.
 

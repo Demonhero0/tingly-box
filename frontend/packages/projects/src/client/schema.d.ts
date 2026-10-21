@@ -299,8 +299,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted
-         * @description Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, nothing is deleted
+         * Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted
+         * @description Archive a project or folder (the same as PATCH archived=true): its threads stop and stay readable, its IM chats are unbound, nothing is deleted
          */
         delete: operations["apiV1ProjectsIdDelete"];
         options?: never;
