@@ -91,7 +91,7 @@ func (ph *ProtocolHandler) HandleOpenAIDecisions(c *gin.Context) {
 }
 
 func decisionBadRequest(c *gin.Context, msg string) {
-	c.JSON(http.StatusBadRequest, ErrorResponse{
+	writeErrorResponse(c, http.StatusBadRequest, ErrorResponse{
 		Error: ErrorDetail{Message: msg, Type: "invalid_request_error"},
 	})
 }

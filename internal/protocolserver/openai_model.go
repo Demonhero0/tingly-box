@@ -47,7 +47,7 @@ func (ph *ProtocolHandler) OpenAIListModelsForScenario(c *gin.Context, scenario 
 func (ph *ProtocolHandler) openAIListModelsWithScenario(c *gin.Context, scenario *typ.RuleScenario) {
 	cfg := ph.deps.Config
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		writeErrorResponse(c, http.StatusInternalServerError, ErrorResponse{
 			Error: ErrorDetail{
 				Message: "Config not available",
 				Type:    "internal_error",

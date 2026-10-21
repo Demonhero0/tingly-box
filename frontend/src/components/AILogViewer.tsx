@@ -16,6 +16,8 @@ import {
     TableSortLabel,
     Switch,
     Tooltip,
+    TextField,
+    MenuItem,
 } from '@mui/material';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardArrowDown as KeyboardArrowDownIcon, KeyboardArrowUp as KeyboardArrowUpIcon, Refresh as RefreshIcon, ErrorOutline as ErrorOutlineIcon } from '@/components/icons';
@@ -84,33 +86,43 @@ const statusColor = (status?: number): 'default' | 'success' | 'warning' | 'erro
 
 const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario }: RequestsViewerProps) => {
     const [requests, setRequests] = useState<ModelRequestSummary[]>([]);
+    const [total, setTotal] = useState(0);
+    const [limit, setLimit] = useState(200);
+    const [search, setSearch] = useState('');
+    const [errorsOnly, setErrorsOnly] = useState(false);
     const [loading, setLoading] = useState(false);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [details, setDetails] = useState<Record<string, ModelRequestDetail>>({});
+    const [detailState, setDetailState] = useState<{ id: string; detail?: ModelRequestDetail; error?: string }>();
+    const [detailVersion, setDetailVersion] = useState(0);
     const [error, setError] = useState<string | null>(null);
     // Always start unfiltered so the user sees the full picture.
     // initialScenario is kept as a prop only to power the quick-filter chip.
     const [scenario, setScenario] = useState('');
     const tableContainerRef = useRef<HTMLDivElement>(null);
+    const listSequence = useRef(0);
     // Sorting is client-side only — never triggers a refetch.
     const { sortField, sortOrder, handleSort } = useTableSort<SortField>('time');
 
     const loadRequests = async () => {
+        const sequence = ++listSequence.current;
         setLoading(true);
         setError(null);
         try {
             const response = await getRequests({
-                limit: 200,
+                limit,
                 scenario: scenario || undefined,
             });
+            if (sequence !== listSequence.current) return;
             if (response && response.requests) {
                 setRequests(response.requests);
+                setTotal(response.total);
             }
+            setDetailVersion(version => version + 1);
         } catch (e: any) {
-            setError(e instanceof Error ? e.message : 'Failed to load requests');
+            if (sequence === listSequence.current) setError(e instanceof Error ? e.message : 'Failed to load requests');
         } finally {
-            setLoading(false);
+            if (sequence === listSequence.current) setLoading(false);
         }
     };
 
@@ -118,14 +130,16 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
     useEffect(() => {
         loadRequests();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scenario]);
+    }, [scenario, limit]);
 
-    useAutoRefresh(autoRefresh, loadRequests, [scenario]);
+    useAutoRefresh(autoRefresh, loadRequests, [scenario, limit]);
 
     // Client-side sort — re-sorts the already-fetched rows instead of
     // refetching from the network on every sort change.
     const sortedRequests = useMemo(() => {
-        return [...requests].sort((a, b) => {
+        const query = search.trim().toLowerCase();
+        return requests.filter(request => (!errorsOnly || request.has_error) &&
+            (!query || JSON.stringify(request).toLowerCase().includes(query))).sort((a, b) => {
             let comparison = 0;
             switch (sortField) {
                 case 'time':
@@ -149,25 +163,20 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
             }
             return sortOrder === 'asc' ? comparison : -comparison;
         });
-    }, [requests, sortField, sortOrder]);
+    }, [requests, sortField, sortOrder, search, errorsOnly]);
 
-    const toggleRow = async (id: string) => {
-        if (expandedId === id) {
-            setExpandedId(null);
-            return;
-        }
-        setExpandedId(id);
-        if (!details[id]) {
-            try {
-                const detail = await getRequestDetail(id);
-                if (detail) {
-                    setDetails((prev) => ({ ...prev, [id]: detail }));
-                }
-            } catch (e: any) {
-                setError(e instanceof Error ? e.message : 'Failed to load request detail');
-            }
-        }
-    };
+    // Only the open request owns detail state. Cleanup rejects stale responses.
+    useEffect(() => {
+        if (!expandedId) return;
+        let cancelled = false;
+        getRequestDetail(expandedId).then(detail => {
+            if (!cancelled) setDetailState({ id: expandedId, detail: detail ?? undefined,
+                error: detail ? undefined : 'Request details are no longer available in retained history.' });
+        }).catch((error: unknown) => {
+            if (!cancelled) setDetailState({ id: expandedId, error: error instanceof Error ? error.message : 'Failed to load request detail' });
+        });
+        return () => { cancelled = true; };
+    }, [expandedId, detailVersion, getRequestDetail]);
 
     return (
         <Stack spacing={1.5} sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -214,9 +223,14 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                             color: "text.secondary",
                             whiteSpace: 'nowrap'
                         }}>
-                        {loading ? 'Refreshing…' : `${requests.length} requests`}
+                        {loading ? 'Refreshing…' : `${sortedRequests.length} shown · ${total} recent requests`}
                     </Typography>
                 </Stack>
+                <TextField size="small" label="Search loaded requests" value={search} onChange={event => setSearch(event.target.value)} sx={{ minWidth: 220 }} />
+                <Chip size="small" label="With errors" color={errorsOnly ? 'error' : 'default'} variant={errorsOnly ? 'filled' : 'outlined'} onClick={() => setErrorsOnly(value => !value)} />
+                <TextField select size="small" label="Load" value={limit} onChange={event => setLimit(Number(event.target.value))} sx={{ minWidth: 95 }}>
+                    {[200, 500, 1000].map(value => <MenuItem key={value} value={value}>{value}</MenuItem>)}
+                </TextField>
                 <Stack direction="row" spacing={1} sx={{
                     alignItems: "center"
                 }}>
@@ -317,20 +331,21 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                                         <Typography sx={{
                                             color: "text.secondary"
                                         }}>
-                                            {loading ? 'Loading...' : 'No model requests yet — send a request through the gateway.'}
+                                            {loading ? 'Loading...' : requests.length > 0 ? 'No loaded requests match these filters.' : 'No model requests in recent retained history.'}
                                         </Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 sortedRequests.map((req) => {
                                     const expanded = expandedId === req.request_id;
-                                    const detail = details[req.request_id];
+                                    const current = detailState?.id === req.request_id ? detailState : undefined;
+                                    const detail = current?.detail;
                                     return (
                                         <Fragment key={req.request_id}>
                                             <TableRow
                                                 hover
                                                 sx={{ cursor: 'pointer' }}
-                                                onClick={() => toggleRow(req.request_id)}
+                                                onClick={() => setExpandedId(expanded ? null : req.request_id)}
                                             >
                                                 <TableCell padding="checkbox">
                                                     <IconButton size="small">
@@ -383,6 +398,7 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                                                 <TableCell colSpan={7} sx={{ pb: 0, pt: 0, border: 'none' }}>
                                                     <Collapse in={expanded} timeout="auto" unmountOnExit>
                                                         <Box sx={{ p: 1.5, backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                                                            {current?.error && <Alert severity="warning">{current?.error}</Alert>}
                                                             {detail ? (
                                                                 <RequestJourney
                                                                     events={detail.events}
@@ -391,7 +407,7 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                                                                 />
                                                             ) : (
                                                                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                                    Loading journey...
+                                                                    {current?.error ? 'Use refresh to retry.' : 'Loading journey...'}
                                                                 </Typography>
                                                             )}
                                                             <Stack

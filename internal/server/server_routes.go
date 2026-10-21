@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 
-	"github.com/gin-gonic/gin"
 	"github.com/tingly-dev/tingly-box/internal/middleware"
 	"github.com/tingly-dev/tingly-box/internal/server/module"
 	sharing "github.com/tingly-dev/tingly-box/internal/server/module/sharing"
@@ -13,13 +12,12 @@ import (
 
 // setupMiddleware configures server middleware
 func (s *Server) setupMiddleware() {
-	// Recovery middleware
-	s.engine.Use(gin.Recovery())
-
 	// Memory log middleware for HTTP request logging
 	if s.memoryLogMW != nil {
 		s.engine.Use(s.memoryLogMW.Middleware())
 	}
+	// Recover inside access logging so panics retain their error and 500 status.
+	s.engine.Use(middleware.Recovery())
 
 	// CORS middleware
 	s.engine.Use(middleware.CORS())
