@@ -107,6 +107,10 @@ func (h *BotHandler) HandleMessage(msg imbot.Message, platform imbot.Platform, b
 	if h.routeProjectCommand(hCtx, text) {
 		return
 	}
+	// A bound chat's /help lists what it can do in Projects.
+	if h.routeProjectHelp(hCtx, text) {
+		return
+	}
 
 	// Check for stop commands FIRST (highest priority)
 	// Supports: /stop, stop, /clear (stop+clear)

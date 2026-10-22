@@ -133,10 +133,11 @@ func Test_BoundChatGoesToItsProject(t *testing.T) {
 	chat.SendText("hello?")
 	chat.WaitText(3*time.Second).AssertContains(t, "Could not send this to the project").AssertContains(t, "paused")
 
-	// Commands still work in a bound chat.
+	// Commands still work in a bound chat; /help lists the Projects ones.
 	chat.Drain()
 	chat.SendText("/help")
-	chat.WaitText(3*time.Second).AssertContains(t, "Your ID:")
+	help := chat.WaitText(3*time.Second).AssertContains(t, "Your ID:").AssertContains(t, "/threads")
+	assert.NotContains(t, help.Text, "@cc", "a bound chat no longer reaches @cc")
 	assert.Len(t, router.inbound(), 2, "commands are not sent to the project")
 }
 
