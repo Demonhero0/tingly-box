@@ -7510,12 +7510,39 @@
             }
           },
           {
+            "name": "parent",
+            "in": "query",
+            "description": "An Agent call's request id: page through that subagent's steps instead of the thread's own conversation",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
-            "description": "Latest N events",
+            "description": "Latest N events (of those before `before`); on the conversation, every older usage event comes too",
             "required": false,
             "schema": {
               "type": "integer"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "An event id: only events older than it",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "RFC 3339 time: every event added or changed at or after it (its updated_at), subagent steps included; parent, limit and before do not apply",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -12774,10 +12801,15 @@
             "items": {
               "$ref": "#/components/schemas/ThreadEvent"
             }
+          },
+          "more": {
+            "type": "boolean",
+            "description": "Field more"
           }
         },
         "required": [
-          "events"
+          "events",
+          "more"
         ]
       },
       "ExecuteToolRequest": {
@@ -19063,6 +19095,11 @@
           "thread_id": {
             "type": "string",
             "description": "Field thread_id"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Field updated_at"
           }
         },
         "required": [
@@ -19070,7 +19107,8 @@
           "thread_id",
           "kind",
           "content",
-          "created_at"
+          "created_at",
+          "updated_at"
         ]
       },
       "ThreadRespondRequest": {
