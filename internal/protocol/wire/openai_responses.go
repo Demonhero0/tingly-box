@@ -149,6 +149,26 @@ type ResponsesOutputItemWire struct {
 	Arguments *string                    `json:"arguments,omitempty"`
 }
 
+// MarshalJSON ensures message items always carry "content" (an empty array
+// when unset): the real Responses API sends "content":[] on a message's
+// response.output_item.added, and Codex ignores a message item without it,
+// then drops every output_text delta for lack of an active item (#1922).
+func (i ResponsesOutputItemWire) MarshalJSON() ([]byte, error) {
+	type plain ResponsesOutputItemWire
+	if i.Type != "message" {
+		return json.Marshal(plain(i))
+	}
+	content := i.Content
+	if content == nil {
+		content = []ResponsesContentPartWire{}
+	}
+	// The outer Content shadows plain's omitempty one.
+	return json.Marshal(struct {
+		plain
+		Content []ResponsesContentPartWire `json:"content"`
+	}{plain(i), content})
+}
+
 type ResponsesContentPartWire struct {
 	Type        string        `json:"type"`
 	Text        string        `json:"text,omitempty"`
