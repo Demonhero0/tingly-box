@@ -1,6 +1,7 @@
 package configapply
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -91,6 +92,35 @@ func TestWorkBuddyConfig_ApplyStatusPreviewRestore(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "claude-sonnet-5", "restore returns the pre-apply content")
 	assert.Contains(t, string(data), `"mine"`)
+}
+
+// One edition restored, the other without a backup: not a success, and the
+// message names both what was restored and what failed.
+func TestRestoreWorkBuddyConfig_PartialRestoreIsNotSuccess(t *testing.T) {
+	r, file := workBuddyTestRouter(t, []typ.Rule{
+		{UUID: "wb1", Scenario: typ.ScenarioWorkBuddy, RequestModel: "claude-sonnet-5", Active: true},
+	})
+	home := filepath.Dir(filepath.Dir(file))
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".workbuddy-ai"), 0o755))
+	require.NoError(t, os.WriteFile(file, []byte(`[{"id":"mine","url":"https://x/v1/chat/completions"}]`), 0o600))
+
+	// The China file exists (backed up); the international one is created (no backup).
+	require.Contains(t, doWB(r, http.MethodPost, "/apply/workbuddy").Body.String(), `"success":true`)
+
+	time.Sleep(1100 * time.Millisecond)
+	var resp RestoreConfigResponse
+	require.NoError(t, json.Unmarshal(doWB(r, http.MethodPost, "/restore/workbuddy").Body.Bytes(), &resp))
+	assert.False(t, resp.Success)
+	require.Len(t, resp.RestoredFiles, 1)
+	assert.Contains(t, resp.RestoredFiles[0], "~/.workbuddy/models.json")
+	require.Len(t, resp.Failures, 1)
+	assert.Contains(t, resp.Failures[0], "~/.workbuddy-ai/models.json")
+	assert.Contains(t, resp.Message, "~/.workbuddy/models.json")
+	assert.Contains(t, resp.Message, "~/.workbuddy-ai/models.json")
+
+	data, err := os.ReadFile(file)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "claude-sonnet-5", "the edition with a backup is still restored")
 }
 
 // A route that is written but never registered fails silently (the frontend just

@@ -81,7 +81,8 @@ but Cursor (`scenarioRegistry.tsx` `DEFAULT_HIDDEN`).
       `availableModels` logic), keeps an array as an array, creates new files as an
       array;
     - status is "applied" only when every installed edition matches; restore rolls
-      back each installed edition that has a backup.
+      back each installed edition that has a backup and succeeds only when all of them
+      were restored (a partial restore reports what was restored and what failed).
     It no longer writes `~/.codebuddy/models.json` (that is CodeBuddy CLI/IDE's
     file); entries an older build left there are not cleaned up automatically.
 - **Auto Config behaviour** (`internal/config/apply_config_workbuddy.go`,

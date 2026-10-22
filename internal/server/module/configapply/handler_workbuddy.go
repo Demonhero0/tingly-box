@@ -143,10 +143,14 @@ func (h *Handler) RestoreWorkBuddyConfig(c *gin.Context) {
 			resp.PreRestoreBackups = append(resp.PreRestoreBackups, r.PreRestoreBackup)
 		}
 	}
-	resp.Success = len(restored) > 0
-	if resp.Success {
+	resp.Success = len(restored) > 0 && len(resp.Failures) == 0
+	switch {
+	case resp.Success:
 		resp.Message = "Restored " + strings.Join(restored, ", ")
-	} else {
+	case len(restored) > 0:
+		resp.Message = "Partially restored " + agentType + ": restored " + strings.Join(restored, ", ") +
+			"; failed " + strings.Join(resp.Failures, "; ")
+	default:
 		resp.Message = "Restore failed for " + agentType + ": " + strings.Join(resp.Failures, "; ")
 	}
 	c.JSON(http.StatusOK, resp)
