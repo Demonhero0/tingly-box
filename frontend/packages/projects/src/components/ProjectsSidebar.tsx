@@ -1,15 +1,13 @@
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Badge, Box, Divider, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Tooltip, Typography } from '@mui/material';
 import { NAV_ROW_SX, navRowSelectedSx, navRowTextSlotProps } from '@tingly/ui/theme/nav';
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useProjectList } from '../hooks/useProjectList';
-import { api, unwrap, type ProjectSummary, type Thread } from '../client';
-import { folderName, timeAgo } from '../utils/format';
-import { Add, ChatBubble, Folder, FolderOpen, Star } from './icons';
+import { Add, ChatBubble, Folder } from './icons';
 import { useProjectsHost } from '../host/ProjectsHost';
-import { needsUser } from './project/threadStatus';
+import { NavTree } from './NavTree';
 
 /** One row of a sidebar section: a place the user can open. */
 export interface ProjectsSidebarRow {
@@ -27,8 +25,6 @@ export interface ProjectsSidebarRow {
     attention?: boolean;
     /** Work runs here and nothing waits: a quieter dot. */
     running?: boolean;
-    /** Rows nested under this one (a folder's recent sessions). */
-    children?: ProjectsSidebarRow[];
     /** Trailing content: a count, a status mark. */
     end?: ReactNode;
 }
@@ -47,6 +43,8 @@ export interface ProjectsSidebarSection {
     rows: ProjectsSidebarRow[];
     /** Shown when there are no rows. */
     empty?: ReactNode;
+    /** Replaces the generic rows (the working folders draw a tree). */
+    content?: ReactNode;
 }
 
 export interface ProjectsSidebarProps {
@@ -61,9 +59,6 @@ export interface ProjectsSidebarProps {
     /** Called after a row or link is followed (closes a host's mobile drawer). */
     onNavigate?: () => void;
 }
-
-// The folder a working directory sits in, home shortened to ~.
-const parentPath = (path: string) => path.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '').replace(/^\/(Users|home)\/[^/]+/, '~') || '/';
 
 /** How many IM bots the host has, for the sidebar's IM row; null until known or when there is no IM. */
 function useImBotCount(enabled: boolean): number | null {
@@ -80,48 +75,6 @@ function useImBotCount(enabled: boolean): number | null {
         };
     }, [enabled, im]);
     return count;
-}
-
-/** What a project or folder row says about its threads: running and waiting, else what waits. */
-function useActivity() {
-    const { t } = useTranslation('projects');
-    return (p: ProjectSummary, waitingKey: 'sidebar.waiting' | 'sidebar.sessionsWaiting') => {
-        const { working } = p.threads;
-        const waiting = p.threads.waiting + p.threads.failed;
-        if (working > 0 && waiting > 0) return t('sidebar.activity', { running: working, waiting });
-        if (working > 0) return t('sidebar.running', { count: working });
-        return waiting > 0 ? t(waitingKey, { count: waiting }) : undefined;
-    };
-}
-
-const MAX_RECENT = 3;
-
-/**
- * The open folder's latest live sessions, listed under it: what runs and what
- * waits first. One request, for the open folder only, read again when its
- * counts change.
- */
-function useRecentSessions(folder: ProjectSummary | undefined): Thread[] {
-    const [threads, setThreads] = useState<Thread[]>([]);
-    const id = folder?.id;
-    const c = folder?.threads;
-    const signature = c ? `${c.working}/${c.waiting}/${c.failed}/${c.idle}/${c.ready}` : '';
-    useEffect(() => {
-        if (!id) {
-            setThreads([]);
-            return;
-        }
-        let alive = true;
-        unwrap(api.GET('/api/v1/projects/{id}/threads', { params: { path: { id } } }))
-            .then((r) => alive && setThreads(r.threads ?? []))
-            .catch(() => {
-                // The folder row still works without its sessions.
-            });
-        return () => {
-            alive = false;
-        };
-    }, [id, signature]);
-    return threads;
 }
 
 function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection; onNavigate?: () => void }) {
@@ -147,11 +100,12 @@ function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection;
                 )}
             </Box>}
             <List disablePadding>
-                {section.rows.length === 0 && section.empty && (
+                {section.content}
+                {section.rows.length === 0 && !section.content && section.empty && (
                     <Typography variant="body2" color="text.secondary" sx={{ px: 3, py: 1 }}>{section.empty}</Typography>
                 )}
                 {section.rows.map((row) => (
-                    <Fragment key={row.key}>
+                    <Box key={row.key}>
                     <ListItemButton
                         component={NavLink}
                         to={row.to}
@@ -174,28 +128,7 @@ function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection;
                         <ListItemText primary={row.label} secondary={row.subtitle} slotProps={navRowTextSlotProps(!!row.selected)} sx={{ minWidth: 0, my: 0 }} />
                         {row.end != null && <Box className="row-end" sx={{ ml: 1, flexShrink: 0, display: 'flex', alignItems: 'center' }}>{row.end}</Box>}
                     </ListItemButton>
-                    {row.children?.map((c) => (
-                        <ListItemButton
-                            key={c.key}
-                            component={NavLink}
-                            to={c.to}
-                            onClick={onNavigate}
-                            title={c.title}
-                            aria-current={c.selected ? 'page' : undefined}
-                            sx={{
-                                ...NAV_ROW_SX,
-                                ml: 4.5, pl: 1.25, py: 0.25, minHeight: 28,
-                                color: 'text.secondary',
-                                '&:hover': { backgroundColor: 'action.hover', color: 'text.primary' },
-                                ...(c.selected && { backgroundColor: 'action.selected', color: 'text.primary' }),
-                            }}
-                        >
-                            <Badge color="warning" variant="dot" invisible={!c.attention && !c.running} sx={[{ mr: 1.25, '& .MuiBadge-badge': { position: 'static', transform: 'none' } }, c.attention ? {} : RUNNING_DOT]} />
-                            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: fontSizes.sm, color: 'inherit' }}>{c.label}</Typography>
-                            {c.end != null && <Box sx={{ ml: 1, flexShrink: 0, fontSize: fontSizes.xs, color: 'text.disabled' }}>{c.end}</Box>}
-                        </ListItemButton>
-                    ))}
-                    </Fragment>
+                    </Box>
                 ))}
             </List>
         </Box>
@@ -208,7 +141,7 @@ function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection;
  * the host; Tingly Box passes its working folders in as a section.
  */
 export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, showIm = true, sections = [], onNavigate }: ProjectsSidebarProps) {
-    const { t, i18n } = useTranslation('projects');
+    const { t } = useTranslation('projects');
     const navigate = useNavigate();
     const location = useLocation();
     const { paths, im } = useProjectsHost();
@@ -217,9 +150,6 @@ export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sho
     const { projects, folders } = useProjectList(showProjects || showWorkdirs);
     const [params] = useSearchParams();
     const scope = location.pathname === paths.folder().split('?')[0] ? params.get('path') ?? '' : undefined;
-    const activity = useActivity();
-    const openFolder = scope ? (folders ?? []).find((f) => f.path === scope) : undefined;
-    const recent = useRecentSessions(openFolder);
     const openSession = params.get('session');
 
     const projectSection: ProjectsSidebarSection | null = showProjects ? {
@@ -233,38 +163,20 @@ export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sho
                 onNavigate?.();
             },
         },
-        rows: (projects ?? []).map((p) => {
-            const to = paths.project(p.id);
-            return {
-                key: p.id,
-                label: p.name,
-                to,
-                selected: location.pathname === to,
-                attention: p.threads.waiting + p.threads.failed > 0,
-                running: p.threads.working > 0,
-                icon: p.starred ? <Star /> : undefined,
-                subtitle: activity(p, 'sidebar.waiting'),
-            };
-        }),
+        rows: [],
+        content: projects?.length ? (
+            <NavTree
+                items={projects}
+                isFolder={false}
+                activeId={projects?.find((p) => location.pathname === paths.project(p.id))?.id}
+                openSession={params.get('thread')}
+                openParam="thread"
+                to={(p) => paths.project(p.id)}
+                onNavigate={onNavigate}
+            />
+        ) : undefined,
         empty: projects ? t('sidebar.noProjects') : undefined,
     } : null;
-
-    // The open folder's sessions that run or wait come first, then the latest; archived ones stay out.
-    const rank = (th: Thread) => (needsUser(th.status) ? 0 : th.status === 'working' ? 1 : 2);
-    const recentRows = (path: string): ProjectsSidebarRow[] => recent
-        .filter((th) => th.status !== 'resolved')
-        .sort((a, b) => rank(a) - rank(b) || b.updated_at.localeCompare(a.updated_at))
-        .slice(0, MAX_RECENT)
-        .map((th) => ({
-            key: th.id,
-            label: th.title,
-            title: th.title,
-            to: `${paths.folder(path)}${paths.folder(path).includes('?') ? '&' : '?'}session=${encodeURIComponent(th.id)}`,
-            selected: th.id === openSession,
-            attention: needsUser(th.status),
-            running: th.status === 'working',
-            end: th.status === 'working' || needsUser(th.status) ? undefined : timeAgo(th.updated_at, i18n.language),
-        }));
 
     const workdirSection: ProjectsSidebarSection | null = showWorkdirs ? {
         key: 'workdirs',
@@ -277,22 +189,18 @@ export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sho
                 onNavigate?.();
             },
         },
-        rows: (folders ?? []).map((f) => {
-            const path = f.path ?? '';
-            return {
-                key: f.id,
-                label: folderName(path),
-                title: path,
-                icon: <FolderOpen />,
-                // What waits here, else where the folder is.
-                subtitle: activity(f, 'sidebar.sessionsWaiting') ?? parentPath(path),
-                to: paths.folder(path),
-                selected: scope === path && !openSession,
-                attention: f.threads.waiting + f.threads.failed > 0,
-                running: f.threads.working > 0,
-                children: f.id === openFolder?.id ? recentRows(path) : undefined,
-            };
-        }),
+        rows: [],
+        content: folders?.length ? (
+            <NavTree
+                items={folders}
+                isFolder
+                activeId={folders.find((f) => f.path === scope)?.id}
+                openSession={openSession}
+                openParam="session"
+                to={(f) => paths.folder(f.path ?? '')}
+                onNavigate={onNavigate}
+            />
+        ) : undefined,
         empty: folders ? t('sidebar.noWorkdirs') : undefined,
     } : null;
 
