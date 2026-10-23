@@ -43,9 +43,14 @@ type anthropicToOpenAIConverter struct {
 	toolCallArgs     strings.Builder
 	hasToolCalls     bool
 	suppressToolCall bool
-	pendingToolCalls []AnthropicToOpenAIToolCall
-	thinkingText     strings.Builder
-	serviceTier      *string // from message_start usage; stamped on every chunk
+	// toolCallIndex is the Chat tool_calls[].index of the current tool call;
+	// nextToolCallIndex counts the calls emitted so far. Chat clients merge
+	// deltas that share an index, so each emitted call needs its own.
+	toolCallIndex     int
+	nextToolCallIndex int
+	pendingToolCalls  []AnthropicToOpenAIToolCall
+	thinkingText      strings.Builder
+	serviceTier       *string // from message_start usage; stamped on every chunk
 
 	// pending event queue
 	pending []interface{}
@@ -145,11 +150,14 @@ func (c *anthropicToOpenAIConverter) processEvent(event *anthropic.BetaRawMessag
 			c.suppressToolCall = c.hooks != nil && c.hooks.ShouldSuppressTool != nil && c.hooks.ShouldSuppressTool(c.toolCallName)
 			if !c.suppressToolCall {
 				c.hasToolCalls = true
+				// Suppressed calls never reach the client, so they take no index.
+				c.toolCallIndex = c.nextToolCallIndex
+				c.nextToolCallIndex++
 				emptyArgs := ""
 				c.emitChunk(wire.ChatStreamDelta{
 					ToolCalls: []wire.ChatStreamToolCall{
 						{
-							Index: 0,
+							Index: c.toolCallIndex,
 							ID:    c.toolCallID,
 							Type:  "function",
 							Function: wire.ChatStreamToolFunction{
@@ -177,7 +185,7 @@ func (c *anthropicToOpenAIConverter) processEvent(event *anthropic.BetaRawMessag
 				c.emitChunk(wire.ChatStreamDelta{
 					ToolCalls: []wire.ChatStreamToolCall{
 						{
-							Index:    0,
+							Index:    c.toolCallIndex,
 							Function: wire.ChatStreamToolFunction{Arguments: &args},
 						},
 					},
