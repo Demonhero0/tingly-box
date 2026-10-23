@@ -3,6 +3,7 @@ package configapply
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,11 +21,20 @@ func collectWorkBuddyRuleModels(cfg *config.Config) []string {
 
 const noWorkBuddyRulesMessage = "Add a model rule for WorkBuddy first — Auto Config writes one WorkBuddy model per rule."
 
+// workBuddyDisplayPaths names the installed editions' files, or every edition's
+// when none is installed, so the UI always shows where Auto Config looks.
+func workBuddyDisplayPaths(installed, all []config.WorkBuddyTarget) string {
+	if len(installed) > 0 {
+		return config.WorkBuddyDisplayPaths(installed)
+	}
+	return config.WorkBuddyDisplayPaths(all)
+}
+
 // ApplyWorkBuddyConfigFromState writes the active WorkBuddy-scenario rules into
-// ~/.codebuddy/models.json. Like the other agents it does NOT touch routing
-// rules, and unlike OpenCode it does not invent a default model: with no rules
-// there is nothing to write, which is reported instead of creating a phantom
-// entry.
+// the models.json of every installed WorkBuddy edition. Like the other agents it
+// does NOT touch routing rules, and unlike OpenCode it does not invent a default
+// model: with no rules there is nothing to write, which is reported instead of
+// creating a phantom entry.
 func (h *Handler) ApplyWorkBuddyConfigFromState(c *gin.Context) {
 	cfg := h.config
 	if cfg == nil {
@@ -60,68 +70,88 @@ func (h *Handler) GetWorkBuddyConfigPreview(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, WorkBuddyConfigPreviewResponse{Message: "Global config not available"})
 		return
 	}
+	installed, all, err := config.WorkBuddyTargets()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, WorkBuddyConfigPreviewResponse{Message: err.Error()})
+		return
+	}
 	models := collectWorkBuddyRuleModels(cfg)
 	baseURL := middleware.BaseURLFromRequest(c, h.resolvedPort()) + "/tingly/workbuddy"
 	entries := config.BuildWorkBuddyModelEntries(baseURL, maskSecret(cfg.GetModelToken()), models)
-	out, err := json.MarshalIndent(map[string]interface{}{"models": entries}, "", "  ")
+	out, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, WorkBuddyConfigPreviewResponse{Message: "Failed to generate config JSON: " + err.Error()})
 		return
 	}
-	resp := WorkBuddyConfigPreviewResponse{Success: true, ConfigJSON: string(out), Path: config.WorkBuddyModelsRelPath, Models: models}
-	if len(models) == 0 {
+	resp := WorkBuddyConfigPreviewResponse{Success: true, ConfigJSON: string(out), Path: workBuddyDisplayPaths(installed, all), Models: models}
+	switch {
+	case len(models) == 0:
 		resp.Message = noWorkBuddyRulesMessage
+	case len(installed) == 0:
+		resp.Message = config.WorkBuddyNotInstalledMessage(all)
 	}
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetWorkBuddyConfigStatus compares ~/.codebuddy/models.json with the models the
-// WorkBuddy rules produce now.
+// GetWorkBuddyConfigStatus compares the installed editions' models.json with
+// the models the WorkBuddy rules produce now.
 func (h *Handler) GetWorkBuddyConfigStatus(c *gin.Context) {
-	applied, err := config.ReadWorkBuddyAppliedState()
+	installed, all, err := config.WorkBuddyTargets()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ClientConfigStatusResponse{Error: err.Error()})
 		return
 	}
-	state, diffs := config.CompareWorkBuddyConfig(applied, collectWorkBuddyRuleModels(h.config))
+	state, diffs := config.CompareWorkBuddyTargets(installed, collectWorkBuddyRuleModels(h.config))
 	c.JSON(http.StatusOK, ClientConfigStatusResponse{
 		Success:     true,
 		State:       state,
-		Path:        config.WorkBuddyModelsRelPath,
+		Path:        workBuddyDisplayPaths(installed, all),
 		Differences: toDifferences(diffs),
 	})
 }
 
-// RestoreWorkBuddyConfig rolls ~/.codebuddy/models.json back to its most recent
-// backup (the pre-restore state is itself backed up first).
+// RestoreWorkBuddyConfig rolls each installed edition's models.json back to its
+// most recent backup (the pre-restore state is itself backed up first).
 func (h *Handler) RestoreWorkBuddyConfig(c *gin.Context) {
 	const agentType = "workbuddy"
-	path, err := config.WorkBuddyModelsFilePath()
+	installed, all, err := config.WorkBuddyTargets()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, RestoreConfigResponse{AgentType: agentType, Message: "Restore failed: " + err.Error()})
 		return
 	}
-	r, err := aiagent.RestoreLatestBackup(path)
-	if err != nil {
-		msg := err.Error()
-		if r != nil && r.Message != "" {
-			msg = r.Message
-		}
-		c.JSON(http.StatusOK, RestoreConfigResponse{
-			AgentType: agentType,
-			Failures:  []string{config.WorkBuddyModelsRelPath + ": " + msg},
-			Message:   "Restore failed for " + agentType + ": " + msg,
-		})
+	if len(installed) == 0 {
+		msg := config.WorkBuddyNotInstalledMessage(all)
+		c.JSON(http.StatusOK, RestoreConfigResponse{AgentType: agentType, Failures: []string{msg}, Message: "Restore failed for " + agentType + ": " + msg})
 		return
 	}
-	resp := RestoreConfigResponse{
-		Success:       true,
-		AgentType:     agentType,
-		RestoredFiles: []string{config.WorkBuddyModelsRelPath + " <- " + r.RestoredFrom},
-		Message:       "Restored " + config.WorkBuddyModelsRelPath,
+
+	resp := RestoreConfigResponse{AgentType: agentType, RestoredFiles: []string{}, PreRestoreBackups: []string{}}
+	var restored []string
+	for _, t := range installed {
+		r, err := aiagent.RestoreLatestBackup(t.Path)
+		if err != nil {
+			msg := err.Error()
+			if r != nil && r.Message != "" {
+				msg = r.Message
+			}
+			resp.Failures = append(resp.Failures, t.DisplayPath+": "+msg)
+			continue
+		}
+		restored = append(restored, t.DisplayPath)
+		resp.RestoredFiles = append(resp.RestoredFiles, t.DisplayPath+" <- "+r.RestoredFrom)
+		if r.PreRestoreBackup != "" {
+			resp.PreRestoreBackups = append(resp.PreRestoreBackups, r.PreRestoreBackup)
+		}
 	}
-	if r.PreRestoreBackup != "" {
-		resp.PreRestoreBackups = []string{r.PreRestoreBackup}
+	resp.Success = len(restored) > 0 && len(resp.Failures) == 0
+	switch {
+	case resp.Success:
+		resp.Message = "Restored " + strings.Join(restored, ", ")
+	case len(restored) > 0:
+		resp.Message = "Partially restored " + agentType + ": restored " + strings.Join(restored, ", ") +
+			"; failed " + strings.Join(resp.Failures, "; ")
+	default:
+		resp.Message = "Restore failed for " + agentType + ": " + strings.Join(resp.Failures, "; ")
 	}
 	c.JSON(http.StatusOK, resp)
 }

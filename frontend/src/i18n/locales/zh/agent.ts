@@ -173,7 +173,7 @@ export default {
       "restartNote": "保存后，在对话的模型选择器里「自定义」分组下选择该模型；若没有出现，请重启 WorkBuddy。",
       "applied": "已把模型写入 {{path}}",
       "autoTitle": "自动配置",
-      "autoDescription": "自动配置会把下方每条规则对应的模型合并写入 ~/.codebuddy/models.json——这是腾讯文档中的自定义模型文件，WorkBuddy 会和设置里添加的模型一起读取。你已有的其他模型会保留，写入前会先备份原文件。",
+      "autoDescription": "自动配置会把下方每条规则对应的模型合并写入本机已安装的 WorkBuddy：国内版 ~/.workbuddy/models.json、国际版 ~/.workbuddy-ai/models.json（两个都装了就都写）。你已有的其他模型会保留，写入前会先备份原文件。",
       "autoCaveat": "写入后在 WorkBuddy 里没看到模型？请完全退出并重新打开 WorkBuddy；仍然没有的话，按下面的手动步骤配置。",
       "manualTitle": "手动配置",
       "previewLoading": "正在加载预览…",

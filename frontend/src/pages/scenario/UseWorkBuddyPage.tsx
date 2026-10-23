@@ -8,9 +8,15 @@ import type { AgentApplyResult } from './components/AgentSetupCard';
 
 const WORKBUDDY_DOCS_URL =
     'https://www.workbuddy.ai/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Model';
-const MODELS_JSON = '~/.codebuddy/models.json';
+/** One installed edition's models.json (~/.workbuddy for China, ~/.workbuddy-ai for international). */
+type WorkBuddyFileResult = { path: string; success: boolean; created?: boolean; updated?: boolean; backupPath?: string };
 
-/** Merge the WorkBuddy rules' models into models.json; `onSkipped` reports ids the user already owns. */
+const pathsWhere = (files: WorkBuddyFileResult[], pick: (f: WorkBuddyFileResult) => unknown) => {
+    const out = files.filter(pick).map((f) => f.path);
+    return out.length ? out : undefined;
+};
+
+/** Merge the WorkBuddy rules' models into each installed edition's models.json; `onSkipped` reports ids the user already owns. */
 const applyWorkBuddy = async (
     t: TFunction,
     onSkipped?: (ids: string[]) => void,
@@ -21,12 +27,13 @@ const applyWorkBuddy = async (
             return { success: false, error: result.message || t('scenarioPage.unknownError') };
         }
         if (result.skipped?.length) onSkipped?.(result.skipped);
+        const files: WorkBuddyFileResult[] = result.files ?? [];
         return {
             success: true,
-            files: [MODELS_JSON],
-            createdFiles: result.created ? [MODELS_JSON] : undefined,
-            updatedFiles: result.updated ? [MODELS_JSON] : undefined,
-            backupPaths: result.backupPath ? [result.backupPath] : undefined,
+            files: files.map((f) => f.path),
+            createdFiles: pathsWhere(files, (f) => f.created),
+            updatedFiles: pathsWhere(files, (f) => f.updated),
+            backupPaths: files.flatMap((f) => (f.backupPath ? [f.backupPath] : [])),
         };
     } catch {
         return { success: false, error: t('scenarioPage.workbuddy.applyFailed') };
@@ -69,7 +76,7 @@ const WorkBuddySetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
                 const result = await slot.runApply(() => applyWorkBuddy(t, (ids) =>
                     showNotification(t('scenarioPage.workbuddy.skipped', { ids: ids.join(', ') }), 'warning')));
                 if (result.success) {
-                    showNotification(t('scenarioPage.workbuddy.applied', { path: MODELS_JSON }), 'success');
+                    showNotification(t('scenarioPage.workbuddy.applied', { path: result.files?.join(', ') }), 'success');
                     slot.closeDialog();
                 } else {
                     showNotification(result.error || t('scenarioPage.workbuddy.applyFailed'), 'error');
@@ -82,8 +89,8 @@ const WorkBuddySetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
 
 // WorkBuddy is wired through its "custom model" setting (an OpenAI-compatible
 // endpoint + key), not through a WorkBuddy account login — see
-// .design/workbuddy-agent.md. Auto Config merges into ~/.codebuddy/models.json,
-// the file Tencent documents.
+// .design/workbuddy-agent.md. Auto Config merges into the models.json of every
+// installed edition: ~/.workbuddy (China) and/or ~/.workbuddy-ai (international).
 const workbuddy: AgentPageDescriptor = {
     scenario: 'workbuddy',
     title: 'WorkBuddy',

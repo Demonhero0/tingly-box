@@ -1,6 +1,7 @@
 package configapply
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,6 +24,7 @@ func workBuddyTestRouter(t *testing.T, rules []typ.Rule) (*gin.Engine, string) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".workbuddy"), 0o755))
 	cfg, err := config.NewConfig(config.WithConfigDir(t.TempDir()))
 	require.NoError(t, err)
 	cfg.Rules = rules
@@ -33,7 +35,7 @@ func workBuddyTestRouter(t *testing.T, rules []typ.Rule) (*gin.Engine, string) {
 	r.GET("/preview/workbuddy", h.GetWorkBuddyConfigPreview)
 	r.GET("/status/workbuddy", h.GetWorkBuddyConfigStatus)
 	r.POST("/restore/workbuddy", h.RestoreWorkBuddyConfig)
-	return r, filepath.Join(home, ".codebuddy", "models.json")
+	return r, filepath.Join(home, ".workbuddy", "models.json")
 }
 
 func doWB(r *gin.Engine, method, path string) *httptest.ResponseRecorder {
@@ -58,10 +60,12 @@ func TestWorkBuddyConfig_ApplyStatusPreviewRestore(t *testing.T) {
 		{UUID: "wb2", Scenario: typ.ScenarioWorkBuddy, RequestModel: "inactive", Active: false},
 		{UUID: "cc1", Scenario: typ.ScenarioClaudeCode, RequestModel: "other-scenario", Active: true},
 	})
-	require.NoError(t, os.MkdirAll(filepath.Dir(file), 0o755))
-	require.NoError(t, os.WriteFile(file, []byte(`{"models":[{"id":"mine","url":"https://x/v1/chat/completions"}]}`), 0o600))
+	require.NoError(t, os.WriteFile(file, []byte(`[{"id":"mine","url":"https://x/v1/chat/completions"}]`), 0o600))
 
-	assert.Contains(t, doWB(r, http.MethodGet, "/status/workbuddy").Body.String(), `"state":"not_applied"`)
+	status := doWB(r, http.MethodGet, "/status/workbuddy").Body.String()
+	assert.Contains(t, status, `"state":"not_applied"`)
+	assert.Contains(t, status, `~/.workbuddy/models.json`)
+	assert.NotContains(t, status, `.workbuddy-ai`, "only the installed edition is listed")
 
 	prev := doWB(r, http.MethodGet, "/preview/workbuddy").Body.String()
 	assert.Contains(t, prev, `claude-sonnet-5`)
@@ -88,6 +92,35 @@ func TestWorkBuddyConfig_ApplyStatusPreviewRestore(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "claude-sonnet-5", "restore returns the pre-apply content")
 	assert.Contains(t, string(data), `"mine"`)
+}
+
+// One edition restored, the other without a backup: not a success, and the
+// message names both what was restored and what failed.
+func TestRestoreWorkBuddyConfig_PartialRestoreIsNotSuccess(t *testing.T) {
+	r, file := workBuddyTestRouter(t, []typ.Rule{
+		{UUID: "wb1", Scenario: typ.ScenarioWorkBuddy, RequestModel: "claude-sonnet-5", Active: true},
+	})
+	home := filepath.Dir(filepath.Dir(file))
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".workbuddy-ai"), 0o755))
+	require.NoError(t, os.WriteFile(file, []byte(`[{"id":"mine","url":"https://x/v1/chat/completions"}]`), 0o600))
+
+	// The China file exists (backed up); the international one is created (no backup).
+	require.Contains(t, doWB(r, http.MethodPost, "/apply/workbuddy").Body.String(), `"success":true`)
+
+	time.Sleep(1100 * time.Millisecond)
+	var resp RestoreConfigResponse
+	require.NoError(t, json.Unmarshal(doWB(r, http.MethodPost, "/restore/workbuddy").Body.Bytes(), &resp))
+	assert.False(t, resp.Success)
+	require.Len(t, resp.RestoredFiles, 1)
+	assert.Contains(t, resp.RestoredFiles[0], "~/.workbuddy/models.json")
+	require.Len(t, resp.Failures, 1)
+	assert.Contains(t, resp.Failures[0], "~/.workbuddy-ai/models.json")
+	assert.Contains(t, resp.Message, "~/.workbuddy/models.json")
+	assert.Contains(t, resp.Message, "~/.workbuddy-ai/models.json")
+
+	data, err := os.ReadFile(file)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "claude-sonnet-5", "the edition with a backup is still restored")
 }
 
 // A route that is written but never registered fails silently (the frontend just

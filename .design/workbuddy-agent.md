@@ -61,12 +61,30 @@ but Cursor (`scenarioRegistry.tsx` `DEFAULT_HIDDEN`).
   - **All ids taken → refuse.** When every rule's id already belongs to a user
     model, Auto Config writes nothing (no backup, stale managed entries kept)
     and says so, instead of reporting success for a file that gained nothing.
-  - **Decision (2026-10-12): Auto Config writes `~/.codebuddy/models.json`** — the
-    only officially documented target — and keeps the UI steps as the manual
-    fallback (they work whichever file the desktop app reads). It does **not** write
-    `~/.workbuddy/models.json` (third-party only). Risk accepted: if the desktop
-    app reads a different file, Auto Config is a silent no-op; the dialog says so
-    and points at the manual steps.
+  - ~~Decision (2026-10-12): Auto Config writes `~/.codebuddy/models.json`~~ —
+    superseded below.
+  - **Verified on a real Windows install (2026-10-21), and the current decision.**
+    The desktop app's settings UI keeps custom models in one file per edition:
+    China edition `%USERPROFILE%\.workbuddy\models.json`, international edition
+    (workbuddy.ai) `%USERPROFILE%\.workbuddy-ai\models.json`. Both editions can be
+    installed side by side, each with its own folder. The file is a **top-level JSON
+    array** of model entries (same fields as above, plus e.g. `useCustomProtocol`),
+    not the documented `{"models": [...]}` object. So Auto Config:
+    - detects installed editions by their config folder and writes **every**
+      installed one (no edition picker); with neither folder present it writes
+      nothing and says "WorkBuddy not found — open it once" rather than inventing
+      a folder;
+    - handles each file independently (one broken file doesn't block the other;
+      the overall result succeeds only if all did) and returns per-file results
+      (`files[]`) so the UI names exactly what was written;
+    - reads/writes both shapes — keeps an existing object as an object (with the
+      `availableModels` logic), keeps an array as an array, creates new files as an
+      array;
+    - status is "applied" only when every installed edition matches; restore rolls
+      back each installed edition that has a backup and succeeds only when all of them
+      were restored (a partial restore reports what was restored and what failed).
+    It no longer writes `~/.codebuddy/models.json` (that is CodeBuddy CLI/IDE's
+    file); entries an older build left there are not cleaned up automatically.
 - **Auto Config behaviour** (`internal/config/apply_config_workbuddy.go`,
   `configapply/handler_workbuddy.go`; routes `GET /config/workbuddy/status`,
   `GET /config/preview/workbuddy`, `POST /config/apply/workbuddy`,
@@ -78,7 +96,7 @@ but Cursor (`scenarioRegistry.tsx` `DEFAULT_HIDDEN`).
   top-level keys are preserved. An id already used by a user entry is skipped and
   reported, not overwritten. `availableModels`, when present and non-empty, is kept
   consistent (stale managed ids dropped, written ids added) because it filters the
-  picker after merging. Refuses (touches nothing) if the file is not a JSON object;
+  picker after merging. Refuses (touches nothing) if the file is neither a JSON array nor an object;
   backs up first; atomic write; keeps existing permissions, new file 0600 (holds an
   API key). No rules → nothing is written and the user is told to add a rule (no
   phantom default model). Not done: the `agent apply/restore workbuddy` CLI path
