@@ -129,6 +129,9 @@ func (d *Driver) Prepare(ctx context.Context, prompt string, opts agentboot.Exec
 		cleanEnv = os.Environ()
 	}
 	env := cleanEnv
+	if opts.Entrypoint != "" {
+		env = MergeEnv(env, []string{FormatEnv(EnvClaudeEntrypoint, opts.Entrypoint)})
+	}
 	if len(config.CustomEnv) > 0 {
 		env = MergeEnv(env, config.CustomEnv)
 	}

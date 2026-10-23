@@ -16,6 +16,10 @@ const (
 	EnvNodePath    = "NODE_PATH"
 	EnvBunVersions = "BUN_VERSIONS"
 	EnvBunInstall  = "BUN_INSTALL"
+
+	// EnvClaudeEntrypoint names how a Claude Code session was started. It is
+	// written into the transcript, and the /resume picker hides "sdk-*" ones.
+	EnvClaudeEntrypoint = "CLAUDE_CODE_ENTRYPOINT"
 )
 
 // GetCleanEnv returns a clean environment for running Claude CLI.
