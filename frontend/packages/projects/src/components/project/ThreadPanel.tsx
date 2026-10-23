@@ -16,6 +16,7 @@ import { useNotify } from '../../hooks/useNotify';
 import { formatTokens } from '../../utils/format';
 import { DiffDialog } from './DiffDialog';
 import { ComposerStrip } from './ComposerStrip';
+import { RAIL_MIN_PANEL, ThreadInfoRail } from './ThreadInfoRail';
 import { LoadEarlier } from './LoadEarlier';
 import { ThreadStatusChip, toneColor } from './threadStatus';
 import { threadTranscript } from './threadTranscript';
@@ -72,6 +73,9 @@ interface Props {
     liveTasks?: BackgroundTask[];
     /** Re-reads the session, e.g. after a task was stopped. */
     onRefresh?: () => void;
+    /** A card the rail carries above its own (a folder's session list); the rail then stays on, from `railMinPanel` wide. */
+    railTop?: React.ReactNode;
+    railMinPanel?: number;
 }
 
 type View = 'chat' | 'trajectory';
@@ -82,12 +86,29 @@ const anchorSelector = (anchor: TrajectoryAnchor): string => {
     return `[data-block="${anchor.block}"]`;
 };
 
-export function ThreadPanel({ projectId, folder = false, threadId, thread, events, more = false, onLoadEarlier, subagents, running, disabled, onBack, hideTitle, actions, composerContext, belowComposer, liveTasks = [], onRefresh }: Props) {
+export function ThreadPanel({ projectId, folder = false, threadId, thread, events, more = false, onLoadEarlier, subagents, running, disabled, onBack, hideTitle, actions, composerContext, belowComposer, liveTasks = [], onRefresh, railTop, railMinPanel = RAIL_MIN_PANEL }: Props) {
     const { t } = useTranslation('projects');
     const notify = useNotify();
     const [diffOpen, setDiffOpen] = useState(false);
     const [menu, setMenu] = useState<HTMLElement | null>(null);
     const [taskOpen, setTaskOpen] = useState(false);
+    // The info rail sits beside the conversation when the panel is wide enough; the user can hide it.
+    const panelRef = useRef<HTMLDivElement>(null);
+    const [wide, setWide] = useState(false);
+    const [railOn, setRailOn] = useState(() => readLocal('thread.rail') !== '0');
+    useEffect(() => {
+        const el = panelRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= railMinPanel));
+        ro.observe(el);
+        return () => ro.disconnect();
+        // The panel's box exists once the thread has loaded.
+    }, [!!thread, railMinPanel]);
+    const toggleRail = () => {
+        writeLocal('thread.rail', railOn ? '0' : '1');
+        setRailOn(!railOn);
+    };
+    const rail = wide && (railOn || railTop != null);
     // Chat and Trajectory read the same transcript; the choice and whether
     // every tool call starts open are remembered per browser.
     const [view, setViewState] = useState<View>(() => readLocal('thread.view') === 'trajectory' ? 'trajectory' : 'chat');
@@ -270,7 +291,8 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
     const canReview = !!thread.branch && thread.commits_ahead > 0 && !thread.merged_at;
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        <Box ref={panelRef} sx={{ display: 'flex', height: '100%', minHeight: 0 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', minHeight: 0 }}>
             <Box sx={{ px: 1.5, pt: 1, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
                 {/* One row to name the thread and act on it, one quiet row of facts. */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -280,7 +302,7 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
                         : <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: '0.9375rem', fontWeight: 650, color: 'text.primary' }} title={thread.title}>{thread.title}</Typography>}
                     {canReview && <Button size="small" variant="contained" startIcon={<DiffIcon />} onClick={() => setDiffOpen(true)} sx={{ flexShrink: 0, py: 0.25 }}>{t('thread.review')}</Button>}
                     {/* While work runs in the background it names itself. */}
-                    {session && liveTasks.length > 0 && (
+                    {session && liveTasks.length > 0 && !rail && (
                         <Tooltip title={t('session.backgroundTasks')}>
                             <Button size="small" variant="outlined" color="inherit" startIcon={<Stream sx={{ fontSize: '16px !important' }} />} onClick={(e) => setTasksAnchor(e.currentTarget)}
                                 sx={{ borderRadius: 4, borderColor: 'divider', color: 'text.secondary', py: 0, px: 1.25, minWidth: 0, whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -307,7 +329,8 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
                         <MenuItem onClick={() => { setMenu(null); setFocus(null); setView(view === 'chat' ? 'trajectory' : 'chat'); }}>{view === 'chat' ? t('thread.showTrajectory') : t('thread.showChat')}</MenuItem>
                         {view === 'chat' && <MenuItem onClick={() => { setMenu(null); toggleExpand(); }}>{expandAll ? t('thread.collapseTools') : t('thread.expandTools')}</MenuItem>}
                         {/* The panel opens where the menu was, under the More button. */}
-                        {session && <MenuItem onClick={() => { setTasksAnchor(menu); setMenu(null); }}>{t('session.backgroundTasks')}</MenuItem>}
+                        {session && !rail && <MenuItem onClick={() => { setTasksAnchor(menu); setMenu(null); }}>{t('session.backgroundTasks')}</MenuItem>}
+                        {wide && railTop == null && <MenuItem onClick={() => { setMenu(null); toggleRail(); }}>{railOn ? t('rail.hide') : t('rail.show')}</MenuItem>}
                         {subagents && <MenuItem onClick={() => { setAgentsAnchor(menu); setMenu(null); }}>{t('subagents.title')}</MenuItem>}
                         {session && thread.status !== 'resolved' && (
                             <MenuItem disabled={running || acting} onClick={() => guarded('handoff')}>{running ? t('session.handoffBusy') : t('session.handoff')}</MenuItem>
@@ -327,10 +350,11 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
                         <ThreadStatusChip thread={thread} />,
                         // The folder and branch float above the message box.
                         !thread.branch && !session && t('thread.noRepo'),
-                        thread.merged_at
+                        // The rail's Changes card carries these.
+                        !rail && (thread.merged_at
                             ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: toneColor('success') }}><Merge sx={{ fontSize: 13 }} />{t('thread.mergedInto', { base: thread.base_branch })}</Box>
-                            : thread.commits_ahead > 0 && <>{t('thread.commits', { count: thread.commits_ahead })} · {t('thread.files', { count: thread.files_changed })}</>,
-                        thread.uncommitted && <Box component="span" sx={{ color: toneColor('warning') }}>{t('thread.uncommitted')}</Box>,
+                            : thread.commits_ahead > 0 && <>{t('thread.commits', { count: thread.commits_ahead })} · {t('thread.files', { count: thread.files_changed })}</>),
+                        !rail && thread.uncommitted && <Box component="span" sx={{ color: toneColor('warning') }}>{t('thread.uncommitted')}</Box>,
                     ]} />
                 </Box>
                 <Collapse in={taskOpen}>
@@ -429,6 +453,20 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
                 onClose={() => setConfirm(null)}
                 onConfirm={() => confirm && void runConfirmed(confirm)}
             />
+        </Box>
+        {rail && (
+            <ThreadInfoRail
+                thread={thread}
+                folder={session}
+                tasks={tasks}
+                canReview={canReview}
+                onReview={() => setDiffOpen(true)}
+                onChanged={() => onRefresh?.()}
+                onReveal={(call) => void openInChat({ call })}
+                top={railTop}
+                permission={session ? (thread.permission_mode || t('session.permissionDefault')) : undefined}
+            />
+        )}
         </Box>
     );
 }
