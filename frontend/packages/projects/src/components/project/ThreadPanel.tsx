@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import type { Attachment, BackgroundTask, Subagent, Thread, ThreadEvent } from '../../client';
 import { buildTranscript, SubagentFocus, Trajectory, Transcript, type Respond, type TrajectoryAnchor } from '../../transcript';
 import type { TranscriptSubagents } from '../../hooks/useTranscript';
-import { Composer } from '../Composer';
+import { ThreadComposer } from '../ThreadComposer';
 import { AttachmentChips, uploadAttachments, type AttachOwner } from '../attachments';
 import { CodeBlock, Markdown } from '../Markdown';
 import { ConfirmDialog, CopyIconButton } from '@tingly/ui';
@@ -23,7 +23,7 @@ import { threadOps } from './threadOps';
 import { BackgroundTasksPanel } from '../workdir/BackgroundTasksPanel';
 import { backgroundTasks } from '../workdir/backgroundTasks';
 import { SubagentsPanel } from '../workdir/SubagentsPanel';
-import { readLocal, removeLocal, writeLocal } from '../../utils/storage';
+import { readLocal, writeLocal } from '../../utils/storage';
 import { fontMono, fontSizes } from '@tingly/ui/theme/fonts';
 
 const mono = { fontFamily: fontMono } as const;
@@ -94,14 +94,6 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
     const setView = (next: View) => {
         setViewState(next);
         writeLocal('thread.view', next);
-    };
-    // What is typed but not sent survives leaving the thread or a reload.
-    const draftKey = `draft.${threadId}`;
-    const [draft, setDraftState] = useState(() => readLocal(draftKey) ?? '');
-    const setDraft = (text: string) => {
-        setDraftState(text);
-        if (text) writeLocal(draftKey, text);
-        else removeLocal(draftKey);
     };
     const [expandAll, setExpandAll] = useState(() => readLocal('thread.expandTools') === '1');
     const toggleExpand = () => {
@@ -392,20 +384,10 @@ export function ThreadPanel({ projectId, folder = false, threadId, thread, event
                     </Alert>
                 )}
                 <ComposerStrip thread={thread} folder={session} autoAt={pendingAutoAt} onAutoAnswer={(mode) => { void act(() => ops.setAutoAnswer(mode)).then((ok) => ok && onRefresh?.()); }} />
-                <Composer
+                <ThreadComposer
+                    draftKey={threadId}
                     context={composerContext}
-                    minRows={1}
-                    keepUntilSent
-                    text={draft}
-                    onTextChange={setDraft}
-                    // Clear only what was sent: typing may have gone on meanwhile.
-                    onAccepted={(sent) => setDraftState((prev) => {
-                        if (prev !== sent) return prev;
-                        removeLocal(draftKey);
-                        return '';
-                    })}
                     streaming={running}
-                    sendWhileStreaming
                     onStop={() => { void act(ops.stop); }}
                     disabled={disabled || thread.status === 'resolved'}
                     placeholder={thread.status === 'resolved' ? t(session ? 'session.archivedPlaceholder' : 'thread.resolvedPlaceholder') : running ? t(session ? 'session.queuePlaceholder' : 'thread.queuePlaceholder') : t(session ? 'session.placeholder' : 'thread.placeholder')}
