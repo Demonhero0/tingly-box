@@ -109,6 +109,17 @@ type UsageBreakdown struct {
 
 	// Optional metadata
 	Description string `json:"description,omitempty"`
+
+	// Redeem is set when this entry is a one-shot reward the user can spend
+	// (a reset card). See Redeemer.
+	Redeem *UsageRedeem `json:"redeem,omitempty"`
+}
+
+// UsageRedeem describes a spendable reward: what to ask the provider to spend
+// and what spending it does, so the UI can confirm before it is irreversible.
+type UsageRedeem struct {
+	ID    string `json:"id"`    // the provider's record id for the reward
+	Scope string `json:"scope"` // which allowance it refills: "weekly" (also the 5-hour one) or "5h"
 }
 
 // UsageWindow represents a single quota window
