@@ -93,7 +93,7 @@ export default function PerformanceSummary({ queryParams }: { queryParams: Perfo
     return (
         <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, backgroundColor: 'background.paper', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
             <Box sx={{ px: 2.25, pt: 2, pb: 0.75, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{t('dashboard.performance.title', { defaultValue: 'Response Performance' })}</Typography>
+                <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}>{t('dashboard.performance.title', { defaultValue: 'Response Performance' })}</Typography>
                 {loading && <CircularProgress size={18} />}
             </Box>
             <Box sx={{ px: 2.25, pb: 1, display: 'grid', gridTemplateColumns: '52px repeat(3, minmax(0, 1fr))', columnGap: 1 }}>
@@ -109,7 +109,7 @@ export default function PerformanceSummary({ queryParams }: { queryParams: Perfo
             </Box>
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', '& > * + *': { borderTop: '1px solid', borderColor: 'divider' } }}>
                 {PERCENTILES.map(({ key, label }) => (
-                    <Box key={key} sx={{ px: 2.25, py: 1.25, minWidth: 0, flex: 1, display: 'grid', gridTemplateColumns: '52px repeat(3, minmax(0, 1fr))', alignItems: 'center', columnGap: 1 }}>
+                    <Box key={key} sx={{ px: 2.25, py: 0.75, minWidth: 0, flex: 1, display: 'grid', gridTemplateColumns: '52px repeat(3, minmax(0, 1fr))', alignItems: 'center', columnGap: 1 }}>
                         <Typography sx={{ color: 'text.secondary', fontSize: fontSizes.xs, fontWeight: 600 }}>{label}</Typography>
                         {metrics.map((metric) => {
                             const value = formatMetricValue(metric.metric, metric.kind, key);
