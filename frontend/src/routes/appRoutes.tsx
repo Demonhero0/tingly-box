@@ -74,9 +74,8 @@ const NotifyPage = lazy(() => import('@/pages/notify/NotifyPage'));
 // Projects' pages come from @tingly/projects; this wrapper gives them Tingly
 // Box's fetch, routes and strings (.design/projects.md §3).
 const ProjectsRoute = lazy(() => import('@/pages/projects/ProjectsRoute'));
-const MCPLocalMode = lazy(() => import('@/pages/mcp/MCPLocalMode'));
-const MCPRegisteredServers = lazy(() => import('@/pages/mcp/MCPRegisteredServers'));
-const ServerToolPage = lazy(() => import('@/pages/servertool/ServerToolPage'));
+const MCPToolsPage = lazy(() => import('@/pages/mcp/MCPToolsPage'));
+const MCPProfilesPage = lazy(() => import('@/pages/mcp/MCPProfilesPage'));
 const HubPage = lazy(() => import('@/pages/HubPage'));
 
 // LegacyRemoteAgentRedirect keeps old per-platform bookmarks working
@@ -216,11 +215,16 @@ export const appRoutes = (
             <Route path="/guardrails/credentials" element={<ExperimentalFeatureGate feature="guardrails"><GuardrailsCredentialsPage /></ExperimentalFeatureGate>} />
             <Route path="/guardrails/history" element={<ExperimentalFeatureGate feature="guardrails"><GuardrailsHistoryPage /></ExperimentalFeatureGate>} />
             {/* MCP Settings */}
-            <Route path="/mcp/sources" element={<ExperimentalFeatureGate feature="mcp"><MCPRegisteredServers /></ExperimentalFeatureGate>} />
-            <Route path="/mcp/local-mode" element={<ExperimentalFeatureGate feature="mcp"><MCPLocalMode /></ExperimentalFeatureGate>} />
-            <Route path="/mcp" element={<ExperimentalFeatureGate feature="mcp"><Navigate to="/mcp/sources" replace /></ExperimentalFeatureGate>} />
-            {/* Tools */}
-            <Route path="/tools/servertool" element={<ExperimentalFeatureGate feature="mcp"><ServerToolPage /></ExperimentalFeatureGate>} />
+            <Route path="/mcp/tools" element={<MCPToolsPage />} />
+            <Route path="/mcp/profile/:profileId" element={<MCPProfilesPage />} />
+            <Route path="/mcp/profiles" element={<Navigate to="/mcp/profile/default" replace />} />
+            <Route path="/mcp/sources" element={<Navigate to="/mcp/tools" replace />} />
+            <Route path="/mcp/server-tools" element={<Navigate to="/mcp/tools" replace />} />
+            <Route path="/mcp/clients" element={<Navigate to="/mcp/profile/default" replace />} />
+            <Route path="/mcp/routes" element={<Navigate to="/mcp/profile/default" replace />} />
+            <Route path="/mcp/local-mode" element={<Navigate to="/mcp/profile/default" replace />} />
+            <Route path="/mcp" element={<Navigate to="/mcp/profile/default" replace />} />
+            <Route path="/tools/servertool" element={<Navigate to="/mcp/tools" replace />} />
             {/* Catch-all redirect for unknown routes (also covers legacy /zen/* links) */}
             <Route path="*" element={<Navigate to="/agent" replace />} />
         </Route>

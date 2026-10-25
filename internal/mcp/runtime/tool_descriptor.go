@@ -26,6 +26,12 @@ func SourceImplementation(source typ.MCPSourceConfig) typ.ToolImplementation {
 }
 
 func SourceProvider(source typ.MCPSourceConfig) typ.ToolProvider {
+	if source.Origin != "" {
+		if source.Origin == "builtin" {
+			return typ.ToolProviderBuiltin
+		}
+		return typ.ToolProviderCustom
+	}
 	if source.ID == mcptools.BuiltinWebtoolsSourceID || source.ID == mcptools.BuiltinAdvisorSourceID {
 		return typ.ToolProviderBuiltin
 	}
@@ -59,11 +65,11 @@ func VirtualToolDescriptor(sourceID string, tool coretool.VirtualTool) typ.ToolD
 }
 
 func IsServerVisibleSource(source typ.MCPSourceConfig) bool {
-	return SourceVisibility(source) == typ.ToolVisibilityServer
+	return SourceUsage(source).Gateway
 }
 
 func IsClientVisibleSource(source typ.MCPSourceConfig) bool {
-	return SourceVisibility(source) == typ.ToolVisibilityClient
+	return SourceUsage(source).Client
 }
 
 func IsServerVisibleVirtualTool(tool coretool.VirtualTool) bool {

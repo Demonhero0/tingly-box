@@ -42,6 +42,8 @@ import {
 import { IconLibraryPhoto as TablerLibraryPhoto, IconPhotoScan as TablerPhotoScan, IconWriting as TablerWriting } from '@tabler/icons-react';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useProfileContext } from '@/contexts/ProfileContext';
+import { useMCPProfiles } from '@/pages/mcp/profileStore';
+import { MCP_DEFAULT_PROFILE_ID } from '@/pages/mcp/types';
 import { useImageProfiles } from '@/pages/image/profiles/imageProfileStore';
 import { useTeamContext } from '@/contexts/TeamContext';
 import { orderTeams, teamPath } from '@/utils/team';
@@ -64,10 +66,11 @@ const DASHBOARD_RANGE_PATH = /^\/dashboard\/(today|yesterday|3d|7d|30d|90d)$/;
 
 export function useActivityItems(): ActivityItem[] {
     const { t } = useTranslation();
-    const { skillUser, skillIde, enableGuardrails, enableMCP, enableBench, enableProjects } = useFeatureFlags();
+    const { skillUser, skillIde, enableGuardrails, enableBench, enableProjects } = useFeatureFlags();
     const projectsWaiting = useProjectsWaiting(enableProjects);
     const { profiles } = useProfileContext();
     const imageProfiles = useImageProfiles();
+    const mcpProfiles = useMCPProfiles();
     const { teams } = useTeamContext();
     const botSummary = useBotPlatformSummary();
 
@@ -382,16 +385,23 @@ export function useActivityItems(): ActivityItem[] {
                 defaultPath: powerUpChildren.find((item): item is NavItemBase => item.type !== 'divider')?.path,
                 children: powerUpChildren,
             }] as ActivityItem[] : []),
-            ...(enableMCP ? [{
+            ...[{
                 key: 'tools' as const,
                 icon: <IconTools sx={{ fontSize: 22 }} />,
                 label: t('layout.tools', { defaultValue: 'Tools' }),
-                defaultPath: '/mcp/sources',
+                defaultPath: '/mcp/tools',
                 children: [
-                    { path: '/mcp/sources', label: 'MCP', icon: <SettingsApplications sx={{ fontSize: 20 }} /> },
-                    { path: '/tools/servertool', label: t('layout.servertool', { defaultValue: 'Servertool' }), icon: <IconServer sx={{ fontSize: 20 }} /> },
+                    { path: '/mcp/tools', label: t('mcp.workspace.toolsNav', { defaultValue: 'MCP Tools' }), icon: <IconTerminal sx={{ fontSize: 20 }} />, match: (path: string) => ['/mcp/tools', '/mcp/sources', '/mcp/server-tools', '/tools/servertool'].includes(path) },
+                    ...mcpProfiles.map((p): NavItem => ({
+                        path: `/mcp/profile/${p.id}`,
+                        // The profile is the subject of its row (ux-principles #9).
+                        label: p.name || p.id,
+                        subtitle: p.id === MCP_DEFAULT_PROFILE_ID ? t('layout.default') : t('mcp.workspace.profileCaption', { defaultValue: 'MCP profile' }),
+                        icon: <SettingsApplications sx={{ fontSize: 20 }} />,
+                    })),
+                    { path: '/mcp/profile/new', label: t('mcp.workspace.newProfileAction', { defaultValue: 'New profile' }), icon: <IconPlus sx={{ fontSize: 20 }} /> },
                 ],
-            }] as ActivityItem[] : []),
+            }] as ActivityItem[],
             // ── Configuration: set once, rarely revisited ──
             {
                 key: 'credential',
@@ -443,5 +453,5 @@ export function useActivityItems(): ActivityItem[] {
         ];
 
         return items;
-    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableProjects, projectsWaiting, profiles, imageProfiles, teams, botSummary, hiddenScenarios, pinnedScenarios, vmodelOff]);
+    }, [t, promptMenuItems, enableGuardrails, enableBench, enableProjects, projectsWaiting, profiles, imageProfiles, mcpProfiles, teams, botSummary, hiddenScenarios, pinnedScenarios, vmodelOff]);
 }
