@@ -400,14 +400,28 @@ func (m *Threads) Start(ctx context.Context, p *db.Project, spec StartSpec) (*db
 		return nil, err
 	}
 	t.Cwd = m.layout.ThreadDir(p.ID, t.ID)
+	var note string
 	if repo != nil {
 		t.RepoPath, t.BaseBranch = repo.Path, repo.BaseBranch
 		t.Branch = fmt.Sprintf("tp/%s-%s", slugify(title), t.ID[:6])
-		if err := AddWorktree(ctx, repo.Path, t.Cwd, t.Branch, repo.BaseBranch); err != nil {
-			t.Status, t.WaitReason = db.ThreadWaiting, "Could not create the worktree: "+err.Error()
-			_ = m.store.SaveThread(t)
-			m.publish(t)
-			return t, nil
+		// In the repository's own .claude/worktrees; if that cannot be used
+		// (read-only repository, ...) fall back to the data directory, where
+		// threads used to live, and say so.
+		inRepo := RepoWorktreeDir(repo.Path, slugify(title), t.ID)
+		err := excludeWorktrees(ctx, repo.Path)
+		if err == nil {
+			err = AddWorktree(ctx, repo.Path, inRepo, t.Branch, repo.BaseBranch)
+		}
+		if err == nil {
+			t.Cwd = inRepo
+		} else {
+			note = fmt.Sprintf("Could not create the worktree in %s (%v); using %s instead.", filepath.Join(repo.Path, ".claude", "worktrees"), err, t.Cwd)
+			if err := AddWorktree(ctx, repo.Path, t.Cwd, t.Branch, repo.BaseBranch); err != nil {
+				t.Status, t.WaitReason = db.ThreadWaiting, "Could not create the worktree: "+err.Error()
+				_ = m.store.SaveThread(t)
+				m.publish(t)
+				return t, nil
+			}
 		}
 	} else if err := os.MkdirAll(t.Cwd, 0o755); err != nil {
 		return nil, err
@@ -419,6 +433,9 @@ func (m *Threads) Start(ctx context.Context, p *db.Project, spec StartSpec) (*db
 		return nil, err
 	}
 	m.publish(t)
+	if note != "" {
+		m.addEvent(t, &db.ThreadEvent{Kind: db.EvSystem, Content: note})
+	}
 	src := fromThread(p.MainThreadID)
 	if spec.Origin == "user" {
 		src = Source{}
@@ -453,7 +470,12 @@ func (m *Threads) writeSettings(p *db.Project, t *db.Thread) error {
 			dirs = append(dirs, r.Path)
 		}
 	}
-	settings := map[string]any{"permissions": map[string]any{"additionalDirectories": dirs}}
+	// autoMemoryDirectory points Claude Code's own memory at the project's, so
+	// a project has one memory whatever each thread's cwd is.
+	settings := map[string]any{
+		"autoMemoryDirectory": m.layout.MemoryDir(p.ID),
+		"permissions":         map[string]any{"additionalDirectories": dirs},
+	}
 	path := m.layout.SettingsFile(p.ID, t.ID)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -631,9 +653,10 @@ func (m *Threads) begin(threadID string, a *activeThread) {
 	}
 }
 
-// sessionSettings lets a folder thread read its own uploads, which live
-// outside the folder: the host's settings (a profile's), if any, plus that one
-// extra directory. On error the thread keeps the host's settings.
+// sessionSettings lets a folder thread read the folder's uploads, which live
+// outside the folder: the host's settings (a profile's), if any, plus that
+// extra directory (and the thread's own legacy upload area when it has one).
+// On error the thread keeps the host's settings.
 func (m *Threads) sessionSettings(p *db.Project, t *db.Thread, host string) (string, error) {
 	doc := map[string]any{}
 	if host != "" {
@@ -650,8 +673,14 @@ func (m *Threads) sessionSettings(p *db.Project, t *db.Thread, host string) (str
 		perms = map[string]any{}
 	}
 	dirs, _ := perms["additionalDirectories"].([]any)
-	perms["additionalDirectories"] = append(dirs, m.layout.LibraryDir(UploadOwner(p, t)))
+	dirs = append(dirs, m.layout.LibraryDir(UploadOwner(p, t)))
+	// Uploads of a thread from before they were shared per folder.
+	if legacy := m.layout.LibraryDir(SessionOwner(t.ID)); dirExists(legacy) {
+		dirs = append(dirs, legacy)
+	}
+	perms["additionalDirectories"] = dirs
 	doc["permissions"] = perms
+	doc["autoMemoryDirectory"] = m.layout.MemoryDir(p.ID)
 	path := m.layout.SessionSettingsFile(t.ID)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return host, err
