@@ -7,9 +7,20 @@ export const isAdvisorTool = (tool: MCPCatalogTool, source?: MCPSourceConfig) =>
     !!source?.advisor ||
     (tool.source_id === 'advisor' && tool.implementation === 'virtual');
 
+// Tingly Box's own sources (Advisor, web tools) have no connection to fix: their
+// tools are switched on right here, which also turns the source on.
+export const isBuiltinSource = (source?: MCPSourceConfig) =>
+    source?.origin === 'builtin' || source?.id === 'advisor' || source?.id === 'webtools';
+
+// Server Tools are run by Tingly Box itself, on the server: no MCP connection,
+// no profile, just a switch and their own settings. Today that is Advisor.
+export const isServerToolSource = (source?: MCPSourceConfig) =>
+    source?.transport === 'advisor' || !!source?.advisor || source?.id === 'advisor';
+
 export const isToolRestricted = (tool: MCPCatalogTool, source?: MCPSourceConfig) => {
     const allowed = source?.tools || [];
-    return source?.enabled === false || (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(tool.name));
+    const off = source?.enabled === false && !isBuiltinSource(source);
+    return off || (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(tool.name));
 };
 
 export const toolPolicyPatch = (
@@ -18,6 +29,7 @@ export const toolPolicyPatch = (
     patch: MCPToolPatch
 ): MCPSourceConfig => ({
     id: source.id,
+    ...(patch.enabled && isBuiltinSource(source) ? { enabled: true } : {}),
     tool_policies: {
         ...source.tool_policies,
         [tool.name]: { ...source.tool_policies?.[tool.name], ...patch },

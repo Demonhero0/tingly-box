@@ -41,14 +41,24 @@ Code simply pick one.
 ## Pages
 
 Profiles live in the sidebar, as Claude Code's and Image's do: under Tools there
-is **MCP Tools**, then one row per profile (Default first) and "New profile".
+is **Server Tools**, then **MCP Tools**, then one row per MCP profile and "New MCP Profile".
 
-- **MCP Tools** (`/mcp/tools`): connect any MCP, see every tool (MCP and Server
-  Tool in one list), global switch, test a tool. Each connection card shows what
+**Naming.** The `default` profile is shown as **MCP Integration** with the
+caption "Default MCP profile" (a bare "Default" in the sidebar did not say what
+it was); its id stays `default`. Copy never says just "profile": it is always
+"MCP profile", because Claude Code and Image have profiles of their own in the
+same sidebar. The page where MCPs are connected stays **MCP Tools**.
+
+- **Server Tools** (`/mcp/server-tools`): the tools Tingly Box runs itself
+  (Advisor). Their own page because they are a different kind of thing: no MCP
+  connection, not in profiles, and they work with the experimental MCP flag off.
+  Switch, test, and the consultation model (`?source=` opens the same drawer).
+- **MCP Tools** (`/mcp/tools`): connect any MCP, see its tools, global switch,
+  test a tool. Server Tool sources are filtered out of this list. Each connection card shows what
   it is configured with (URL or command line, how many headers and env vars are
   set) and flags what is still missing (empty URL, command, env or header value,
   Advisor model) with a chip that opens the connection drawer
-  (`?source=<id>`). Advisor's consultation model is configured from its own row.
+  (`?source=<id>`).
 - **Profile** (`/mcp/profile/:id`, `/mcp/profile/new` creates one), laid out like
   the Claude Code profile page: the header holds the name with rename and delete
   beside it (custom only), a status line, the profile switch, refresh, Verify and
@@ -66,7 +76,7 @@ card and filled in the Test dialog.
 
 The old Tool / MCP / Server Tool pages and the "client" concept are removed.
 `/mcp`, `/mcp/profiles`, `/mcp/clients`, `/mcp/routes` land on Default;
-`/mcp/server-tools`, `/mcp/sources` and `/tools/servertool` land on MCP Tools.
+`/mcp/sources` lands on MCP Tools and `/tools/servertool` on Server Tools.
 
 ## Identifiers
 
@@ -90,6 +100,23 @@ is registered on the user's machine under its own name (`tb` for Default,
   `/api/v1/mcp/{id}`.
 - UI: `frontend/src/pages/mcp/` (`MCPToolsPage`, `MCPProfilesPage`,
   `profileState.ts`, `profileStore.ts`, shared `useMCPWorkspace`).
+
+## Server Tools work without any MCP connection
+
+Advisor (and the web tools) are registered by Tingly Box itself, so they exist
+before the user connects anything. Advisor is **on by default**; its switch on the
+Server Tools page is the whole control. A built-in source has no connection to fix,
+so switching one of its tools on also turns the source on (`toolPolicyPatch`); an
+earlier version left the switch disabled while the source was off, with nothing
+in the UI able to turn the source on. Until a consultation model is chosen the
+card says so ("Needs a consultation model"), because a call without one can only
+fail. Existing installs keep the stored `enabled: false` from the old default;
+the switch now enables it. Injection into model requests no longer needs the
+experimental MCP flag: `serverToolsEnabled()` = flag OR a built-in Server Tool is
+offerable (`HasBuiltinServerTools`: source on, policy on, and for Advisor a
+consultation provider configured). Connected MCP tools are still injected only
+with the flag (`WithConnectedTools`). The web tools stay on MCP Tools: they are a
+client-visible stdio source, not a Server Tool.
 
 ## Open (carried, not decided here)
 
