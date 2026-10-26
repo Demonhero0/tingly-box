@@ -1,4 +1,4 @@
-import type { MCPCatalogTool, MCPSourceConfig } from './types';
+import { BUILTIN_IDS, BUILTIN_SERVER_WEBTOOLS_ID, type MCPCatalogTool, type MCPSourceConfig } from './types';
 
 export type MCPToolPatch = { enabled?: boolean };
 
@@ -10,12 +10,13 @@ export const isAdvisorTool = (tool: MCPCatalogTool, source?: MCPSourceConfig) =>
 // Tingly Box's own sources (Advisor, web tools) have no connection to fix: their
 // tools are switched on right here, which also turns the source on.
 export const isBuiltinSource = (source?: MCPSourceConfig) =>
-    source?.origin === 'builtin' || source?.id === 'advisor' || source?.id === 'webtools';
+    source?.origin === 'builtin' || BUILTIN_IDS.some((id) => id === source?.id);
 
-// Server Tools are run by Tingly Box itself, on the server: no MCP connection,
-// no profile, just a switch and their own settings. Today that is Advisor.
+export const isServerWebtoolsSource = (source?: MCPSourceConfig) => source?.id === BUILTIN_SERVER_WEBTOOLS_ID;
+
+// Server Tools have their own configuration and do not belong to MCP profiles.
 export const isServerToolSource = (source?: MCPSourceConfig) =>
-    source?.transport === 'advisor' || !!source?.advisor || source?.id === 'advisor';
+    source?.transport === 'advisor' || !!source?.advisor || source?.id === 'advisor' || isServerWebtoolsSource(source);
 
 export const isToolRestricted = (tool: MCPCatalogTool, source?: MCPSourceConfig) => {
     const allowed = source?.tools || [];
@@ -42,7 +43,7 @@ export type ConnectionSummary = {
     // Short facts about what is configured, e.g. "2 env vars".
     details: Array<{ key: 'headers' | 'env' | 'proxy'; count: number }>;
     // What the user still has to fill in before the connection can work.
-    missing: Array<'endpoint' | 'command' | 'advisorModel' | 'envValue' | 'headerValue'>;
+    missing: Array<'endpoint' | 'command' | 'advisorModel' | 'searchKey' | 'envValue' | 'headerValue'>;
 };
 
 const emptyValues = (map?: Record<string, string>) => Object.values(map || {}).filter((v) => !v.trim()).length;
@@ -52,7 +53,10 @@ const emptyValues = (map?: Record<string, string>) => Object.values(map || {}).f
 export const connectionSummary = (source: MCPSourceConfig): ConnectionSummary => {
     const missing: ConnectionSummary['missing'] = [];
     let target = '';
-    if (source.transport === 'advisor' || source.advisor) {
+    if (isServerWebtoolsSource(source)) {
+        target = 'Serper / Jina Reader';
+        if (!source.env?.SERPER_API_KEY?.trim()) missing.push('searchKey');
+    } else if (source.transport === 'advisor' || source.advisor) {
         target = source.advisor?.model || '';
         if (!target) missing.push('advisorModel');
     } else if (source.transport === 'stdio') {

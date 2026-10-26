@@ -1,7 +1,7 @@
 import { Box, Button, FormControlLabel, Stack, Switch, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import MCPToolParameters from './MCPToolParameters';
-import { isAdvisorTool, isToolRestricted, type MCPToolPatch } from './toolPresentation';
+import { isAdvisorTool, isServerToolSource, isServerWebtoolsSource, isToolRestricted, type MCPToolPatch } from './toolPresentation';
 import type { MCPCatalogTool, MCPSourceConfig } from './types';
 
 // One tool and its global switch. Off here means off in every profile.
@@ -25,6 +25,8 @@ export default function MCPToolCard({
     const { t } = useTranslation();
     const label = (key: string, fallback: string) => t(`mcp.workspace.${key}`, { defaultValue: fallback });
     const advisor = isAdvisorTool(tool, source);
+    const serverTool = isServerToolSource(source);
+    const missingSearchKey = isServerWebtoolsSource(source) && tool.name === 'mcp_web_search' && !source?.env?.SERPER_API_KEY?.trim();
     const restricted = isToolRestricted(tool, source);
     return (
         <Box
@@ -42,7 +44,7 @@ export default function MCPToolCard({
                         {onTest && (
                             <Button
                                 size="small"
-                                disabled={busy || !enabled || !tool.enabled || restricted || advisor}
+                                disabled={busy || (!enabled && !serverTool) || !tool.enabled || restricted || advisor || missingSearchKey}
                                 onClick={onTest}
                             >
                                 {label('testTool', 'Test tool')}
@@ -65,6 +67,11 @@ export default function MCPToolCard({
                 {tool.description && (
                     <Typography variant="body2" color="text.secondary">
                         {tool.description}
+                    </Typography>
+                )}
+                {missingSearchKey && (
+                    <Typography variant="caption" color="warning.main">
+                        {label('missing_searchKey', 'Search needs a Serper API key; Fetch does not.')}
                     </Typography>
                 )}
                 {restricted && (

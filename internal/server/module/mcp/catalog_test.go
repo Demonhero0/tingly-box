@@ -51,6 +51,24 @@ func managementRequest(t *testing.T, r http.Handler, method, path, body string, 
 	return w
 }
 
+func TestServerWebtoolsTestEndpointRunsWithMCPFlagOff(t *testing.T) {
+	h, r, _ := managementFixture(t)
+	require.False(t, h.IsMCPEnabled())
+	upstream := sdk.NewServer(&sdk.Implementation{Name: "webtools", Version: "1"}, nil)
+	upstream.AddTool(&sdk.Tool{Name: "mcp_web_fetch", InputSchema: map[string]any{"type": "object"}}, func(context.Context, *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
+		return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "fetched"}}}, nil
+	})
+	remote := httptest.NewServer(sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return upstream }, &sdk.StreamableHTTPOptions{JSONResponse: true}))
+	defer remote.Close()
+	body, _ := json.Marshal(typ.MCPSourceConfig{ID: "server-webtools", Transport: "http", Endpoint: remote.URL, Enabled: typ.BoolPtr(true), Tools: []string{"mcp_web_fetch"}})
+	managementRequest(t, r, "POST", "/sources", string(body), 201)
+	got := managementRequest(t, r, "POST", "/call", `{"source_id":"server-webtools","tool_name":"mcp_web_fetch"}`, 200)
+	require.Contains(t, got.Body.String(), `"success":true`)
+	require.Contains(t, got.Body.String(), "fetched")
+	managementRequest(t, r, "PATCH", "/sources/server-webtools", `{"tool_policies":{"mcp_web_fetch":{"enabled":false}}}`, 200)
+	managementRequest(t, r, "POST", "/call", `{"source_id":"server-webtools","tool_name":"mcp_web_fetch"}`, 403)
+}
+
 func TestManagementCRUDPersistsAndPreservesOmittedFields(t *testing.T) {
 	h, r, cfg := managementFixture(t)
 	require.False(t, h.IsMCPEnabled())

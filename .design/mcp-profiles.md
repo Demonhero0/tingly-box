@@ -8,7 +8,7 @@ removed with it.
 
 There is one kind of thing, the **gateway tool**. It is either a tool from an
 MCP connection the user added (any MCP, the standard gateway function) or a
-**Server Tool** that Tingly Box provides itself (Advisor today). Server Tools
+**Server Tool** that Tingly Box provides itself (Advisor, Search and Fetch). Server Tools
 differ per vendor and cannot be connected by the user, so the only difference
 the user sees is that they have a switch and nothing else.
 
@@ -50,7 +50,7 @@ it was); its id stays `default`. Copy never says just "profile": it is always
 same sidebar. The page where MCPs are connected stays **MCP Tools**.
 
 - **Server Tools** (`/mcp/server-tools`): the tools Tingly Box runs itself
-  (Advisor). Their own page because they are a different kind of thing: no MCP
+  (Advisor, Search and Fetch). Their own page because they are a different kind of thing: no MCP
   connection, not in profiles, and they work with the experimental MCP flag off.
   Switch, test, and the consultation model (`?source=` opens the same drawer).
 - **MCP Tools** (`/mcp/tools`): connect any MCP, see its tools, global switch,
@@ -103,20 +103,32 @@ is registered on the user's machine under its own name (`tb` for Default,
 
 ## Server Tools work without any MCP connection
 
-Advisor (and the web tools) are registered by Tingly Box itself, so they exist
-before the user connects anything. Advisor is **on by default**; its switch on the
-Server Tools page is the whole control. A built-in source has no connection to fix,
-so switching one of its tools on also turns the source on (`toolPolicyPatch`); an
-earlier version left the switch disabled while the source was off, with nothing
-in the UI able to turn the source on. Until a consultation model is chosen the
-card says so ("Needs a consultation model"), because a call without one can only
-fail. Existing installs keep the stored `enabled: false` from the old default;
-the switch now enables it. Injection into model requests no longer needs the
-experimental MCP flag: `serverToolsEnabled()` = flag OR a built-in Server Tool is
-offerable (`HasBuiltinServerTools`: source on, policy on, and for Advisor a
-consultation provider configured). Connected MCP tools are still injected only
-with the flag (`WithConnectedTools`). The web tools stay on MCP Tools: they are a
-client-visible stdio source, not a Server Tool.
+Server Tools have gateway-only semantics independent of their implementation.
+Advisor is virtual; Search and Fetch use the existing `mcp-builtin` stdio binary
+under reserved source ID `server-webtools`. The original `webtools` source remains
+an independent MCP connection with independent switches and credentials.
+
+Advisor is on by default but is only offered after a consultation provider is
+configured. Server Search and Fetch are **off by default**, with both per-tool
+policies explicitly off. Enabling one tool must not enable its sibling. Search
+requires an explicitly configured `SERPER_API_KEY` in that source's env (a user
+may explicitly supply an environment reference); Fetch uses Jina Reader and
+requires no key. Startup refreshes the built-in executable wiring, not the
+user's switches, allow list, env or policies.
+
+Disabled server web tools retain static schemas from the same definitions used
+by the stdio binary, so their configuration and test actions stay discoverable
+without launching a subprocess. Catalog `enabled` remains policy state, not key
+readiness. Server versions never appear in MCP profiles or client tool lists.
+
+The experimental MCP flag governs connected MCP tools only. Server Tools can be
+injected, called and tested with the flag off once enabled and ready. Injection
+continues to support only existing Chat and Anthropic paths; no Responses or
+other protocol support is added. Native Search/Fetch definitions are removed only
+when the corresponding server replacement was actually injected and remains in
+that request. Explicit native named choices retain their native definitions;
+Advisor loopback requests, missing search keys, disabled tools and unsupported
+paths retain native tools.
 
 ## Open (carried, not decided here)
 
@@ -124,5 +136,5 @@ client-visible stdio source, not a Server Tool.
   (`usage.gateway`). This round keeps that mechanism untouched; whether it stays
   a per-tool flag or becomes a Default-profile concern is a follow-up.
 - `usage.client` is no longer an input. Availability to MCP clients is derived:
-  every non-virtual tool, subject to the switches above. Virtual tools (Advisor)
-  need model context and are never exposed over an MCP endpoint.
+  every ordinary MCP tool, subject to the switches above. Server Tools (Advisor,
+  Search and Fetch) are gateway-only and never exposed over an MCP endpoint.

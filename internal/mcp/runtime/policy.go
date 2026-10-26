@@ -5,8 +5,8 @@ import (
 )
 
 // SourceUsage reports where a source's tools may run. Client availability is not
-// a setting: every non-virtual tool can be offered through a profile, and
-// profiles plus switches decide which. Only gateway execution is configurable.
+// a setting: ordinary MCP tools can be offered through a profile, and profiles
+// plus switches decide which. Server Tools are always gateway-only.
 func SourceUsage(source typ.MCPSourceConfig) typ.MCPToolUsage {
 	usage := typ.MCPToolUsage{Gateway: SourceVisibility(source) == typ.ToolVisibilityServer}
 	if source.Usage != nil {
@@ -14,9 +14,9 @@ func SourceUsage(source typ.MCPSourceConfig) typ.MCPToolUsage {
 	}
 	// A Server Tool exists only to be run by the gateway; its switch is the
 	// tool's own enablement, not a separate usage flag.
-	virtual := SourceImplementation(source) == typ.ToolImplementationVirtual
-	usage.Client = !virtual
-	if virtual {
+	server := IsServerToolSource(source)
+	usage.Client = !server
+	if server {
 		usage.Gateway = true
 	}
 	return usage
@@ -32,7 +32,7 @@ func EffectiveToolPolicy(source typ.MCPSourceConfig, name string) (bool, typ.MCP
 		if policy.Enabled != nil && !*policy.Enabled {
 			enabled = false
 		}
-		if policy.Usage != nil && SourceImplementation(source) != typ.ToolImplementationVirtual {
+		if policy.Usage != nil && !IsServerToolSource(source) {
 			usage.Gateway = policy.Usage.Gateway
 		}
 	}

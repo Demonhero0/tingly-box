@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import MCPToolCard from './MCPToolCard';
 import MCPToolTestDialog from './MCPToolTestDialog';
-import { connectionSummary, toolPolicyPatch, type MCPToolPatch } from './toolPresentation';
+import { connectionSummary, isServerToolSource, isServerWebtoolsSource, toolPolicyPatch, type MCPToolPatch } from './toolPresentation';
 import type { MCPCatalogTool, MCPRouteSource, MCPSourceConfig } from './types';
 
 // Every connection and Server Tool in one list. The applied routing snapshot is
@@ -57,6 +57,8 @@ export default function MCPToolsPanel({
                 const route = routes.find((r) => r.id === source.id);
                 const tools = route?.tools || [];
                 const advisor = source.transport === 'advisor' || !!source.advisor;
+                const serverTool = isServerToolSource(source);
+                const webtools = isServerWebtoolsSource(source);
                 const summary = connectionSummary(source);
                 const failed = route?.state === 'error' || route?.state === 'unconfigured';
                 return (
@@ -81,7 +83,7 @@ export default function MCPToolsPanel({
                                     {source.name || source.id}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                    {advisor
+                                    {serverTool
                                         ? workspace('serverToolLabel', 'Server Tool')
                                         : t(`mcp.relationships.${route?.origin || source.origin || 'external'}`, {
                                               defaultValue: route?.origin || source.origin || 'external',
@@ -102,11 +104,13 @@ export default function MCPToolsPanel({
                                 />
                             </Stack>
                             <Button size="small" onClick={() => onConfigureSource(source.id!)}>
-                                {failed
-                                    ? workspace('fixConnection', 'Fix connection')
-                                    : advisor
-                                      ? workspace('configureAdvisor', 'Configure Advisor model')
-                                      : workspace('configureConnection', 'Configure this connection')}
+                                {webtools
+                                    ? workspace('webtoolsSettings', 'Web tool settings')
+                                    : failed
+                                      ? workspace('fixConnection', 'Fix connection')
+                                      : advisor
+                                        ? workspace('configureAdvisor', 'Configure Advisor model')
+                                        : workspace('configureConnection', 'Configure this connection')}
                             </Button>
                         </Stack>
                         <Stack direction="row" sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
@@ -140,6 +144,11 @@ export default function MCPToolsPanel({
                             <Alert severity={failed ? 'warning' : 'info'} sx={{ mb: 1 }}>
                                 {route.error}
                             </Alert>
+                        )}
+                        {webtools && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                                {workspace('webtoolsContext', 'Configure Search with a Serper API key and enable Search / Fetch separately. Ready tools replace native web tools on supported model routes. The MCP version has independent settings.')}
+                            </Typography>
                         )}
                         {advisor && (
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>

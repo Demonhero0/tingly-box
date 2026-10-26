@@ -430,7 +430,7 @@ func (h *Handler) isServerToolSource(id string) bool {
 	}
 	for _, source := range cfg.Sources {
 		if source.ID == id {
-			return mcpruntime.SourceImplementation(source) == typ.ToolImplementationVirtual
+			return mcpruntime.IsServerToolSource(source)
 		}
 	}
 	return false

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionSummary, isToolRestricted, toolPolicyPatch } from './toolPresentation';
+import { connectionSummary, isServerToolSource, isToolRestricted, toolPolicyPatch } from './toolPresentation';
 
 const tool = { source_id: 'advisor', name: 'advisor', normalized_name: 'x', enabled: false, usage: { client: false, gateway: true }, implementation: 'virtual', input_schema: {} } as never;
 
@@ -28,6 +28,26 @@ describe('connectionSummary', () => {
 
 describe('built-in sources', () => {
     const advisor = { id: 'advisor', transport: 'advisor', origin: 'builtin', enabled: false, tools: ['advisor'] };
+    it('keeps server web tools separate from their MCP version', () => {
+        expect(isServerToolSource({ id: 'server-webtools', transport: 'stdio' })).toBe(true);
+        expect(isServerToolSource({ id: 'webtools', transport: 'stdio' })).toBe(false);
+        expect(connectionSummary({ id: 'server-webtools', transport: 'stdio', command: '/app/tingly-box' })).toMatchObject({
+            target: 'Serper / Jina Reader',
+            missing: ['searchKey'],
+        });
+        expect(connectionSummary({ id: 'server-webtools', env: { SERPER_API_KEY: 'configured' } }).missing).toEqual([]);
+    });
+    it('does not require a connection to enable a configured server web tool', () => {
+        const source = { id: 'server-webtools', enabled: false, tool_policies: {
+            mcp_web_search: { enabled: false }, mcp_web_fetch: { enabled: false },
+        } };
+        const fetch = { source_id: 'server-webtools', name: 'mcp_web_fetch', normalized_name: 'fetch', enabled: false, usage: { client: false, gateway: true }, implementation: 'mcp', input_schema: {} };
+        expect(isToolRestricted(fetch, source)).toBe(false);
+        expect(toolPolicyPatch(source, fetch, { enabled: true })).toMatchObject({
+            enabled: true,
+            tool_policies: { mcp_web_search: { enabled: false }, mcp_web_fetch: { enabled: true } },
+        });
+    });
     it('can be switched on even while the source is off', () => {
         expect(isToolRestricted(tool, advisor)).toBe(false);
         expect(isToolRestricted(tool, { id: 'remote', transport: 'http', enabled: false })).toBe(true);

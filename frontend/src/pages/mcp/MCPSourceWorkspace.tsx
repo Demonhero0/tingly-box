@@ -18,7 +18,8 @@ import {
 import { ExpandMore } from '@/components/icons';
 import MCPToolCard from './MCPToolCard';
 import MCPToolTestDialog from './MCPToolTestDialog';
-import { toolPolicyPatch, type MCPToolPatch } from './toolPresentation';
+import { isBuiltinSource, isServerToolSource, isServerWebtoolsSource, toolPolicyPatch, type MCPToolPatch } from './toolPresentation';
+import WebtoolsSettings from './WebtoolsSettings';
 import AdvisorSettings from './AdvisorSettings';
 import MCPSourceEditor from './MCPSourceEditor';
 import { connectionPatch } from './workspaceState';
@@ -46,7 +47,9 @@ export default function MCPSourceWorkspace({
     const [error, setError] = useState('');
     const [testing, setTesting] = useState<MCPCatalogTool | null>(null);
     const advisor = source.transport === 'advisor' || !!source.advisor;
-    const [configure, setConfigure] = useState(advisor || (source.enabled !== false && route?.state !== 'connected'));
+    const webtools = isServerWebtoolsSource(source);
+    const serverTool = isServerToolSource(source);
+    const [configure, setConfigure] = useState(serverTool || (source.enabled !== false && route?.state !== 'connected'));
     const [confirmDelete, setConfirmDelete] = useState(false);
     const run = async (action: () => Promise<void>) => {
         setBusy(true);
@@ -64,13 +67,18 @@ export default function MCPSourceWorkspace({
     return (
         <Stack spacing={2.5}>
             <Typography color="text.secondary">
-                {label(
-                    'sourceWorkspaceHint',
-                    'Manage the connection and its tools here. A tool switched off here is off in every profile.'
-                )}
+                {serverTool
+                    ? label(
+                          'serverToolWorkspaceHint',
+                          'Configure the service here, then enable each tool below. Server Tools run inside model requests and are not offered through MCP profiles.'
+                      )
+                    : label(
+                          'sourceWorkspaceHint',
+                          'Manage the connection and its tools here. A tool switched off here is off in every profile.'
+                      )}
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
-            {(
+            {!serverTool && (
                 <FormControlLabel
                     control={
                         <Switch
@@ -82,7 +90,7 @@ export default function MCPSourceWorkspace({
                     label={label('sharedAssetEnabled', 'Connection on (off turns all its tools off in every profile)')}
                 />
             )}
-            {source.enabled === false ? (
+            {!serverTool && (source.enabled === false ? (
                 <Alert severity="info">
                     {label('connectionOff', 'This connection is off. Enable it to discover and use its tools.')}
                 </Alert>
@@ -100,7 +108,7 @@ export default function MCPSourceWorkspace({
                         </Button>
                     </Alert>
                 )
-            )}
+            ))}
             {(
                 <Accordion
                     expanded={configure}
@@ -111,13 +119,17 @@ export default function MCPSourceWorkspace({
                 >
                     <AccordionSummary expandIcon={<ExpandMore />}>
                         <Typography style={{ fontWeight: 600 }}>
-                            {advisor
-                                ? label('consultationSetup', 'Consultation model')
-                                : label('connectionSettings', 'Connection settings')}
+                            {webtools
+                                ? label('webtoolsSettings', 'Web tool settings')
+                                : advisor
+                                  ? label('consultationSetup', 'Consultation model')
+                                  : label('connectionSettings', 'Connection settings')}
                         </Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                        {advisor ? (
+                        {webtools ? (
+                            <WebtoolsSettings source={source} onSave={saveSource} />
+                        ) : advisor ? (
                             <AdvisorSettings advisorSource={source} onSave={(patch) => run(() => saveSource(patch))} />
                         ) : (
                             <Stack spacing={2}>
@@ -177,7 +189,7 @@ export default function MCPSourceWorkspace({
                 />
             )}
             <Divider />
-            {!(source.origin === 'builtin' || ['advisor', 'webtools'].includes(source.id!)) && (
+            {!isBuiltinSource(source) && (
                 <Stack spacing={1}>
                     {confirmDelete && (
                         <Alert severity="warning">

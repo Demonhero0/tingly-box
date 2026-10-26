@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField } from '@mui/material';
 import { api } from '@/services/api';
 import MCPToolParameters from './MCPToolParameters';
+import { isServerWebtoolsSource } from './toolPresentation';
 import type { MCPCatalogTool } from './types';
 
 export default function MCPToolTestDialog({
@@ -73,7 +74,7 @@ export default function MCPToolTestDialog({
                 <Button disabled={busy} onClick={onClose}>
                     {t('mcp.center.close', { defaultValue: 'Close' })}
                 </Button>
-                <Button variant="contained" disabled={busy || !enabled || !tool.enabled} onClick={() => void run()}>
+                <Button variant="contained" disabled={busy || (!enabled && !isServerWebtoolsSource({ id: tool.source_id })) || !tool.enabled} onClick={() => void run()}>
                     {label('runTest', 'Run test')}
                 </Button>
             </DialogActions>

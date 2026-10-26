@@ -12,7 +12,7 @@ export const defaultProfile = (): MCPProfile => ({ id: MCP_DEFAULT_PROFILE_ID, n
 
 export const isDefaultProfile = (profile: MCPProfile) => profile.id === MCP_DEFAULT_PROFILE_ID;
 
-// Server Tools (Advisor) run in the gateway and are never offered through a profile.
+// Server Tools run in the gateway and are never offered through a profile.
 export const profileCandidates = (routing: MCPRoutingSnapshot | null) =>
     (routing?.sources || []).flatMap((source) =>
         source.tools

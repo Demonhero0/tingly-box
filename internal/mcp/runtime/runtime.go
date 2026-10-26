@@ -183,8 +183,8 @@ func (t mcpTool) schema() json.RawMessage {
 }
 
 // ListServerToolsForInjection returns MCP tools that should be injected into upstream model requests.
-// Injection is intentionally restricted to server-side virtual tools.
-// Client-facing non-virtual tools must be exposed through MCP transport endpoints instead.
+// Injection includes gateway-only Server Tools and connected MCP tools opted in
+// for gateway usage. The request path gates the latter with the MCP flag.
 func (r *Runtime) ListServerToolsForInjection(ctx context.Context) []openai.ChatCompletionToolUnionParam {
 	if r == nil {
 		return nil
@@ -196,19 +196,11 @@ func (r *Runtime) ListServerToolsForInjection(ctx context.Context) []openai.Chat
 // offered to a model right now. It lets the request path serve Server Tools
 // without the experimental MCP flag, which only governs connected MCP tools.
 func (r *Runtime) HasBuiltinServerTools() bool {
-	if r == nil || r.virtualRegistry == nil {
-		return false
-	}
-	for _, vt := range r.virtualRegistry.ListVirtualTools() {
-		if r.isVirtualServerToolInjectable(vt) {
-			return true
-		}
-	}
-	return false
+	return len(r.ListBuiltinServerToolsForInjection(context.Background())) > 0
 }
 
 // ListBuiltinServerToolsForInjection returns only Tingly Box's own Server
-// Tools (Advisor), which need no MCP connection.
+// Tools (Advisor, Search and Fetch), which need no user-connected MCP.
 func (r *Runtime) ListBuiltinServerToolsForInjection(ctx context.Context) []openai.ChatCompletionToolUnionParam {
 	if r == nil {
 		return nil
@@ -242,6 +234,33 @@ func (r *Runtime) ListBuiltinServerToolsForInjection(ctx context.Context) []open
 			out = append(out, openai.ChatCompletionFunctionTool(def))
 		}
 	}
+	cfg := r.getConfigOrDefault()
+	if cfg == nil {
+		return out
+	}
+	for _, source := range cfg.Sources {
+		if source.ID != mcptools.ServerWebtoolsSourceID {
+			continue
+		}
+		status, err := r.DiscoverSource(ctx, source.ID)
+		if err != nil {
+			continue
+		}
+		for _, tool := range status.Tools {
+			if !r.IsBuiltinServerToolAvailable(source.ID, tool.Name) {
+				continue
+			}
+			params := shared.FunctionParameters{}
+			if err := json.Unmarshal(tool.InputSchema, &params); err != nil {
+				continue
+			}
+			def := shared.FunctionDefinitionParam{Name: tool.NormalizedName, Parameters: params}
+			if tool.Description != "" {
+				def.Description = param.NewOpt(tool.Description)
+			}
+			out = append(out, openai.ChatCompletionFunctionTool(def))
+		}
+	}
 	return out
 }
 
@@ -258,7 +277,7 @@ func (r *Runtime) remoteGatewayTools(ctx context.Context) []openai.ChatCompletio
 	remote := make([]openai.ChatCompletionToolUnionParam, 0)
 	for _, status := range r.Catalog(ctx, "gateway") {
 		for _, tool := range status.Tools {
-			if !tool.Enabled || !tool.Usage.Gateway || tool.Implementation == typ.ToolImplementationVirtual {
+			if !tool.Enabled || !tool.Usage.Gateway || tool.Implementation == typ.ToolImplementationVirtual || status.SourceID == mcptools.ServerWebtoolsSourceID {
 				continue
 			}
 			params := shared.FunctionParameters{"type": "object", "properties": map[string]any{}}
@@ -341,6 +360,10 @@ func (r *Runtime) CallTool(ctx context.Context, normalizedName string, arguments
 	sourceID, toolName, ok := ParseNormalizedToolName(normalizedName)
 	if !ok {
 		return coretool.ToolResult{}, &sessionError{sourceID: sourceID, msg: "invalid normalized MCP tool name: " + normalizedName}
+	}
+
+	if sourceID == mcptools.ServerWebtoolsSourceID && !r.IsBuiltinServerToolAvailable(sourceID, toolName) {
+		return coretool.ToolResult{}, fmt.Errorf("Server Tool %s is disabled or not configured; Search requires SERPER_API_KEY", normalizedName)
 	}
 
 	if cfg := r.GetConfig(); cfg != nil {
@@ -730,6 +753,37 @@ func (r *Runtime) ListCallableServerToolNames(ctx context.Context) map[string]st
 		}
 	}
 	return out
+}
+
+// IsBuiltinServerToolAvailable checks policy and per-tool readiness without
+// connecting a stdio process. A missing search key never disables Fetch.
+func (r *Runtime) IsBuiltinServerToolAvailable(sourceID, toolName string) bool {
+	if r == nil || sourceID != mcptools.ServerWebtoolsSourceID {
+		return false
+	}
+	checker, known := mcptools.WebtoolReadinessCheckers[toolName]
+	if !known {
+		return false
+	}
+	cfg := r.getConfigOrDefault()
+	if cfg == nil {
+		return false
+	}
+	for _, source := range cfg.Sources {
+		if source.ID != sourceID {
+			continue
+		}
+		enabled, usage := EffectiveToolPolicy(source, toolName)
+		if !enabled || !usage.Gateway {
+			return false
+		}
+		expanded := source
+		expanded.Env = maps.Clone(source.Env)
+		expandSourceEnvInPlace(expanded.Env)
+		ts, err := r.toolSourceFactory.CreateToolSource(expanded)
+		return err == nil && ts.IsConfigured() && checker.IsReady(expanded.Env)
+	}
+	return false
 }
 
 // IsClientToolAvailable reports whether a client-visible tool on the given source is
