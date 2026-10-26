@@ -3,7 +3,7 @@ import { Alert, Button } from '@mui/material';
 import type { MCPWorkspace } from './useMCPWorkspace';
 
 // Load, status and execution-off notices shared by the Tools and Profiles pages.
-export default function MCPWorkspaceAlerts({ ws }: { ws: MCPWorkspace }) {
+export default function MCPWorkspaceAlerts({ ws, serverTools = false }: { ws: MCPWorkspace; serverTools?: boolean }) {
     const { t } = useTranslation();
     const label = (key: string, fallback: string) => t(`mcp.workspace.${key}`, { defaultValue: fallback });
     return (
@@ -25,7 +25,7 @@ export default function MCPWorkspaceAlerts({ ws }: { ws: MCPWorkspace }) {
                     {ws.routeError}
                 </Alert>
             )}
-            {!ws.enabled && (
+            {!ws.enabled && !serverTools && (
                 <Alert
                     severity="info"
                     action={

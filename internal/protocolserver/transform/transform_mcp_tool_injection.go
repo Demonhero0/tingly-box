@@ -11,6 +11,8 @@ import (
 	protocoltransform "github.com/tingly-dev/tingly-box/internal/protocol/transform"
 )
 
+const injectedServerToolsKey = "injected_server_tools"
+
 // MCPToolInjectionTransform injects enabled server-side MCP tools into requests.
 type MCPToolInjectionTransform struct {
 	runtime *runtime.Runtime
@@ -102,7 +104,13 @@ func (t *MCPToolInjectionTransform) Apply(ctx *protocoltransform.TransformContex
 				req.System = appendAdvisorBehaviorToAnthropicBetaSystem(req.System)
 			}
 		}
+	default:
+		return nil // Responses and other protocols are deliberately not supported.
 	}
+	if ctx.Extra == nil {
+		ctx.Extra = map[string]any{}
+	}
+	ctx.Extra[injectedServerToolsKey] = extractOpenAIToolNames(mcpTools)
 
 	return nil
 }

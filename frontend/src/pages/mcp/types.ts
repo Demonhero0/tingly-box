@@ -16,7 +16,8 @@ export const MCP_DEFAULT_PROFILE_ID = 'default' as const;
 
 export const BUILTIN_WEBTOOLS_ID = 'webtools' as const;
 export const BUILTIN_ADVISOR_ID = 'advisor' as const;
-export const BUILTIN_IDS = [BUILTIN_WEBTOOLS_ID, BUILTIN_ADVISOR_ID] as const;
+export const BUILTIN_SERVER_WEBTOOLS_ID = 'server-webtools' as const;
+export const BUILTIN_IDS = [BUILTIN_WEBTOOLS_ID, BUILTIN_ADVISOR_ID, BUILTIN_SERVER_WEBTOOLS_ID] as const;
 export type BuiltinId = (typeof BUILTIN_IDS)[number];
 
 export interface MCPKVPair {

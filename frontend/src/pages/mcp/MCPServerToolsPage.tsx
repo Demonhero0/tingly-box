@@ -9,9 +9,7 @@ import MCPWorkspaceAlerts from './MCPWorkspaceAlerts';
 import { isServerToolSource } from './toolPresentation';
 import { useMCPWorkspace } from './useMCPWorkspace';
 
-// Tools Tingly Box runs itself, on the server. They need no MCP connection and
-// work as soon as they are on, so they are kept apart from connected MCPs: no
-// profile, just a switch and the tool's own settings.
+// Tools Tingly Box runs itself: configure, then enable, without an MCP profile.
 export default function MCPServerToolsPage() {
     const { t } = useTranslation();
     const label = (key: string, fallback: string) => t(`mcp.workspace.${key}`, { defaultValue: fallback });
@@ -39,7 +37,7 @@ export default function MCPServerToolsPage() {
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             {label(
                                 'serverToolsHint',
-                                'Provided and run by Tingly Box on the server. No MCP connection needed: they work as soon as they are on.'
+                                'Provided and run by Tingly Box on the server. Configure each service and enable its tools; no MCP connection or profile is needed.'
                             )}
                         </Typography>
                     </Stack>
@@ -51,7 +49,7 @@ export default function MCPServerToolsPage() {
                         <Refresh />
                     </IconButton>
                 </Stack>
-                <MCPWorkspaceAlerts ws={ws} />
+                <MCPWorkspaceAlerts ws={ws} serverTools />
                 <MCPToolsPanel
                     sources={sources}
                     routes={(routing?.sources || []).filter((route) => sources.some((source) => source.id === route.id))}

@@ -99,7 +99,7 @@ func TestRegisterBuiltinTools_RegistersWebtoolsAndAdvisor(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, saved)
-	require.Len(t, saved.Sources, 2)
+	require.Len(t, saved.Sources, 3)
 
 	var webtools, advisor *typ.MCPSourceConfig
 	for i := range saved.Sources {

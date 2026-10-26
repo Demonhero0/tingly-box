@@ -78,6 +78,17 @@ describe('connection workspace', () => {
         expect(screen.getByRole('button', { name: 'Test tool' })).toBeDisabled();
         expect(screen.queryByRole('button', { name: 'Remove connection' })).toBeNull();
     });
+    it('offers web service settings instead of a transport editor, and tests Fetch without the MCP flag', () => {
+        const webtools = { ...source, id: 'server-webtools', transport: 'stdio' as const, env: {} };
+        open(webtools, { ...route, id: webtools.id, tools: [{
+            ...route.tools[0], source_id: webtools.id, name: 'mcp_web_fetch', usage: { client: false, gateway: true },
+        }] }, false);
+        expect(screen.getByLabelText('Serper API key')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Connection settings' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Remove connection' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Test tool' })).not.toBeDisabled();
+        expect(screen.getAllByRole('switch')).toHaveLength(1);
+    });
     it('reports a rejected change and keeps the previous state', async () => {
         save.mockRejectedValue(new Error('Update failed'));
         open();

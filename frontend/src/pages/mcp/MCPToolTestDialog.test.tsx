@@ -53,6 +53,10 @@ describe('shared administrative tool test', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('Rejected by gateway');
         expect(screen.getByTestId('mcp-tool-test-result')).not.toHaveTextContent('old-content');
     });
+    it('allows an enabled Server Tool test without enabling the MCP runtime', () => {
+        render(<MCPToolTestDialog tool={{ ...tool, source_id: 'server-webtools', name: 'mcp_web_fetch' }} enabled={false} onClose={vi.fn()} />);
+        expect(screen.getByRole('button', { name: 'Run test' })).not.toBeDisabled();
+    });
     it('blocks execution when shared runtime or tool enablement is off', () => {
         const view = render(<MCPToolTestDialog tool={tool} enabled={false} onClose={vi.fn()} />);
         expect(screen.getByRole('button', { name: 'Run test' })).toBeDisabled();

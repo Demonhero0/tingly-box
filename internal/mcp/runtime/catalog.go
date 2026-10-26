@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	builtinserver "github.com/tingly-dev/tingly-box/internal/mcp/builtin_server"
+	mcptools "github.com/tingly-dev/tingly-box/internal/mcp/tools"
 	"github.com/tingly-dev/tingly-box/internal/typ"
 )
 
@@ -50,14 +52,23 @@ func (r *Runtime) DiscoverSource(ctx context.Context, id string) (SourceStatus, 
 	if source == nil {
 		return status, &SourceNotFoundError{ID: id}
 	}
-	if !typ.IsMCPSourceEnabled(*source) {
+	if !typ.IsMCPSourceEnabled(*source) && source.ID != mcptools.ServerWebtoolsSourceID {
 		status.State = "disabled"
 		return status, nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.RequestTimeout)*time.Second)
 	defer cancel()
 	var definitions []ToolDefinition
-	if SourceImplementation(*source) == typ.ToolImplementationVirtual {
+	if source.ID == mcptools.ServerWebtoolsSourceID {
+		tools, err := builtinserver.ToolDefinitions()
+		if err != nil {
+			return status, err
+		}
+		for _, tool := range tools {
+			schema, _ := json.Marshal(tool.InputSchema)
+			definitions = append(definitions, ToolDefinition{Name: tool.Name, Description: tool.Description, InputSchema: schema})
+		}
+	} else if SourceImplementation(*source) == typ.ToolImplementationVirtual {
 		if r.virtualRegistry != nil {
 			for _, vt := range r.virtualRegistry.ListVirtualTools() {
 				if source.ID == "advisor" && vt.Name == "advisor" {
@@ -89,6 +100,9 @@ func (r *Runtime) DiscoverSource(ctx context.Context, id string) (SourceStatus, 
 		}
 	}
 	status.State = "connected"
+	if !typ.IsMCPSourceEnabled(*source) {
+		status.State = "disabled"
+	}
 	for _, def := range definitions {
 		if def.Name == "" {
 			continue

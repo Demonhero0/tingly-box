@@ -59,10 +59,10 @@ func (ph *ProtocolHandler) mcpChainTransforms(stripEnabled bool) []transform.Tra
 		ph.mcpTC.guardOn = servertransform.NewMCPToolStripGuardTransform(rt, true)
 		ph.mcpTC.guardOff = servertransform.NewMCPToolStripGuardTransform(rt, false)
 	})
-	// Only Server Tools are on: no connected MCP tools are offered, so there is
-	// nothing for the strip and guard transforms to protect.
+	// Native replacement still runs for flag-off Server Tools. It only strips
+	// definitions whose replacement was actually injected on this request.
 	if !ph.mcpEnabled() {
-		return []transform.Transform{ph.mcpTC.injection}
+		return []transform.Transform{ph.mcpTC.injection, ph.mcpTC.strip}
 	}
 	guard := ph.mcpTC.guardOff
 	if stripEnabled {
