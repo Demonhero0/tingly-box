@@ -31,15 +31,7 @@ func (t *NativeWebSearchStripTransform) Apply(ctx *protocoltransform.TransformCo
 	}
 
 	injected, _ := ctx.Extra[injectedServerToolsKey].([]string)
-	stripSearch, stripFetch := false, false
-	for _, name := range injected {
-		if name == runtime.NormalizeToolName(mcptools.ServerWebtoolsSourceID, mcptools.BuiltinWebSearchToolName) {
-			stripSearch = true
-		}
-		if name == runtime.NormalizeToolName(mcptools.ServerWebtoolsSourceID, mcptools.BuiltinWebFetchToolName) {
-			stripFetch = true
-		}
-	}
+	stripSearch, stripFetch := replacementsPresent(injected, true, true)
 
 	if !stripSearch && !stripFetch {
 		return nil

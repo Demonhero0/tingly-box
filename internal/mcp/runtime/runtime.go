@@ -196,7 +196,30 @@ func (r *Runtime) ListServerToolsForInjection(ctx context.Context) []openai.Chat
 // offered to a model right now. It lets the request path serve Server Tools
 // without the experimental MCP flag, which only governs connected MCP tools.
 func (r *Runtime) HasBuiltinServerTools() bool {
-	return len(r.ListBuiltinServerToolsForInjection(context.Background())) > 0
+	if r == nil {
+		return false
+	}
+	if r.virtualRegistry != nil {
+		for _, vt := range r.virtualRegistry.ListVirtualTools() {
+			if r.isVirtualServerToolInjectable(vt) {
+				return true
+			}
+		}
+	}
+	cfg := r.getConfigOrDefault()
+	if cfg != nil {
+		for _, source := range cfg.Sources {
+			if source.ID != mcptools.ServerWebtoolsSourceID {
+				continue
+			}
+			for _, name := range mcptools.DefaultBuiltinWebtoolNames() {
+				if r.isBuiltinServerToolAvailable(source, name) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // ListBuiltinServerToolsForInjection returns only Tingly Box's own Server
@@ -239,7 +262,7 @@ func (r *Runtime) ListBuiltinServerToolsForInjection(ctx context.Context) []open
 		return out
 	}
 	for _, source := range cfg.Sources {
-		if source.ID != mcptools.ServerWebtoolsSourceID {
+		if source.ID != mcptools.ServerWebtoolsSourceID || !typ.IsMCPSourceEnabled(source) {
 			continue
 		}
 		status, err := r.DiscoverSource(ctx, source.ID)
@@ -247,7 +270,7 @@ func (r *Runtime) ListBuiltinServerToolsForInjection(ctx context.Context) []open
 			continue
 		}
 		for _, tool := range status.Tools {
-			if !r.IsBuiltinServerToolAvailable(source.ID, tool.Name) {
+			if !r.isBuiltinServerToolAvailable(source, tool.Name) {
 				continue
 			}
 			params := shared.FunctionParameters{}
@@ -761,29 +784,24 @@ func (r *Runtime) IsBuiltinServerToolAvailable(sourceID, toolName string) bool {
 	if r == nil || sourceID != mcptools.ServerWebtoolsSourceID {
 		return false
 	}
-	checker, known := mcptools.WebtoolReadinessCheckers[toolName]
-	if !known {
-		return false
-	}
 	cfg := r.getConfigOrDefault()
 	if cfg == nil {
 		return false
 	}
 	for _, source := range cfg.Sources {
-		if source.ID != sourceID {
-			continue
+		if source.ID == sourceID {
+			return r.isBuiltinServerToolAvailable(source, toolName)
 		}
-		enabled, usage := EffectiveToolPolicy(source, toolName)
-		if !enabled || !usage.Gateway {
-			return false
-		}
-		expanded := source
-		expanded.Env = maps.Clone(source.Env)
-		expandSourceEnvInPlace(expanded.Env)
-		ts, err := r.toolSourceFactory.CreateToolSource(expanded)
-		return err == nil && ts.IsConfigured() && checker.IsReady(expanded.Env)
 	}
 	return false
+}
+
+func (r *Runtime) isBuiltinServerToolAvailable(source typ.MCPSourceConfig, toolName string) bool {
+	if _, known := mcptools.WebtoolReadinessCheckers[toolName]; !known {
+		return false
+	}
+	enabled, usage := EffectiveToolPolicy(source, toolName)
+	return enabled && usage.Gateway && r.isSourceToolConfigured(source, toolName)
 }
 
 // IsClientToolAvailable reports whether a client-visible tool on the given source is
@@ -821,24 +839,22 @@ func (r *Runtime) IsClientToolAvailable(sourceID string, toolName string) bool {
 		if !found {
 			return false
 		}
-		// Source-level configuration check via ToolSource.IsConfigured().
-		// Expand env refs first so IsConfigured sees resolved values.
-		expandedSource := source
-		expandedSource.Env = make(map[string]string, len(source.Env))
-		maps.Copy(expandedSource.Env, source.Env)
-		expandSourceEnvInPlace(expandedSource.Env)
-		ts, err := r.toolSourceFactory.CreateToolSource(expandedSource)
-		if err != nil || !ts.IsConfigured() {
-			return false
-		}
-		// Tool-level readiness check (builtin sources only).
-		checker, ok := mcptools.WebtoolReadinessCheckers[toolName]
-		if !ok {
-			return true
-		}
-		return checker.IsReady(expandedSource.Env)
+		return r.isSourceToolConfigured(source, toolName)
 	}
 	return false
+}
+
+// isSourceToolConfigured shares environment resolution and transport/tool readiness
+// without changing each caller's source eligibility or policy checks.
+func (r *Runtime) isSourceToolConfigured(source typ.MCPSourceConfig, toolName string) bool {
+	source.Env = maps.Clone(source.Env)
+	expandSourceEnvInPlace(source.Env)
+	ts, err := r.toolSourceFactory.CreateToolSource(source)
+	if err != nil || !ts.IsConfigured() {
+		return false
+	}
+	checker, known := mcptools.WebtoolReadinessCheckers[toolName]
+	return !known || checker.IsReady(source.Env)
 }
 
 // expandSourceEnvInPlace expands ${VAR} references in an env map using os.Getenv as fallback.

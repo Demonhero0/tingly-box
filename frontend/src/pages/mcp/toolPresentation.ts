@@ -14,6 +14,9 @@ export const isBuiltinSource = (source?: MCPSourceConfig) =>
 
 export const isServerWebtoolsSource = (source?: MCPSourceConfig) => source?.id === BUILTIN_SERVER_WEBTOOLS_ID;
 
+export const needsSearchKey = (source?: MCPSourceConfig) =>
+    isServerWebtoolsSource(source) && !source?.env?.SERPER_API_KEY?.trim();
+
 // Server Tools have their own configuration and do not belong to MCP profiles.
 export const isServerToolSource = (source?: MCPSourceConfig) =>
     source?.transport === 'advisor' || !!source?.advisor || source?.id === 'advisor' || isServerWebtoolsSource(source);
@@ -55,7 +58,7 @@ export const connectionSummary = (source: MCPSourceConfig): ConnectionSummary =>
     let target = '';
     if (isServerWebtoolsSource(source)) {
         target = 'Serper / Jina Reader';
-        if (!source.env?.SERPER_API_KEY?.trim()) missing.push('searchKey');
+        if (needsSearchKey(source)) missing.push('searchKey');
     } else if (source.transport === 'advisor' || source.advisor) {
         target = source.advisor?.model || '';
         if (!target) missing.push('advisorModel');

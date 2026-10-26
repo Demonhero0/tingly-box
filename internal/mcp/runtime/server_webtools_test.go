@@ -29,7 +29,9 @@ func TestServerWebtoolsRequireIndependentOptInAndStayOutOfProfiles(t *testing.T)
 	require.Equal(t, "disabled", status.State)
 	require.Len(t, status.Tools, 2, "disabled tools must remain discoverable without launching stdio")
 	require.Empty(t, r.ListBuiltinServerToolsForInjection(context.Background()))
+	require.False(t, r.HasBuiltinServerTools())
 	source.Enabled = typ.BoolPtr(true)
+	require.False(t, r.HasBuiltinServerTools(), "source enablement alone must not enable its tools")
 	source.ToolPolicies[mcptools.BuiltinWebFetchToolName] = typ.MCPToolPolicy{Enabled: typ.BoolPtr(true)}
 	require.True(t, r.HasBuiltinServerTools())
 	injected := r.ListBuiltinServerToolsForInjection(context.Background())
@@ -55,6 +57,10 @@ func TestServerWebtoolsRequireIndependentOptInAndStayOutOfProfiles(t *testing.T)
 	}
 	source.Env["SERPER_API_KEY"] = "configured-key"
 	require.Len(t, r.ListBuiltinServerToolsForInjection(context.Background()), 2)
+	source.Env["SERPER_API_KEY"] = "${SERPER_API_KEY}"
+	require.True(t, r.IsBuiltinServerToolAvailable(source.ID, mcptools.BuiltinWebSearchToolName))
+	require.Equal(t, "${SERPER_API_KEY}", source.Env["SERPER_API_KEY"], "readiness must not mutate configured references")
+	source.Env["SERPER_API_KEY"] = "configured-key"
 	require.NoError(t, RegisterBuiltinTools(func() *typ.MCPRuntimeConfig { return cfg }, save))
 	for _, s := range cfg.Sources {
 		if s.ID == "server-webtools" {
