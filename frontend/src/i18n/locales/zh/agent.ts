@@ -215,13 +215,13 @@ export default {
   },
   "claudeCode": {
     "slots": {
-      "label": "槽位",
-      "defaultRule": "主规则，没有自己规则的槽位都走它",
+      "label": "Slots",
+      "defaultRule": "主规则，没有自己规则的 slot 都走它",
       "mainRule": "使用主规则（点击给它单独加一条规则）",
       "ownRule": "使用自己的规则（点击改回主规则）",
       "splitAll": "全部拆开",
       "mergeAll": "全部合并",
-      "failed": "更新槽位失败"
+      "failed": "更新 slot 失败"
     },
     "applyFailed": "应用配置失败",
     "configPath": "将环境配置添加到 Claude Code 配置文件",
@@ -249,6 +249,7 @@ export default {
       "renameProfile": "重命名方案",
       "deleteProfile": "删除方案",
       "quickStart": "启动",
+      "profileRefHint": "profile 后可以用方案名称,也可以用 id({{id}})",
       "commandGlobal": "全局",
       "settingsFile": "设置",
       "settingsFileWarning": "这是生成的运行配置；手动修改会被配置方案覆盖和模型规则重新生成。",
