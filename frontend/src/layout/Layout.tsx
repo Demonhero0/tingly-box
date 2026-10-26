@@ -130,11 +130,10 @@ const LayoutInner = ({ children }: LayoutProps) => {
         return hidden.length > 0 ? [...visible, { type: 'divider' as const }, ...hidden] : visible;
     }, [activityItems, activeActivity, editingAgents]);
 
-    // A sidebar is a choice between pages; an activity with a single page
-    // (Bench, or Prompt with one of its two flags on) has nothing to choose,
-    // so its rail item goes straight to that page with no sidebar.
+    // Power-ups keeps its secondary layout even with one enabled page.
+    // Other single-page activities still navigate without a sidebar.
     const activeSidebar = activityItems.find(item => item.key === activeActivity)?.sidebar;
-    const hasSidebar = !!activeSidebar || sidebarItems.filter(item => item.type !== 'divider').length > 1;
+    const hasSidebar = !!activeSidebar || sidebarItems.filter(item => item.type !== 'divider').length > (activeActivity === 'powerups' ? 0 : 1);
 
     const activeActivityLabel = useMemo(() => {
         const activity = activityItems.find(item => item.key === activeActivity);
@@ -150,7 +149,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
     const [flyoutOpen, setFlyoutOpen] = useState(false);
 
     const handleActivityClick = (item: ActivityItem) => {
-        const hasSidebarItems = !!item.sidebar || (item.children?.filter(child => child.type !== 'divider').length ?? 0) > 1;
+        const hasSidebarItems = !!item.sidebar || (item.children?.filter(child => child.type !== 'divider').length ?? 0) > (item.key === 'powerups' ? 0 : 1);
         if (!hasSidebarItems) {
             setMobileOpen(false);
         }
