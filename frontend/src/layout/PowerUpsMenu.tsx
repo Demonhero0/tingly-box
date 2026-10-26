@@ -144,7 +144,6 @@ export const PowerUpsMenu: React.FC<PowerUpsMenuProps> = ({ anchorEl, onClose, o
             description: t('system.experimentalFeatures.enableMCP'),
             path: '/mcp/sources',
             enabled: enableMCP,
-            stage: 'exp' as const,
         },
         {
             key: 'guardrails',
