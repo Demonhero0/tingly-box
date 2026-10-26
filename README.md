@@ -513,3 +513,17 @@ If Tingly Box has been useful to you, consider supporting its development.
 | Alipay | <img src="https://github.com/tingly-dev/tingly-box/blob/main/docs/donation/alipay.jpg?raw=true" width="180" alt="Alipay"> |
 
 </div>
+
+
+## ❤️ Thanks to Sponsors
+
+<div align="left">
+
+|   Sponsor   |                Details                |
+| :---------: | :-----------------------------------: |
+| 0xbeekeeper |             First Sponsor             |
+|  richardxx  | Long Term Claude Subscription Support |
+| huajiankan  |      Figma Subscription Support       |
+
+</div>
+
