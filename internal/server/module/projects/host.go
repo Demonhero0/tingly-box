@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/tingly-dev/tingly-box/internal/config"
+	"github.com/tingly-dev/tingly-box/internal/server/module/statusline"
 	"github.com/tingly-dev/tingly-box/internal/tbclient"
 	"github.com/tingly-dev/tingly-box/internal/typ"
 	projectsapp "github.com/tingly-dev/tingly-box/projects"
@@ -22,6 +23,9 @@ import (
 type Host struct {
 	cfg *config.Config
 	cc  *tbclient.TBClientImpl
+	// routes resolves each listed model to the real model behind it via the
+	// status line's own PreviewRoute; nil leaves the list as the bare ids.
+	routes *statusline.Handler
 	// bridge carries Projects messages to IM chats; see chatbridge.go.
 	bridge *ChatBridge
 }
@@ -30,6 +34,14 @@ var _ projectsapp.Host = (*Host)(nil)
 
 func NewHost(cfg *config.Config) *Host {
 	return &Host{cfg: cfg, cc: tbclient.NewTBClient(cfg)}
+}
+
+// WithRoutePreview names the status line's route preview, so the model list
+// can show what each id resolves to. Same wiring as the scenario module's
+// tier listing (server_webui_api.go).
+func (h *Host) WithRoutePreview(routes *statusline.Handler) *Host {
+	h.routes = routes
+	return h
 }
 
 // ClientFor talks Anthropic Messages to the gateway's claude_code scenario
@@ -47,7 +59,9 @@ func (h *Host) ClientFor(_ context.Context, model string) (llm.Client, string, e
 }
 
 // Models lists the request models the claude_code scenario has active rules
-// for, the default tier first.
+// for, the default tier first. Each entry also carries what the status line
+// would route it to, so an alias can be shown with the real model it stands
+// for.
 func (h *Host) Models(context.Context) ([]llm.Model, error) {
 	def := h.cc.ClaudeCodeDefaultModel()
 	out := []llm.Model{{ID: def, DisplayName: def}}
@@ -63,6 +77,14 @@ func (h *Host) Models(context.Context) ([]llm.Model, error) {
 			name = d
 		}
 		out = append(out, llm.Model{ID: m, DisplayName: name})
+	}
+	if h.routes != nil {
+		for i := range out {
+			if route := h.routes.PreviewRoute(string(typ.ScenarioClaudeCode), out[i].ID); route != nil {
+				out[i].ProviderModel = route.Model
+				out[i].ProviderName = route.ProviderName
+			}
+		}
 	}
 	return out, nil
 }
