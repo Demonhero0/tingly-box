@@ -15,7 +15,7 @@ export const en = {
         settings: 'Settings', noChats: 'No chats yet', collapse: 'Close sidebar', expand: 'Open sidebar',
     },
     rail: { title: 'Thread details', environment: 'Environment', folder: 'Folder', branch: 'Branch', model: 'Model', permissions: 'Permissions', usage: 'Usage', tokens: 'Tokens in / out', turns: 'Turns', changes: 'Changes', noCommits: 'No commits yet', finished_one: '{{count}} finished', finished_other: '{{count}} finished', hide: 'Hide details', show: 'Show details' },
-    sidebar: { showOlder_one: 'Show {{count}} older…', showOlder_other: 'Show {{count}} older…', fold: 'Fold {{name}}', unfold: 'Unfold {{name}}', activity: '{{running}} running · {{waiting}} waiting', running_one: '{{count}} running', running_other: '{{count}} running', recent: 'Recent sessions', noWorkdirs: 'No working folders yet', sessionsWaiting_one: '{{count}} session waits on you', sessionsWaiting_other: '{{count}} sessions wait on you', noProjects: 'No projects yet', waiting_one: '{{count}} thread waits on you', waiting_other: '{{count}} threads wait on you' },
+    sidebar: { activity: '{{running}} running · {{waiting}} waiting', running_one: '{{count}} running', running_other: '{{count}} running', recent: 'Recent sessions', noWorkdirs: 'No working folders yet', sessionsWaiting_one: '{{count}} session waits on you', sessionsWaiting_other: '{{count}} sessions wait on you', noProjects: 'No projects yet', waiting_one: '{{count}} thread waits on you', waiting_other: '{{count}} threads wait on you' },
     // IM chats bound to projects (TEP #2143, .design/projects-im.md).
     im: {
         title: 'IM',
@@ -174,6 +174,7 @@ export const en = {
         files_one: '{{count}} file', files_other: '{{count}} files',
         noRepo: 'No repository — files go to the Library', fromBase: 'from {{base}}', uncommitted: 'uncommitted changes',
         copyCd: 'Copy cd command to the worktree', back: 'Back to Overview',
+        editTitle: 'Rename thread',
         review: 'Review changes', resolve: 'Mark resolved', reopen: 'Reopen', showTask: 'Show task', hideTask: 'Hide task',
         showTrajectory: 'Show trajectory', showChat: 'Show conversation', expandTools: 'Expand all tool calls', collapseTools: 'Collapse tool calls',
         fromCoordinator: 'Coordinator', allowThread: 'Always allow {{tool}} here', loadEarlier: 'Show earlier messages',
