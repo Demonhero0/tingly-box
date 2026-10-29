@@ -28,7 +28,8 @@ export default function StatCard({ title, value, subtitle, icon, statusDot, colo
         <Paper
             elevation={0}
             sx={{
-                p: 2,
+                p: 1.5,
+                px: 2,
                 borderRadius: 2,
                 border: '1px solid',
                 borderColor: 'divider',
@@ -48,8 +49,8 @@ export default function StatCard({ title, value, subtitle, icon, statusDot, colo
                         gridTemplateColumns: icon ? 'minmax(0, 1fr) 28px' : 'minmax(0, 1fr) auto',
                         alignItems: 'flex-start',
                         gap: 1,
-                        mb: 1,
-                        minHeight: '2.7em',
+                        mb: 0.5,
+                        minHeight: '1.4em',
                     }}
                 >
                     <Typography

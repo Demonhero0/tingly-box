@@ -131,8 +131,8 @@ export default function QuotaHistoryView({ startTime, endTime, provider, daily, 
         <Stack sx={{ gap: 2 }}>
             {snapshots.length >= 1000 && <Alert severity="info">{t('dashboard.quotaHistory.limitHint', { defaultValue: 'Showing the latest 1,000 points. Choose a provider or shorter time range to see more.' })}</Alert>}
             {providers.map((item) => (
-                <Paper key={item.uuid} variant="outlined" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 2 }}>
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 1, mb: 2 }}>
+                <Box key={item.uuid}>
+                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 1, mb: 1.25, px: 0.5 }}>
                         <ProviderLabel uuid={item.uuid} size={18}>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{item.name}</Typography>
                         </ProviderLabel>
@@ -151,7 +151,7 @@ export default function QuotaHistoryView({ startTime, endTime, provider, daily, 
                     ) : (
                         <Typography variant="body2" color="text.secondary">{t('dashboard.quotaHistory.noWindows', { defaultValue: 'No quota windows reported' })}</Typography>
                     )}
-                </Paper>
+                </Box>
             ))}
         </Stack>
     );
