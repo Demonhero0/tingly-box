@@ -126,6 +126,16 @@ func (w *World) anyRunning() bool {
 	return false
 }
 
+// UpdateProject changes the project's settings, as the user would in the UI
+// (without waking the coordinator).
+func (w *World) UpdateProject(change func(*db.Project)) {
+	w.T.Helper()
+	p, err := w.Store.GetProject(w.Project.ID)
+	require.NoError(w.T, err)
+	change(p)
+	require.NoError(w.T, w.Store.SaveProject(p))
+}
+
 // Say is the user writing in the project conversation.
 func (w *World) Say(text string) {
 	w.T.Helper()
