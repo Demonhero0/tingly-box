@@ -607,6 +607,17 @@ added for issue #1606 (tool-returned `image_url` parts corrupted in
 appear per protocol, and the conversion contract those cases enforce, lives
 in [`multimodal-content.md`](./multimodal-content.md).
 
+The `*/namespace_tools[_stream]` cases cover Responses `namespace` tools (how
+Codex sends MCP tools; issue #2305). A Chat or Anthropic upstream has no such
+grouping, so the case sends a namespace tool plus a replayed namespaced
+`function_call` and asserts both directions: the upstream is offered the member
+as a flat function named `<namespace><name>` (replayed call included), and the
+function call it answers with reaches the client with `namespace` and `name`
+restored. The namespace and member are chosen to flatten to `get_weather`, the
+name the shared tool-use mock answers with, so the upstream "calls" what it was
+shown. The case lives in `content_shapes_namespace.go`; the design is in
+[`responses-namespace-tools.md`](./responses-namespace-tools.md).
+
 ### 10.2 Prompt-cache request suite (`cache_controls.go`)
 
 Prompt-cache metadata is also request-shaped and therefore cannot be exercised

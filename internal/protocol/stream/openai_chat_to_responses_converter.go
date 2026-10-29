@@ -11,6 +11,7 @@ import (
 	"github.com/openai/openai-go/v3"
 
 	"github.com/tingly-dev/tingly-box/internal/protocol"
+	"github.com/tingly-dev/tingly-box/internal/protocol/toolnamespace"
 	protocolusage "github.com/tingly-dev/tingly-box/internal/protocol/usage"
 	"github.com/tingly-dev/tingly-box/internal/protocol/wire"
 )
@@ -40,6 +41,9 @@ type chatToResponsesConverter struct {
 
 	// pending is an internal queue of events to yield one-by-one
 	pending []wire.ResponsesEvent
+
+	// namespaces restores the namespace of calls to flattened namespace tools.
+	namespaces toolnamespace.Index
 }
 
 // pendingToolCallResponse tracks a tool call being assembled from stream chunks
@@ -53,7 +57,7 @@ type pendingToolCallResponse struct {
 
 // NewChatToResponsesConverter creates a converter that reads from an OpenAI
 // Chat Completions stream and yields Responses API wire events.
-func NewChatToResponsesConverter(stream OpenAIChatStream, responseModel string) *chatToResponsesConverter {
+func NewChatToResponsesConverter(stream OpenAIChatStream, responseModel string, namespaces toolnamespace.Index) *chatToResponsesConverter {
 	return &chatToResponsesConverter{
 		stream:           stream,
 		responseModel:    responseModel,
@@ -63,6 +67,7 @@ func NewChatToResponsesConverter(stream OpenAIChatStream, responseModel string) 
 		textOutputIndex:  -1,
 		usage:            protocol.ZeroTokenUsage(),
 		pendingToolCalls: make(map[int]*pendingToolCallResponse),
+		namespaces:       namespaces,
 	}
 }
 
@@ -172,7 +177,7 @@ func (c *chatToResponsesConverter) processChunk(chunk *openai.ChatCompletionChun
 				Type:           "response.output_item.added",
 				SequenceNumber: c.nextSeq(),
 				OutputIndex:    toolOutputIndex,
-				Item:           newResponsesFunctionCallItem(itemID, callID, toolCall.Function.Name, "", "in_progress"),
+				Item:           newResponsesFunctionCallItem(c.namespaces, itemID, callID, toolCall.Function.Name, "", "in_progress"),
 			})
 		}
 
@@ -272,7 +277,7 @@ func (c *chatToResponsesConverter) emitCompletionEvents() {
 			Type:           "response.output_item.done",
 			SequenceNumber: c.nextSeq(),
 			OutputIndex:    ptc.outputIdx,
-			Item:           newResponsesFunctionCallItem(ptc.itemID, callID, ptc.name, arguments, "completed"),
+			Item:           newResponsesFunctionCallItem(c.namespaces, ptc.itemID, callID, ptc.name, arguments, "completed"),
 		})
 	}
 
@@ -289,7 +294,7 @@ func (c *chatToResponsesConverter) emitCompletionEvents() {
 	for _, idx := range sortedIndexes {
 		ptc := c.pendingToolCalls[idx]
 		callID := ptc.callID
-		output[ptc.outputIdx] = newResponsesFunctionCallItem(ptc.itemID, callID, ptc.name, ptc.arguments.String(), itemStatus)
+		output[ptc.outputIdx] = newResponsesFunctionCallItem(c.namespaces, ptc.itemID, callID, ptc.name, ptc.arguments.String(), itemStatus)
 	}
 
 	if isIncomplete {
@@ -400,12 +405,14 @@ func newResponsesMessageItem(itemID, status, text string) wire.ResponsesOutputIt
 	}
 }
 
-func newResponsesFunctionCallItem(itemID, callID, name, arguments, status string) wire.ResponsesOutputItemWire {
+func newResponsesFunctionCallItem(namespaces toolnamespace.Index, itemID, callID, name, arguments, status string) wire.ResponsesOutputItemWire {
+	namespace, name := namespaces.Restore(name)
 	return wire.ResponsesOutputItemWire{
 		ID:        itemID,
 		CallID:    callID,
 		Type:      "function_call",
 		Name:      name,
+		Namespace: namespace,
 		Arguments: &arguments,
 		Status:    status,
 	}

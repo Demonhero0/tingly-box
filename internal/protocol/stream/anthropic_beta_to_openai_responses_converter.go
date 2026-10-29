@@ -9,6 +9,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/tingly-dev/tingly-box/internal/protocol"
+	"github.com/tingly-dev/tingly-box/internal/protocol/toolnamespace"
 	usagepkg "github.com/tingly-dev/tingly-box/internal/protocol/usage"
 	"github.com/tingly-dev/tingly-box/internal/protocol/wire"
 )
@@ -38,6 +39,9 @@ type anthropicBetaToResponsesConverter struct {
 
 	// internal event queue
 	pending []wire.ResponsesEvent
+
+	// namespaces restores the namespace of calls to flattened namespace tools.
+	namespaces toolnamespace.Index
 }
 
 // pendingResponseTextBlock tracks one Anthropic text content block as one
@@ -63,6 +67,7 @@ type pendingResponseToolCall struct {
 func newAnthropicBetaToResponsesConverter(
 	stream AnthropicBetaStream,
 	responseModel string,
+	namespaces toolnamespace.Index,
 ) *anthropicBetaToResponsesConverter {
 	ts := time.Now().Unix()
 	return &anthropicBetaToResponsesConverter{
@@ -73,6 +78,7 @@ func newAnthropicBetaToResponsesConverter(
 		pendingTextBlocks: make(map[int]*pendingResponseTextBlock),
 		pendingToolCalls:  make(map[int]*pendingResponseToolCall),
 		createdAt:         ts,
+		namespaces:        namespaces,
 	}
 }
 
@@ -82,8 +88,9 @@ func newAnthropicBetaToResponsesConverter(
 func NewAnthropicBetaToOpenAIResponsesConverter(
 	stream AnthropicBetaStream,
 	responseModel string,
+	namespaces toolnamespace.Index,
 ) StreamConverter {
-	return newAnthropicBetaToResponsesConverter(stream, responseModel)
+	return newAnthropicBetaToResponsesConverter(stream, responseModel, namespaces)
 }
 
 func (c *anthropicBetaToResponsesConverter) Next() (interface{}, bool, error) {
@@ -206,6 +213,7 @@ func (c *anthropicBetaToResponsesConverter) emitContentBlockStart(event *anthrop
 		c.pendingToolCalls[index] = &pendingResponseToolCall{itemID: ids.FunctionCall(), callID: toolID, name: toolName, outputIndex: currentOutputIndex}
 
 		arguments := ""
+		namespace, name := c.namespaces.Restore(toolName)
 		c.pending = append(c.pending, wire.ResponsesOutputItemAddedEvent{
 			Type:           "response.output_item.added",
 			SequenceNumber: int64(c.nextSeq()),
@@ -214,7 +222,8 @@ func (c *anthropicBetaToResponsesConverter) emitContentBlockStart(event *anthrop
 				Type:      "function_call",
 				ID:        c.pendingToolCalls[index].itemID,
 				CallID:    toolID,
-				Name:      toolName,
+				Name:      name,
+				Namespace: namespace,
 				Arguments: &arguments,
 				Status:    "in_progress",
 			},
@@ -296,6 +305,7 @@ func (c *anthropicBetaToResponsesConverter) emitContentBlockStop(event *anthropi
 		)
 	} else if pending, exists := c.pendingToolCalls[index]; exists {
 		argumentsStr := pending.arguments.String()
+		namespace, name := c.namespaces.Restore(pending.name)
 		c.pending = append(c.pending,
 			wire.ResponsesFunctionCallArgumentsDoneEvent{
 				Type:           "response.function_call_arguments.done",
@@ -312,7 +322,8 @@ func (c *anthropicBetaToResponsesConverter) emitContentBlockStop(event *anthropi
 					Type:      "function_call",
 					ID:        pending.itemID,
 					CallID:    pending.callID,
-					Name:      pending.name,
+					Name:      name,
+					Namespace: namespace,
 					Arguments: &argumentsStr,
 					Status:    "completed",
 				},
@@ -352,11 +363,13 @@ func (c *anthropicBetaToResponsesConverter) emitCompletionEvents() {
 	}
 	for _, pending := range c.pendingToolCalls {
 		argumentsStr := pending.arguments.String()
+		namespace, name := c.namespaces.Restore(pending.name)
 		output[pending.outputIndex] = wire.ResponsesOutputItemWire{
 			Type:      "function_call",
 			ID:        pending.itemID,
 			CallID:    pending.callID,
-			Name:      pending.name,
+			Name:      name,
+			Namespace: namespace,
 			Arguments: &argumentsStr,
 			Status:    itemStatus,
 		}
