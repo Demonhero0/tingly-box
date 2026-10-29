@@ -63,7 +63,7 @@ function QuotaChart({ series, language, startTime, endTime }: { series: Series; 
     const tickTime = (time: number) => new Date(time).toLocaleString(language, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     return (
-        <Box sx={{ minWidth: 0, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+        <Box sx={{ minWidth: 0, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, backgroundColor: 'background.paper' }}>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 1, mb: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{series.label}</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right' }}>{valueLabel(latest)}</Typography>

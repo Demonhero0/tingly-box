@@ -5,7 +5,6 @@ import {
     Box,
     CircularProgress,
     Grid,
-    Paper,
     IconButton,
     Skeleton,
     ToggleButton,
@@ -321,7 +320,7 @@ export default function UserUsagePage() {
             <Box component="h1" sx={visuallyHidden}>
                 {t('dashboard.userUsage.title', { defaultValue: 'Team usage' })}
             </Box>
-            <Paper variant="outlined" sx={{ px: 1.5, py: 1, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1.5 }}>
                         <ToggleButtonGroup
                             size="small"
                             exclusive
@@ -345,7 +344,7 @@ export default function UserUsagePage() {
                                 </IconButton>
                             </span>
                         </Tooltip>
-            </Paper>
+            </Box>
 
             {error && <Alert severity="error">{error}</Alert>}
 
