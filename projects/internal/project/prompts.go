@@ -36,7 +36,8 @@ func threadSystemPrompt(l Layout, p *db.Project, t *db.Thread) string {
 	b.WriteString("<rules>\n")
 	b.WriteString("- Do only the task you were given. If you notice other work worth doing, mention it in your report instead of doing it.\n")
 	if t.Branch != "" {
-		fmt.Fprintf(&b, "- You are on branch %s (from %s) in your own worktree (%s). Commit your work to this branch when it is done and verified. Do not push, merge, or touch other branches.\n", t.Branch, t.BaseBranch, t.Cwd)
+		fmt.Fprintf(&b, "- You are on branch %s (from %s) in your own worktree (%s). Commit your work to this branch when it is done and verified. Do not merge, force-push, or touch other branches.\n", t.Branch, t.BaseBranch, t.Cwd)
+		b.WriteString("- Open a pull request only when the task, the project instructions or the user ask for one: push your own branch and open it against the base branch, following the repo's PR template, and put its link in your report. If you cannot, report the failure and its cause as an error and leave the commits on the branch. Never merge it yourself.\n")
 	} else {
 		fmt.Fprintf(&b, "- This thread has no repository. Write deliverables (documents, data, scripts) under %s so they appear in the project Library.\n", l.OutputDir(p.ID, slugify(t.Title)))
 	}
