@@ -241,6 +241,13 @@ export default {
       "deleteService": "Delete Service",
       "deleteSmartRule": "Delete Smart Rule"
     },
+    "ruleConditions": {
+      "defaultTitle": "Default",
+      "addCondition": "Add condition",
+      "conditionsHint": "Conditions are checked from top to bottom; the first match wins.",
+      "conditionsPaused": "Conditions are saved but paused",
+      "conditionsResume": "Resume"
+    },
     "tooltips": {
       "addProviderFirst": "Add a provider to enable request forwarding",
       "addProviderSecond": "Add another provider (with 2+ providers, load balancing will be enabled based on strategy)",

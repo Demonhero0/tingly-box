@@ -241,6 +241,13 @@ export default {
       "deleteService": "删除服务",
       "deleteSmartRule": "删除智能规则"
     },
+    "ruleConditions": {
+      "defaultTitle": "默认",
+      "addCondition": "添加条件",
+      "conditionsHint": "条件从上到下依次检查，先匹配到的生效。",
+      "conditionsPaused": "条件已保存，但处于暂停状态",
+      "conditionsResume": "恢复"
+    },
     "tooltips": {
       "addProviderFirst": "添加提供商以启用请求转发",
       "addProviderSecond": "添加另一个提供商（有 2+ 个提供商时，将根据策略启用负载平衡）",
