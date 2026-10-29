@@ -272,21 +272,21 @@ export default function DashboardPage() {
                                     display: 'grid',
                                     gridTemplateColumns: 'minmax(0, 1fr)',
                                     '@media (min-width: 1280px)': {
-                                        gridTemplateColumns: '320px minmax(0, 1fr)',
+                                        gridTemplateColumns: 'minmax(0, 1fr) 400px',
                                     },
                                     gap: 2,
                                     alignItems: 'stretch',
                                 }}
                             >
                                 <Box sx={{ minWidth: 0, display: 'flex' }}>
-                                    <PerformanceSummary queryParams={recordsParams} />
-                                </Box>
-                                <Box sx={{ minWidth: 0, display: 'flex' }}>
                                     {timeRange === 'today' || timeRange === 'yesterday' ? (
                                         <HourlyTokenHistoryChart data={timeSeries} />
                                     ) : (
                                         <DailyTokenHistoryChart data={timeSeries} />
                                     )}
+                                </Box>
+                                <Box sx={{ minWidth: 0, display: 'flex' }}>
+                                    <PerformanceSummary queryParams={recordsParams} />
                                 </Box>
                             </Box>
                             {/* Per-model totals belong to the summary, not to every tab. */}
