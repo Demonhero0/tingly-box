@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Alert,
     Box,
+    Card,
     Button,
     Checkbox,
     Dialog,
@@ -18,7 +19,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { Add, Close, Delete, Edit, Refresh } from '@/components/icons';
+import { Add, Delete, Edit, Refresh } from '@/components/icons';
 import { PageLayout } from '@/components/PageLayout';
 import PageHeader from '@/components/PageHeader';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -27,6 +28,7 @@ import { agentPageHeaderSx } from '@/pages/scenario/components/ScenarioCardHeade
 import { getApiBaseUrl } from '@/utils/protocol';
 import { api } from '@/services/api';
 import ProfileConnect from './ProfileConnect';
+import MCPToolRow from './MCPToolRow';
 import GitHubScope from './GitHubScope';
 import MCPWorkspaceAlerts from './MCPWorkspaceAlerts';
 import { useMCPWorkspace } from './useMCPWorkspace';
@@ -61,7 +63,8 @@ function ProfileAccess({ profile, url }: { profile: MCPProfile; url: string }) {
 // top of the tool's global switch on the Tools page.
 export default function MCPProfilesPage() {
     const { t } = useTranslation();
-    const label = (key: string, fallback: string) => t(`mcp.workspace.${key}`, { defaultValue: fallback });
+    const label = (key: string, fallback: string, options?: Record<string, unknown>) =>
+        t(`mcp.workspace.${key}`, { defaultValue: fallback, ...options });
     const { profileId } = useParams();
     const navigate = useNavigate();
     const ws = useMCPWorkspace();
@@ -256,63 +259,44 @@ export default function MCPProfilesPage() {
                                 : label('emptyProfile', 'This profile has no tools. Add the ones this agent should use.')}
                         </Typography>
                     )}
-                    <Stack spacing={1} sx={{ mt: 1 }}>
-                        {rows.map((row) => {
-                            const globallyOff = row.tool ? !row.tool.enabled : true;
-                            return (
-                                <Stack
-                                    key={row.name}
-                                    direction="row"
-                                    aria-label={`${row.sourceName} / ${row.tool?.name || row.name}`}
-                                    role="group"
-                                    sx={{
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: 1,
-                                        px: 1.5,
-                                        py: 0.75,
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                        borderRadius: 1.5,
-                                        opacity: globallyOff ? 0.6 : 1,
-                                    }}
-                                >
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography variant="body2" style={{ fontWeight: 600 }}>
-                                            {row.sourceName ? `${row.sourceName} / ` : ''}
-                                            {row.tool?.name || row.name}
-                                        </Typography>
-                                        {globallyOff && (
-                                            <Typography variant="caption" color="text.secondary">
-                                                {row.tool
+                    {rows.length > 0 && (
+                        <Card variant="outlined" sx={{ mt: 1, borderRadius: 1.5, overflow: 'hidden' }}>
+                            <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                    {label('toolsOn', '{{on}} of {{total}} tools on', {
+                                        on: rows.filter((row) => row.on && row.tool?.enabled).length,
+                                        total: rows.length,
+                                    })}
+                                </Typography>
+                            </Box>
+                            {rows.map((row) => {
+                                const globallyOff = row.tool ? !row.tool.enabled : true;
+                                return (
+                                    <MCPToolRow
+                                        key={row.name}
+                                        name={row.tool?.name || row.name}
+                                        prefix={row.sourceName}
+                                        tool={row.tool}
+                                        checked={row.on}
+                                        switchDisabled={busy}
+                                        muted={globallyOff}
+                                        caption={
+                                            globallyOff
+                                                ? row.tool
                                                     ? label('globallyOff', 'Off on the MCP Tools page, so it is unavailable here')
-                                                    : label('toolGone', 'This tool no longer exists')}
-                                            </Typography>
-                                        )}
-                                    </Box>
-                                    <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}>
-                                        <Switch
-                                            size="small"
-                                            disabled={busy}
-                                            checked={row.on}
-                                            slotProps={{ input: { 'aria-label': row.tool?.name || row.name } }}
-                                            onChange={(e) => void save(setProfileToolOn(profile, row.name, e.target.checked))}
-                                        />
-                                        {custom && (
-                                            <IconButton
-                                                size="small"
-                                                disabled={busy}
-                                                aria-label={label('removeFromProfile', 'Remove from profile')}
-                                                onClick={() => void save(removeProfileTool(profile, row.name))}
-                                            >
-                                                <Close fontSize="small" />
-                                            </IconButton>
-                                        )}
-                                    </Stack>
-                                </Stack>
-                            );
-                        })}
-                    </Stack>
+                                                    : label('toolGone', 'This tool no longer exists')
+                                                : undefined
+                                        }
+                                        groupRole
+                                        ariaLabel={`${row.sourceName} / ${row.tool?.name || row.name}`}
+                                        onToggle={(on) => void save(setProfileToolOn(profile, row.name, on))}
+                                        onRemove={custom ? () => void save(removeProfileTool(profile, row.name)) : undefined}
+                                        removeDisabled={busy}
+                                    />
+                                );
+                            })}
+                        </Card>
+                    )}
                 </Box>
             </Stack>
             <ConfirmDialog
